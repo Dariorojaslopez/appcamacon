@@ -260,6 +260,45 @@ body {
   background-color: rgba(250, 204, 21, 0.04);
 }
 
+.install-nudge-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(17, 24, 39, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.install-nudge-card {
+  width: min(420px, 100%);
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.28);
+  padding: 1rem;
+}
+
+.install-nudge-title {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.install-nudge-text {
+  margin: 0 0 0.75rem;
+  font-size: 0.88rem;
+  color: #4b5563;
+}
+
+.install-nudge-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
 .btn-secondary:disabled {
   opacity: 0.6;
   cursor: default;

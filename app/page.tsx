@@ -21,6 +21,9 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export default function HomePage() {
+  const INSTALL_NUDGE_DISMISSED_AT_KEY = 'sigocc_install_nudge_dismissed_at';
+  const INSTALL_NUDGE_DELAY_MS = 900;
+  const INSTALL_NUDGE_COOLDOWN_MS = 1000 * 60 * 60 * 24;
   const router = useRouter();
   const [identification, setIdentification] = useState('');
   const [password, setPassword] = useState('');
@@ -30,6 +33,7 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [installAvailable, setInstallAvailable] = useState(false);
+  const [showInstallNudge, setShowInstallNudge] = useState(false);
 
   // Registro básico del service worker para PWA
   useEffect(() => {
@@ -45,10 +49,21 @@ export default function HomePage() {
       deferredEvent.preventDefault();
       setInstallPrompt(deferredEvent);
       setInstallAvailable(true);
+      try {
+        const raw = window.localStorage.getItem(INSTALL_NUDGE_DISMISSED_AT_KEY);
+        const dismissedAt = raw ? Number(raw) : 0;
+        const inCooldown = Number.isFinite(dismissedAt) && Date.now() - dismissedAt < INSTALL_NUDGE_COOLDOWN_MS;
+        if (!inCooldown) {
+          window.setTimeout(() => setShowInstallNudge(true), INSTALL_NUDGE_DELAY_MS);
+        }
+      } catch {
+        window.setTimeout(() => setShowInstallNudge(true), INSTALL_NUDGE_DELAY_MS);
+      }
     };
     const onInstalled = () => {
       setInstallPrompt(null);
       setInstallAvailable(false);
+      setShowInstallNudge(false);
     };
 
     window.addEventListener('beforeinstallprompt', handler);
@@ -67,6 +82,18 @@ export default function HomePage() {
     if (outcome === 'accepted') {
       setInstallAvailable(false);
       setInstallPrompt(null);
+      setShowInstallNudge(false);
+    } else {
+      setShowInstallNudge(false);
+    }
+  };
+
+  const dismissInstallNudge = () => {
+    setShowInstallNudge(false);
+    try {
+      window.localStorage.setItem(INSTALL_NUDGE_DISMISSED_AT_KEY, String(Date.now()));
+    } catch {
+      // ignorar
     }
   };
 
@@ -169,6 +196,24 @@ export default function HomePage() {
 
   return (
     <main className="auth-page">
+      {showInstallNudge && installAvailable && (
+        <div className="install-nudge-backdrop" role="presentation">
+          <section className="install-nudge-card" aria-label="Instalar aplicación">
+            <h3 className="install-nudge-title">Instala la app en este dispositivo</h3>
+            <p className="install-nudge-text">
+              Accede más rápido desde el inicio y úsala como aplicación.
+            </p>
+            <div className="install-nudge-actions">
+              <button type="button" className="btn-primary" onClick={handleInstallClick}>
+                Instalar ahora
+              </button>
+              <button type="button" className="btn-secondary" onClick={dismissInstallNudge}>
+                Ahora no
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
       <div className="auth-hero">
         <div className="auth-hero-overlay" />
         <div className="auth-hero-content">
