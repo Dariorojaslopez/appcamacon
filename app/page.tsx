@@ -15,6 +15,11 @@ interface LoginResponse {
   error?: string;
 }
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+}
+
 export default function HomePage() {
   const router = useRouter();
   const [identification, setIdentification] = useState('');
@@ -23,21 +28,8 @@ export default function HomePage() {
   const [recovering, setRecovering] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [installPrompt, setInstallPrompt] = useState<any | null>(null);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [installAvailable, setInstallAvailable] = useState(false);
-
-  /** Sesión aún válida (p. ej. Android «Atrás» al login): volver al panel sin «perder» el acceso. */
-  useEffect(() => {
-    let cancelled = false;
-    fetch('/api/auth/me', { credentials: 'include' })
-      .then((res) => {
-        if (!cancelled && res.ok) router.replace('/dashboard');
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [router]);
 
   // Registro básico del service worker para PWA
   useEffect(() => {
@@ -48,27 +40,55 @@ export default function HomePage() {
       .register('/sw.js')
       .catch((err) => console.error('Error al registrar el service worker', err));
 
-    const handler = (e: any) => {
-      e.preventDefault();
-      setInstallPrompt(e);
+    const handler = (e: Event) => {
+      const deferredEvent = e as BeforeInstallPromptEvent;
+      deferredEvent.preventDefault();
+      setInstallPrompt(deferredEvent);
       setInstallAvailable(true);
+    };
+    const onInstalled = () => {
+      setInstallPrompt(null);
+      setInstallAvailable(false);
     };
 
     window.addEventListener('beforeinstallprompt', handler);
+    window.addEventListener('appinstalled', onInstalled);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener('appinstalled', onInstalled);
     };
   }, []);
 
   const handleInstallClick = async () => {
     if (!installPrompt) return;
-    installPrompt.prompt();
+    await installPrompt.prompt();
     const { outcome } = await installPrompt.userChoice;
     if (outcome === 'accepted') {
       setInstallAvailable(false);
       setInstallPrompt(null);
     }
+  };
+
+  const handleInstallHelpClick = () => {
+    if (typeof window === 'undefined') return;
+    const ua = window.navigator.userAgent.toLowerCase();
+    const isAndroid = /android/.test(ua);
+    const isIOS = /iphone|ipad|ipod/.test(ua);
+    const isEdge = /edg\//.test(ua);
+    const isChrome = /chrome/.test(ua) && !isEdge;
+
+    let message = 'Para instalar la app, abre el menu del navegador y usa "Instalar aplicacion".';
+    if (isAndroid && isChrome) {
+      message = 'Chrome Android: abre el menu (tres puntos) y toca "Instalar aplicacion" o "Agregar a pantalla principal".';
+    } else if (isAndroid && isEdge) {
+      message = 'Edge Android: abre el menu y selecciona "Instalar esta aplicacion".';
+    } else if (isIOS) {
+      message = 'iPhone/iPad: toca Compartir y luego "Agregar a pantalla de inicio".';
+    } else if (isChrome || isEdge) {
+      message = 'En escritorio: usa el icono de instalar en la barra de direcciones o el menu del navegador.';
+    }
+    window.alert(message);
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -224,9 +244,13 @@ export default function HomePage() {
         {message && <p className="feedback feedback-success">{message}</p>}
         {error && <p className="feedback feedback-error">{error}</p>}
 
-        {installAvailable && (
+        {installAvailable ? (
           <button type="button" className="btn-secondary" onClick={handleInstallClick}>
             Instalar aplicación en este dispositivo
+          </button>
+        ) : (
+          <button type="button" className="btn-secondary" onClick={handleInstallHelpClick}>
+            Cómo instalar aplicación
           </button>
         )}
       </section>
