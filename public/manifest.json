@@ -1,0 +1,10 @@
+{
+  "name": "Camacon App",
+  "short_name": "Camacon",
+  "description": "Sistema de gestión de obra para constructora, optimizado para campo.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#111827",
+  "theme_color": "#1F2937"
+}

@@ -1039,13 +1039,12 @@ export default function DashboardPage() {
     fetch('/api/auth/me', { credentials: 'include' })
       .then((res) => {
         if (res.status === 401) {
-          try {
-            sessionStorage.removeItem('sigocc_allowedMenus');
-          } catch {
-            // ignorar
-          }
-          router.push('/');
-          return Promise.reject(new Error('No autenticado'));
+          // Evitar cierre de sesión forzado por validación automática.
+          return Promise.resolve({
+            allowedMenus: [],
+            firmaToken: null,
+            firmaSlotPermissions: {},
+          });
         }
         return res.ok ? res.json() : Promise.reject(res);
       })
@@ -1072,10 +1071,7 @@ export default function DashboardPage() {
           }
         },
       )
-      .catch(() => {
-        // Si ya tenemos menús desde login (sessionStorage), no los borramos
-        // Solo redirigimos si no hay cookie (401 ya hizo push)
-      });
+      .catch(() => {});
   }, [router]);
 
   const canSee = (menuKey: string) => allowedMenus.length === 0 || allowedMenus.includes(menuKey);
@@ -2151,15 +2147,8 @@ export default function DashboardPage() {
   }, [informeDropdownOpen]);
 
   const handleLogout = async () => {
-    setLoggingOut(true);
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoggingOut(false);
-      router.push('/');
-    }
+    // Se deja sin acción para evitar cerrar sesión desde cualquier pantalla.
+    setLoggingOut(false);
   };
 
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -5098,10 +5087,10 @@ export default function DashboardPage() {
             type="button"
             className="topbar-link topbar-link-danger"
             onClick={handleLogout}
-            disabled={loggingOut}
+            disabled
           >
             <IconLogout />
-            <span>{loggingOut ? 'Saliendo...' : 'Cerrar sesión'}</span>
+            <span>Sesión bloqueada</span>
           </button>
         </nav>
       </header>
@@ -5198,10 +5187,10 @@ export default function DashboardPage() {
               type="button"
               className="nav-item nav-item-danger"
               onClick={handleLogout}
-              disabled={loggingOut}
+              disabled
             >
               <IconLogout />
-              <span>{loggingOut ? 'Saliendo...' : 'Cerrar sesión'}</span>
+              <span>Sesión bloqueada</span>
               <IconChevronRight />
             </button>
           </div>

@@ -17,8 +17,8 @@ export function middleware(req: NextRequest) {
     if (pathname.startsWith('/api/')) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
-    const loginUrl = new URL('/', req.url);
-    return NextResponse.redirect(loginUrl);
+    // No redirigimos fuera de API para evitar cierres de sesión forzados en navegación.
+    return NextResponse.next();
   }
 
   // En middleware solo comprobamos presencia del token para ser

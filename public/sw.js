@@ -1,5 +1,11 @@
 self.addEventListener('install', (event) => {
-  event.waitUntil(self.skipWaiting());
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open('sigocc-runtime');
+      await cache.addAll(['/offline.html', '/manifest.json']);
+      await self.skipWaiting();
+    })(),
+  );
 });
 
 self.addEventListener('activate', (event) => {
