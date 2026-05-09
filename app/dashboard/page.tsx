@@ -496,6 +496,8 @@ export default function DashboardPage() {
   const [informeDropdownOpen, setInformeDropdownOpen] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [installAvailable, setInstallAvailable] = useState(false);
+  const [isAppInstalled, setIsAppInstalled] = useState(false);
+  const [canShowInstallCta, setCanShowInstallCta] = useState(false);
   const [activeSection, setActiveSection] = useState<
     | 'home'
     | 'settings'
@@ -1055,16 +1057,33 @@ export default function DashboardPage() {
     if (typeof window === 'undefined') return;
     if (!('serviceWorker' in navigator)) return;
 
+    const standaloneByMedia = window.matchMedia('(display-mode: standalone)').matches;
+    const standaloneByIOS = Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone);
+    const ua = window.navigator.userAgent.toLowerCase();
+    const isAndroid = /android/.test(ua);
+    const isIOS = /iphone|ipad|ipod/.test(ua);
+    const isEdge = /edg\//.test(ua);
+    const isChrome = /chrome/.test(ua) && !isEdge;
+    const shouldShowInstallCta = isAndroid || isIOS || isChrome || isEdge;
+    setCanShowInstallCta(shouldShowInstallCta);
+    if (standaloneByMedia || standaloneByIOS) {
+      setIsAppInstalled(true);
+      setInstallPrompt(null);
+      setInstallAvailable(false);
+    }
+
     navigator.serviceWorker.register('/sw.js').catch(() => {});
 
     const handleBeforeInstallPrompt = (event: Event) => {
       const deferredEvent = event as BeforeInstallPromptEvent;
       deferredEvent.preventDefault();
+      if (isAppInstalled) return;
       setInstallPrompt(deferredEvent);
       setInstallAvailable(true);
     };
 
     const handleAppInstalled = () => {
+      setIsAppInstalled(true);
       setInstallPrompt(null);
       setInstallAvailable(false);
     };
@@ -1076,7 +1095,7 @@ export default function DashboardPage() {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
-  }, []);
+  }, [isAppInstalled]);
 
   const canSee = (menuKey: string) => allowedMenus.length === 0 || allowedMenus.includes(menuKey);
 
@@ -5113,12 +5132,12 @@ export default function DashboardPage() {
               <span>Usuarios</span>
             </button>
           )}
-          {installAvailable && (
+          {canShowInstallCta && !isAppInstalled && installAvailable && (
             <button type="button" className="topbar-link" onClick={handleInstallClick}>
               <span>Instalar app</span>
             </button>
           )}
-          {!installAvailable && (
+          {canShowInstallCta && !isAppInstalled && !installAvailable && (
             <button type="button" className="topbar-link" onClick={handleInstallHelpClick}>
               <span>Como instalar</span>
             </button>
@@ -5214,7 +5233,7 @@ export default function DashboardPage() {
                 <IconChevronRight />
               </button>
             )}
-            {installAvailable && (
+            {canShowInstallCta && !isAppInstalled && installAvailable && (
               <button
                 type="button"
                 className="nav-item"
@@ -5224,7 +5243,7 @@ export default function DashboardPage() {
                 <IconChevronRight />
               </button>
             )}
-            {!installAvailable && (
+            {canShowInstallCta && !isAppInstalled && !installAvailable && (
               <button
                 type="button"
                 className="nav-item"

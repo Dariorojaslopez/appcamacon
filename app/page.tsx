@@ -34,11 +34,27 @@ export default function HomePage() {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [installAvailable, setInstallAvailable] = useState(false);
   const [showInstallNudge, setShowInstallNudge] = useState(false);
+  const [isAppInstalled, setIsAppInstalled] = useState(false);
+  const [canShowInstallCta, setCanShowInstallCta] = useState(false);
 
   // Registro básico del service worker para PWA
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!('serviceWorker' in navigator)) return;
+
+    const standaloneByMedia = window.matchMedia('(display-mode: standalone)').matches;
+    const standaloneByIOS = Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone);
+    const ua = window.navigator.userAgent.toLowerCase();
+    const isAndroid = /android/.test(ua);
+    const isIOS = /iphone|ipad|ipod/.test(ua);
+    const isEdge = /edg\//.test(ua);
+    const isChrome = /chrome/.test(ua) && !isEdge;
+    const shouldShowInstallCta = isAndroid || isIOS || isChrome || isEdge;
+    setCanShowInstallCta(shouldShowInstallCta);
+    if (standaloneByMedia || standaloneByIOS) {
+      setIsAppInstalled(true);
+      setShowInstallNudge(false);
+    }
 
     navigator.serviceWorker
       .register('/sw.js')
@@ -47,6 +63,7 @@ export default function HomePage() {
     const handler = (e: Event) => {
       const deferredEvent = e as BeforeInstallPromptEvent;
       deferredEvent.preventDefault();
+      if (isAppInstalled) return;
       setInstallPrompt(deferredEvent);
       setInstallAvailable(true);
       try {
@@ -61,6 +78,7 @@ export default function HomePage() {
       }
     };
     const onInstalled = () => {
+      setIsAppInstalled(true);
       setInstallPrompt(null);
       setInstallAvailable(false);
       setShowInstallNudge(false);
@@ -73,7 +91,7 @@ export default function HomePage() {
       window.removeEventListener('beforeinstallprompt', handler);
       window.removeEventListener('appinstalled', onInstalled);
     };
-  }, []);
+  }, [isAppInstalled]);
 
   const handleInstallClick = async () => {
     if (!installPrompt) return;
@@ -196,7 +214,7 @@ export default function HomePage() {
 
   return (
     <main className="auth-page">
-      {showInstallNudge && installAvailable && (
+      {canShowInstallCta && showInstallNudge && installAvailable && !isAppInstalled && (
         <div className="install-nudge-backdrop" role="presentation">
           <section className="install-nudge-card" aria-label="Instalar aplicación">
             <h3 className="install-nudge-title">Instala la app en este dispositivo</h3>
@@ -289,15 +307,17 @@ export default function HomePage() {
         {message && <p className="feedback feedback-success">{message}</p>}
         {error && <p className="feedback feedback-error">{error}</p>}
 
-        {installAvailable ? (
-          <button type="button" className="btn-secondary" onClick={handleInstallClick}>
-            Instalar aplicación en este dispositivo
-          </button>
-        ) : (
-          <button type="button" className="btn-secondary" onClick={handleInstallHelpClick}>
-            Cómo instalar aplicación
-          </button>
-        )}
+        {canShowInstallCta &&
+          !isAppInstalled &&
+          (installAvailable ? (
+            <button type="button" className="btn-secondary" onClick={handleInstallClick}>
+              Instalar aplicación en este dispositivo
+            </button>
+          ) : (
+            <button type="button" className="btn-secondary" onClick={handleInstallHelpClick}>
+              Cómo instalar aplicación
+            </button>
+          ))}
       </section>
     </main>
   );
