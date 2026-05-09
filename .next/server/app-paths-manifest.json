@@ -1,0 +1,6 @@
+{
+  "/api/admin/obras/route": "app/api/admin/obras/route.js",
+  "/page": "app/page.js",
+  "/api/admin/catalogos/jornadas/route": "app/api/admin/catalogos/jornadas/route.js",
+  "/dashboard/page": "app/dashboard/page.js"
+}

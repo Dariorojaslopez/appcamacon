@@ -1,0 +1,424 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  identification String   @unique
+  email          String   @unique
+  password       String
+  name           String
+  role           String   @default("SUPER_ADMIN")
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  informes  InformeDiario[]
+}
+
+model Project {
+  id          String          @id @default(cuid())
+  consecutivo Int?            // Número consecutivo de la obra (se asigna al crear)
+  name        String
+  description String?
+  code        String          @unique
+  startDate   DateTime?       // Fecha inicio obra
+  endDate     DateTime?       // Fecha fin obra
+  // Enlace de carpeta OneDrive (compartido) si usas Microsoft Graph. Si está vacío, se usa el .env global.
+  evidenciasOnedriveShareUrl String?
+  // ID o URL de carpeta Google Drive para evidencias de esta obra. Si está vacío, se usa GOOGLE_DRIVE_FOLDER_ID del .env.
+  evidenciasGoogleDriveFolderId String?
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  informes           InformeDiario[]
+  frentesObraCatalog FrenteObraCatalog[]
+  contratistasCatalog ContratistaCatalog[]
+  encargadosCatalog EncargadoReporteCatalog[]
+  cargosCatalog     CargoCatalog[]
+  itemsCatalog      ItemCatalog[]
+}
+
+// Frentes de obra por proyecto. Configurables en administración; el informe referencia el ítem del catálogo.
+model FrenteObraCatalog {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  nombre    String
+  orden     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  informes  InformeDiario[]
+
+  @@unique([projectId, nombre])
+  @@index([projectId, isActive, orden])
+}
+
+// Turnos / jornadas (rango horario). Configurables en administración.
+model JornadaCatalog {
+  id          String   @id @default(cuid())
+  nombre      String
+  horaInicio  String   // "HH:mm"
+  horaFin     String   // "HH:mm"
+  orden       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  informes    InformeDiario[]
+
+  @@index([isActive, orden])
+}
+
+model InformeDiario {
+  id                 String    @id @default(cuid())
+  date               DateTime
+  jornadaCatalogoId  String?
+  jornadaCatalogo    JornadaCatalog? @relation(fields: [jornadaCatalogoId], references: [id])
+  condiciones        String?
+  actividades        String?
+  incidentes         String?
+  evidenciasUrl      String?
+
+  // Evidencias y cierre
+  registroFotografico        Boolean? @default(false)
+  observacionesGenerales     String?
+  observaciones               String?
+  // Cierre: las 4 firmas de evidencias completas bloquean edición del informe.
+  informeCerrado             Boolean   @default(false)
+  cerradoEn                  DateTime?
+
+  // Datos generales
+  informeConsecutivo Int?
+  informeNo          String?
+  centroTrabajoConsecutivo Int?
+  centroTrabajo      String?
+  frenteObra         String?
+  frenteObraCatalogoId String?
+  frenteObraCatalogo   FrenteObraCatalog? @relation(fields: [frenteObraCatalogoId], references: [id], onDelete: SetNull)
+  contratista        String?
+  contratistaCatalogoId String?
+  contratistaCatalog    ContratistaCatalog? @relation(fields: [contratistaCatalogoId], references: [id], onDelete: SetNull)
+  encargadoReporte   String?
+  encargadoReporteCatalogoId String?
+  encargadoReporteCatalog    EncargadoReporteCatalog? @relation(fields: [encargadoReporteCatalogoId], references: [id], onDelete: SetNull)
+  cargo              String?   // Texto mostrado / libre; si hay catálogo, refleja su nombre
+  cargoCatalogoId  String?
+  cargoCatalog       CargoCatalog? @relation(fields: [cargoCatalogoId], references: [id], onDelete: SetNull)
+  horaEntrada        String?   // "HH:mm"
+  horaSalida         String?   // "HH:mm"
+
+  // Jornada y condiciones
+  huboSuspension     Boolean?  @default(false)
+  motivoSuspension   String?
+  horaSuspension     String?   // "HH:mm"
+  horaReinicio       String?   // "HH:mm"
+  tipoClima          String?
+  horasClima         Float?
+
+  // Relaciones
+  userId             String
+  user               User      @relation(fields: [userId], references: [id])
+
+  projectId          String
+  project            Project   @relation(fields: [projectId], references: [id])
+
+  personal           PersonalObra[]
+  equipos            EquipoObra[]
+  materialIngresos  MaterialIngreso[]
+  materialEntregas  MaterialEntrega[]
+  actividadesObra  ActividadObra[]
+  ensayosObra       EnsayoObra[]
+  danosRedesObra    DanoRedesObra[]
+  noConformidadesObra NoConformidadObra[]
+  firmas              FirmaInforme[]
+  suspensiones        InformeSuspension[]
+
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  /// Un informe por combinación obra + día (UTC) + jornada
+  @@unique([projectId, date, jornadaCatalogoId])
+  @@index([projectId, date, jornadaCatalogoId])
+}
+
+/// Varias suspensiones por informe (obra + fecha + jornada).
+model InformeSuspension {
+  id                 String        @id @default(cuid())
+  informeDiarioId    String
+  informeDiario      InformeDiario @relation(fields: [informeDiarioId], references: [id], onDelete: Cascade)
+  motivoSuspension   String
+  horaSuspension     String
+  horaReinicio       String
+  tipoClima          String?
+  horasClima         Float?
+  orden              Int           @default(0)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@index([informeDiarioId, orden])
+}
+
+// Firmas de evidencias: una fila por tipo de rol (slot), columnas visibles en BD.
+model FirmaInforme {
+  id          String    @id @default(cuid())
+  slot        String
+  firmado     Boolean   @default(false)
+  codigo      String    @default("")
+  observacion String    @default("")
+  firmadoEn   DateTime?
+
+  informeId   String
+  informe     InformeDiario @relation(fields: [informeId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([informeId, slot])
+  @@index([informeId])
+}
+
+model PersonalObra {
+  id             String   @id @default(cuid())
+  nombre         String
+  cargo          String
+  subcontratista String?
+  horaEntrada    String?  // "HH:mm"
+  horaSalida     String?  // "HH:mm"
+
+  informeId      String
+  informe        InformeDiario @relation(fields: [informeId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model EquipoObra {
+  id            String   @id @default(cuid())
+  descripcion   String
+  placaRef      String?
+  propiedad     String?  // PROPIO / ALQUILADO
+  estado        String?  // Selección libre (ej. Operativo / Fuera de servicio)
+  horasTrabajadas Float?
+  horaIngreso   String?  // "HH:mm"
+  horaSalida    String?  // "HH:mm"
+
+  informeId     String
+  informe       InformeDiario @relation(fields: [informeId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model MaterialIngreso {
+  id            String   @id @default(cuid())
+  proveedor     String
+  tipoMaterial  String
+  noRemision    String
+  unidad        String
+  cantidad      Float?
+
+  informeId     String
+  informe       InformeDiario @relation(fields: [informeId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model MaterialEntrega {
+  id            String   @id @default(cuid())
+  tipoMaterial  String
+  unidad        String
+  cantidad      Float?
+  contratista   String
+  firmaRecibido Boolean  @default(false)
+
+  informeId     String
+  informe       InformeDiario @relation(fields: [informeId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model ActividadObra {
+  id               String   @id @default(cuid())
+  pk               String
+  abscisado        String
+  itemContractual  String
+  descripcion      String
+  unidadMedida     String
+  observacion      Boolean  @default(false)
+  observacionTexto String?
+  imagenUrl        String?
+  largo            Float?
+  ancho            Float?
+  altura           Float?
+  cantidadTotal    Float?   // m3
+
+  informeId        String
+  informe          InformeDiario @relation(fields: [informeId], references: [id], onDelete: Cascade)
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model EnsayoObra {
+  id              String   @id @default(cuid())
+  materialActividad String
+  tipoEnsayo     String
+  idMuestra      String
+
+  laboratorio     String
+  localizacion   String
+  resultado       String
+  observacion    String?
+  imagenUrl      String?
+
+  informeId       String
+  informe         InformeDiario @relation(fields: [informeId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model DanoRedesObra {
+  id            String   @id @default(cuid())
+
+  horaReporte   String?
+  direccion     String
+  tipoDano      String
+  entidad       String
+  noReporte     String
+
+  observacion   String?
+  imagenUrl     String?
+
+  informeId      String
+  informe        InformeDiario @relation(fields: [informeId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model NoConformidadObra {
+  id String @id @default(cuid())
+
+  noConformidad String
+  detalle        String
+  estado         String
+  imagenUrl      String?
+
+  informeId       String
+  informe         InformeDiario @relation(fields: [informeId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ContratistaCatalog {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  cedula    String
+  nombre    String
+  isActive  Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  informes  InformeDiario[]
+
+  @@unique([projectId, cedula])
+  @@index([projectId, isActive, nombre])
+}
+
+model EncargadoReporteCatalog {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  cedula    String
+  nombre    String
+  isActive  Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  informes  InformeDiario[]
+
+  @@unique([projectId, cedula])
+  @@index([projectId, isActive, nombre])
+}
+
+model CargoCatalog {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  /// Consecutivo autonumérico por obra (1, 2, 3… dentro de cada projectId)
+  consecutivo Int?
+  nombre    String
+  isActive  Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  informes  InformeDiario[]
+
+  @@unique([projectId, nombre])
+  @@index([projectId, consecutivo])
+  @@index([projectId, isActive, nombre])
+}
+
+model ItemCatalog {
+  id            String   @id @default(cuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  codigo        String
+  descripcion   String
+  unidad        String?
+  precioUnitario Float?
+  cantidad      Float?
+  largo         Float?
+  ancho         Float?
+  altura        Float?
+  imagenUrl     String?
+  orden         Int      @default(0)
+  isActive      Boolean  @default(true)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([projectId, codigo])
+  @@index([projectId, isActive, orden, codigo])
+}
+
+model RoleMenuPermission {
+  role    String
+  menuKey String
+
+  @@id([role, menuKey])
+}
+
+// Permisos de firma en Evidencias: permKey "token" = ver código en barra; resto = filas donde puede firmar.
+model RoleFirmaPermission {
+  role    String
+  permKey String
+
+  @@id([role, permKey])
+}
+
+model RoleLabel {
+  role  String @id
+  label String
+}

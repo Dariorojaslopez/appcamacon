@@ -1,0 +1,41 @@
+{
+  "name": "sigocc-core",
+  "version": "1.0.0",
+  "description": "SIGOCC - Sistema de Gestión Integrado Occidental Colombia. Aplicación web PWA mobile-first para trabajadores de obra.",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "dev:https": "next dev -H 0.0.0.0 --experimental-https",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "bcryptjs": "^3.0.3",
+    "exceljs": "^4.4.0",
+    "jsonwebtoken": "^9.0.2",
+    "next": "^14.1.0",
+    "nodemailer": "^6.9.15",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^3.0.0",
+    "@types/node": "^20.10.5",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "eslint": "^8.56.0",
+    "eslint-config-next": "^14.1.0",
+    "prisma": "5.22.0",
+    "typescript": "^5.3.3"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  }
+}

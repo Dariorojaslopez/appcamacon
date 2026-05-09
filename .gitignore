@@ -1,0 +1,6 @@
+node_modules
+
+# Secretos y entorno local (no subir a Git)
+.env
+.env.local
+.env*.local
