@@ -7,9 +7,9 @@ export const metadata: Metadata = {
   themeColor: '#1F2937',
   manifest: '/manifest.json',
   icons: {
-    icon: '/images/Logo_camacon.ico',
-    shortcut: '/images/Logo_camacon.ico',
-    apple: '/images/Logo_camacon.png',
+    icon: '/icons/icon-192.png',
+    shortcut: '/icons/icon-192.png',
+    apple: '/icons/icon-512.png',
   },
   viewport: {
     width: 'device-width',

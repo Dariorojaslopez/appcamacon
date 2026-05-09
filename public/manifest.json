@@ -1,10 +1,27 @@
 {
+  "id": "/",
   "name": "Camacon App",
   "short_name": "Camacon",
   "description": "Sistema de gestión de obra para constructora, optimizado para campo.",
   "start_url": "/",
   "scope": "/",
+  "display_override": ["standalone", "minimal-ui", "browser"],
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#111827",
-  "theme_color": "#1F2937"
+  "theme_color": "#1F2937",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
 }

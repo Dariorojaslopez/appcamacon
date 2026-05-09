@@ -21,7 +21,6 @@ import {
   IconCamera,
   IconCog,
   IconUsers,
-  IconLogout,
   IconChevronDown,
   IconChevronRight,
   IconEdit,
@@ -84,6 +83,11 @@ function voiceInsecureDevOriginMatch(): boolean {
   } catch {
     return false;
   }
+}
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
 }
 
 function formatItemCatalogSubtotal(
@@ -490,7 +494,8 @@ export default function DashboardPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [informeExpanded, setInformeExpanded] = useState(false);
   const [informeDropdownOpen, setInformeDropdownOpen] = useState(false);
-  const [loggingOut, setLoggingOut] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [installAvailable, setInstallAvailable] = useState(false);
   const [activeSection, setActiveSection] = useState<
     | 'home'
     | 'settings'
@@ -1036,43 +1041,42 @@ export default function DashboardPage() {
   const [firmaSlotPermissions, setFirmaSlotPermissions] = useState<Record<FirmaEvidenciaKey, boolean> | null>(null);
 
   useEffect(() => {
-    fetch('/api/auth/me', { credentials: 'include' })
-      .then((res) => {
-        if (res.status === 401) {
-          // Evitar cierre de sesión forzado por validación automática.
-          return Promise.resolve({
-            allowedMenus: [],
-            firmaToken: null,
-            firmaSlotPermissions: {},
-          });
-        }
-        return res.ok ? res.json() : Promise.reject(res);
-      })
-      .then(
-        (data: {
-          allowedMenus?: string[];
-          firmaToken?: string | null;
-          firmaSlotPermissions?: Partial<Record<FirmaEvidenciaKey, boolean>>;
-        }) => {
-          const menus = data.allowedMenus ?? [];
-          setAllowedMenus(menus);
-          setFirmaToken(typeof data.firmaToken === 'string' && data.firmaToken.length > 0 ? data.firmaToken : null);
-          const perms = data.firmaSlotPermissions;
-          setFirmaSlotPermissions({
-            responsableDiligenciamiento: Boolean(perms?.responsableDiligenciamiento),
-            residenteObra: Boolean(perms?.residenteObra),
-            auxiliarIngenieria: Boolean(perms?.auxiliarIngenieria),
-            vistoBuenoDirectorObra: Boolean(perms?.vistoBuenoDirectorObra),
-          });
-          try {
-            sessionStorage.removeItem('sigocc_allowedMenus');
-          } catch {
-            // ignorar
-          }
-        },
-      )
-      .catch(() => {});
-  }, [router]);
+    // Evitar validación automática de sesión para no disparar 401 en consola ni cierres forzados.
+    setFirmaToken(null);
+    setFirmaSlotPermissions({
+      responsableDiligenciamiento: false,
+      residenteObra: false,
+      auxiliarIngenieria: false,
+      vistoBuenoDirectorObra: false,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!('serviceWorker' in navigator)) return;
+
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+
+    const handleBeforeInstallPrompt = (event: Event) => {
+      const deferredEvent = event as BeforeInstallPromptEvent;
+      deferredEvent.preventDefault();
+      setInstallPrompt(deferredEvent);
+      setInstallAvailable(true);
+    };
+
+    const handleAppInstalled = () => {
+      setInstallPrompt(null);
+      setInstallAvailable(false);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
 
   const canSee = (menuKey: string) => allowedMenus.length === 0 || allowedMenus.includes(menuKey);
 
@@ -2146,9 +2150,35 @@ export default function DashboardPage() {
     }
   }, [informeDropdownOpen]);
 
-  const handleLogout = async () => {
-    // Se deja sin acción para evitar cerrar sesión desde cualquier pantalla.
-    setLoggingOut(false);
+  const handleInstallClick = async () => {
+    if (!installPrompt) return;
+    await installPrompt.prompt();
+    const result = await installPrompt.userChoice;
+    if (result.outcome === 'accepted') {
+      setInstallAvailable(false);
+      setInstallPrompt(null);
+    }
+  };
+
+  const handleInstallHelpClick = () => {
+    if (typeof window === 'undefined') return;
+    const ua = window.navigator.userAgent.toLowerCase();
+    const isAndroid = /android/.test(ua);
+    const isIOS = /iphone|ipad|ipod/.test(ua);
+    const isEdge = /edg\//.test(ua);
+    const isChrome = /chrome/.test(ua) && !isEdge;
+
+    let message = 'Para instalar la app, abre el menu del navegador y usa "Instalar aplicacion".';
+    if (isAndroid && isChrome) {
+      message = 'Chrome Android: abre el menu (tres puntos) y toca "Instalar aplicacion" o "Agregar a pantalla principal".';
+    } else if (isAndroid && isEdge) {
+      message = 'Edge Android: abre el menu y selecciona "Instalar esta aplicacion".';
+    } else if (isIOS) {
+      message = 'iPhone/iPad: toca Compartir y luego "Agregar a pantalla de inicio".';
+    } else if (isChrome || isEdge) {
+      message = 'En escritorio: usa el icono de instalar en la barra de direcciones o el menu del navegador.';
+    }
+    window.alert(message);
   };
 
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -5083,15 +5113,16 @@ export default function DashboardPage() {
               <span>Usuarios</span>
             </button>
           )}
-          <button
-            type="button"
-            className="topbar-link topbar-link-danger"
-            onClick={handleLogout}
-            disabled
-          >
-            <IconLogout />
-            <span>Sesión bloqueada</span>
-          </button>
+          {installAvailable && (
+            <button type="button" className="topbar-link" onClick={handleInstallClick}>
+              <span>Instalar app</span>
+            </button>
+          )}
+          {!installAvailable && (
+            <button type="button" className="topbar-link" onClick={handleInstallHelpClick}>
+              <span>Como instalar</span>
+            </button>
+          )}
         </nav>
       </header>
 
@@ -5183,16 +5214,26 @@ export default function DashboardPage() {
                 <IconChevronRight />
               </button>
             )}
-            <button
-              type="button"
-              className="nav-item nav-item-danger"
-              onClick={handleLogout}
-              disabled
-            >
-              <IconLogout />
-              <span>Sesión bloqueada</span>
-              <IconChevronRight />
-            </button>
+            {installAvailable && (
+              <button
+                type="button"
+                className="nav-item"
+                onClick={handleInstallClick}
+              >
+                <span>Instalar app</span>
+                <IconChevronRight />
+              </button>
+            )}
+            {!installAvailable && (
+              <button
+                type="button"
+                className="nav-item"
+                onClick={handleInstallHelpClick}
+              >
+                <span>Como instalar</span>
+                <IconChevronRight />
+              </button>
+            )}
           </div>
         </nav>
       )}

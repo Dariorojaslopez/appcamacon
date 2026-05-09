@@ -1,23 +1,46 @@
+const CACHE_VERSION = 'v2';
+const RUNTIME_CACHE = `sigocc-runtime-${CACHE_VERSION}`;
+const PRECACHE_ASSETS = ['/offline.html', '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png'];
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     (async () => {
-      const cache = await caches.open('sigocc-runtime');
-      await cache.addAll(['/offline.html', '/manifest.json']);
+      const cache = await caches.open(RUNTIME_CACHE);
+      await cache.addAll(PRECACHE_ASSETS);
       await self.skipWaiting();
     })(),
   );
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(keys.filter((key) => key !== RUNTIME_CACHE).map((key) => caches.delete(key)));
+      await self.clients.claim();
+    })(),
+  );
 });
 
 self.addEventListener('fetch', (event) => {
+  const requestUrl = new URL(event.request.url);
+  const isHttpRequest = requestUrl.protocol === 'http:' || requestUrl.protocol === 'https:';
+
+  // Evita errores al intentar cachear esquemas no soportados (ej: chrome-extension://).
+  if (!isHttpRequest) {
+    return;
+  }
+
+  if (event.request.method !== 'GET') {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   event.respondWith(
-    caches.open('sigocc-runtime').then(async (cache) => {
+    caches.open(RUNTIME_CACHE).then(async (cache) => {
       try {
         const response = await fetch(event.request);
-        if (event.request.method === 'GET' && response.ok) {
+        if (response.ok) {
           cache.put(event.request, response.clone());
         }
         return response;
