@@ -738,7 +738,6 @@ export default function DashboardPage() {
   const [itemsFilterProjectId, setItemsFilterProjectId] = useState('');
   const [itemsSaving, setItemsSaving] = useState(false);
   const [itemsError, setItemsError] = useState<string | null>(null);
-  const [itemsImportRaw, setItemsImportRaw] = useState('');
   const [itemNewDescripcion, setItemNewDescripcion] = useState('');
   const [itemNewUnidad, setItemNewUnidad] = useState('');
   const [itemNewPrecio, setItemNewPrecio] = useState('');
@@ -2911,6 +2910,7 @@ export default function DashboardPage() {
       setBudgetChapterCodigo('');
       setBudgetChapterNombre('');
       await reloadItemsBudgetTree();
+      setItemsError('Capítulo creado correctamente.');
     } catch {
       setItemsError('Error de conexión.');
     } finally {
@@ -2943,6 +2943,7 @@ export default function DashboardPage() {
       setBudgetSubchapterNombre('');
       if (data.subchapter?.id) setItemsTargetSubchapterId(String(data.subchapter.id));
       await reloadItemsBudgetTree();
+      setItemsError('Subcapítulo creado correctamente.');
     } catch {
       setItemsError('Error de conexión.');
     } finally {
@@ -3058,6 +3059,7 @@ export default function DashboardPage() {
         return;
       }
       await reloadItemsBudgetTree();
+      setItemsError('Ítem creado correctamente.');
       setItemNewDescripcion('');
       setItemNewUnidad('');
       setItemNewPrecio('');
@@ -3066,46 +3068,6 @@ export default function DashboardPage() {
       setItemNewAncho('');
       setItemNewAltura('');
       setItemNewImagenUrl('');
-    } catch {
-      setItemsError('Error de conexión.');
-    } finally {
-      setItemsSaving(false);
-    }
-  };
-
-  const importItemsCatalog = async () => {
-    if (!itemsFilterProjectId) {
-      setItemsError('Seleccione una obra.');
-      return;
-    }
-    if (!itemsImportRaw.trim()) {
-      setItemsError('Pegue o cargue el texto del listado primero.');
-      return;
-    }
-    if (!itemsTargetSubchapterId) {
-      setItemsError('Seleccione el subcapítulo destino de la importación.');
-      return;
-    }
-    setItemsSaving(true);
-    setItemsError(null);
-    try {
-      const res = await fetch('/api/admin/catalogos/items', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          projectId: itemsFilterProjectId,
-          subchapterId: itemsTargetSubchapterId,
-          rawText: itemsImportRaw,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setItemsError(data.error ?? 'No se pudo importar');
-        return;
-      }
-      await reloadItemsBudgetTree();
-      setItemsError(`Importación completada (${data.imported ?? 0} ítems).`);
     } catch {
       setItemsError('Error de conexión.');
     } finally {
@@ -6644,11 +6606,21 @@ export default function DashboardPage() {
                   Ítems contractuales (por obra)
                 </h2>
                 <p className="shell-text">
-                  El presupuesto se organiza en <strong>capítulos</strong>, <strong>subcapítulos</strong> e{' '}
-                  <strong>ítems</strong> (actividades medibles y cobrables), alineado a estructuras tipo licitación y
-                  APU. Los ítems se usan en <strong>Actividades desarrolladas</strong> del informe diario.
+                  Organice el presupuesto por <strong>capítulos</strong> y <strong>subcapítulos</strong>, y registre los{' '}
+                  <strong>ítems contractuales</strong> (código, unidad, precio, etc.). Esos ítems aparecen luego en{' '}
+                  <strong>Actividades desarrolladas</strong> del informe diario.
                 </p>
-                {itemsError && <p className={itemsError.startsWith('Importación completada') ? 'feedback feedback-success' : 'feedback feedback-error'}>{itemsError}</p>}
+                {itemsError ? (
+                  <p
+                    className={
+                      itemsError.startsWith('Importación completada') || itemsError.includes('correctamente')
+                        ? 'feedback feedback-success'
+                        : 'feedback feedback-error'
+                    }
+                  >
+                    {itemsError}
+                  </p>
+                ) : null}
 
                 <div className="form-field" style={{ marginBottom: '1rem' }}>
                   <label className="form-label" htmlFor="items-filter-obra">Obra</label>
@@ -6676,12 +6648,13 @@ export default function DashboardPage() {
                       Estructura del presupuesto
                     </h3>
                     <p className="shell-text-muted" style={{ marginBottom: '0.75rem' }}>
-                      Capítulo (rubro mayor) → subcapítulo (agrupación) → ítems. Las importaciones y los ítems nuevos
-                      se ubican en el subcapítulo que elija abajo.
+                      <strong>Paso 1:</strong> cree al menos un capítulo y un subcapítulo. <strong>Paso 2:</strong>{' '}
+                      elija el subcapítulo donde irán los ítems nuevos. <strong>Paso 3:</strong> use el formulario «Crear
+                      ítem manual» más abajo.
                     </p>
                     <div className="form-field" style={{ marginBottom: '1rem' }}>
                       <label className="form-label" htmlFor="items-target-subchapter">
-                        Subcapítulo destino (importar / crear ítem aquí)
+                        Subcapítulo donde se crearán los ítems nuevos
                       </label>
                       <select
                         id="items-target-subchapter"
@@ -6701,12 +6674,14 @@ export default function DashboardPage() {
                         )}
                       </select>
                     </div>
-                    <div
-                      className="form-row-inline"
-                      style={{ marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'flex-end' }}
-                    >
-                      <form className="auth-form" onSubmit={createBudgetChapter} style={{ flex: '1 1 280px', margin: 0 }}>
-                        <h4 className="shell-title" style={{ fontSize: '0.92rem' }}>Nuevo capítulo</h4>
+                    <div className="budget-hierarchy-forms">
+                      <form className="budget-inline-form" onSubmit={createBudgetChapter}>
+                        <h4 className="shell-title" style={{ fontSize: '0.92rem', margin: 0 }}>
+                          Nuevo capítulo
+                        </h4>
+                        <p className="shell-text-muted" style={{ margin: 0, fontSize: '0.78rem' }}>
+                          Rubro mayor del presupuesto (ej. 1000, 2000…).
+                        </p>
                         <div className="form-row-inline">
                           <div className="form-field" style={{ marginBottom: 0, minWidth: '6rem' }}>
                             <label className="form-label" htmlFor="budget-ch-codigo">Código</label>
@@ -6719,7 +6694,7 @@ export default function DashboardPage() {
                               disabled={itemsSaving}
                             />
                           </div>
-                          <div className="form-field" style={{ marginBottom: 0, flex: 1, minWidth: '10rem' }}>
+                          <div className="form-field" style={{ marginBottom: 0, flex: '1 1 10rem', minWidth: 0 }}>
                             <label className="form-label" htmlFor="budget-ch-nombre">Nombre</label>
                             <input
                               id="budget-ch-nombre"
@@ -6730,15 +6705,20 @@ export default function DashboardPage() {
                               disabled={itemsSaving}
                             />
                           </div>
-                          <button type="submit" className="btn-secondary" disabled={itemsSaving} style={{ marginTop: '1.35rem' }}>
-                            + Capítulo
+                          <button type="submit" className="btn-primary" disabled={itemsSaving}>
+                            Crear capítulo
                           </button>
                         </div>
                       </form>
-                      <form className="auth-form" onSubmit={createBudgetSubchapter} style={{ flex: '1 1 300px', margin: 0 }}>
-                        <h4 className="shell-title" style={{ fontSize: '0.92rem' }}>Nuevo subcapítulo</h4>
+                      <form className="budget-inline-form" onSubmit={createBudgetSubchapter}>
+                        <h4 className="shell-title" style={{ fontSize: '0.92rem', margin: 0 }}>
+                          Nuevo subcapítulo
+                        </h4>
+                        <p className="shell-text-muted" style={{ margin: 0, fontSize: '0.78rem' }}>
+                          Agrupación dentro del capítulo (ej. tipo de pavimento o intervención).
+                        </p>
                         <div className="form-row-inline">
-                          <div className="form-field" style={{ marginBottom: 0, minWidth: '10rem' }}>
+                          <div className="form-field" style={{ marginBottom: 0, minWidth: '10rem', flex: '1 1 40%' }}>
                             <label className="form-label" htmlFor="budget-sub-ch">Capítulo padre</label>
                             <select
                               id="budget-sub-ch"
@@ -6755,7 +6735,7 @@ export default function DashboardPage() {
                               ))}
                             </select>
                           </div>
-                          <div className="form-field" style={{ marginBottom: 0, flex: 1, minWidth: '8rem' }}>
+                          <div className="form-field" style={{ marginBottom: 0, flex: '1 1 8rem', minWidth: 0 }}>
                             <label className="form-label" htmlFor="budget-sub-nombre">Nombre</label>
                             <input
                               id="budget-sub-nombre"
@@ -6766,56 +6746,14 @@ export default function DashboardPage() {
                               disabled={itemsSaving}
                             />
                           </div>
-                          <button type="submit" className="btn-secondary" disabled={itemsSaving} style={{ marginTop: '1.35rem' }}>
-                            + Subcapítulo
+                          <button type="submit" className="btn-primary" disabled={itemsSaving}>
+                            Crear subcapítulo
                           </button>
                         </div>
                       </form>
                     </div>
                   </>
                 ) : null}
-
-                <div className="form-field" style={{ marginBottom: '1rem' }}>
-                  <label className="form-label" htmlFor="items-import-file">Importar listado de ítems (.txt)</label>
-                  <input
-                    id="items-import-file"
-                    className="form-input calidad-file-input"
-                    type="file"
-                    accept=".txt,text/plain"
-                    disabled={!itemsFilterProjectId || itemsSaving}
-                    onChange={(e) => {
-                      const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
-                      if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = () => setItemsImportRaw(String(reader.result ?? ''));
-                      reader.readAsText(file);
-                    }}
-                  />
-                </div>
-
-                <div className="form-field" style={{ marginBottom: '0.75rem' }}>
-                  <label className="form-label" htmlFor="items-import-raw">Texto del listado</label>
-                  <textarea
-                    id="items-import-raw"
-                    className="textarea-input personal-input"
-                    rows={8}
-                    value={itemsImportRaw}
-                    onChange={(e) => setItemsImportRaw(e.target.value)}
-                    placeholder="Pegue aquí el contenido del listado (tabulado)."
-                    disabled={!itemsFilterProjectId || itemsSaving}
-                  />
-                </div>
-                <button
-                  type="button"
-                  className="btn-primary"
-                  disabled={
-                    !itemsFilterProjectId || !itemsTargetSubchapterId || itemsSaving || !itemsImportRaw.trim()
-                  }
-                  onClick={importItemsCatalog}
-                  style={{ marginBottom: '1.25rem' }}
-                >
-                  {itemsSaving ? 'Importando...' : 'Importar/actualizar ítems'}
-                </button>
 
                 <form className="auth-form" onSubmit={createItemCatalog} style={{ marginBottom: '1.5rem' }}>
                   <h3 className="shell-title" style={{ fontSize: '1rem' }}>Crear ítem manual</h3>

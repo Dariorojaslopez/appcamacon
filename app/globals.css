@@ -160,6 +160,52 @@ body {
   gap: 1rem;
 }
 
+/* Capítulo / subcapítulo en Configuración → Ítems */
+.budget-hierarchy-forms {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+@media (min-width: 900px) {
+  .budget-hierarchy-forms {
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  .budget-inline-form {
+    flex: 1 1 0;
+    min-width: 280px;
+  }
+}
+
+.budget-inline-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: #f9fafb;
+  margin: 0;
+  min-width: 0;
+}
+
+.budget-inline-form .form-row-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: flex-end;
+}
+
+.budget-inline-form .btn-primary {
+  width: auto;
+  min-width: 10.5rem;
+  margin-top: 0;
+  flex-shrink: 0;
+}
+
 .forgot-form {
   margin-top: 0.25rem;
 }

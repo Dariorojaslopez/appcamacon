@@ -37,12 +37,22 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ chapter }, { status: 201 });
   } catch (e: unknown) {
-    const pe = e as { code?: string; name?: string };
+    const pe = e as { code?: string; name?: string; message?: string };
+    const msg = String(pe.message ?? '');
     if (pe.name === 'TokenExpiredError' || pe.name === 'JsonWebTokenError') {
       return NextResponse.json({ error: 'Sesión expirada' }, { status: 401 });
     }
     if (pe.code === 'P2002') {
       return NextResponse.json({ error: 'Ya existe un capítulo con ese código en esta obra' }, { status: 409 });
+    }
+    if (/BudgetChapter/i.test(msg) && /does not exist|no existe|Unknown model/i.test(msg)) {
+      return NextResponse.json(
+        {
+          error:
+            'La base de datos no tiene las tablas de presupuesto jerárquico. En el servidor ejecute: npx prisma migrate deploy',
+        },
+        { status: 503 },
+      );
     }
     console.error(e);
     return NextResponse.json({ error: 'Error al crear capítulo' }, { status: 500 });
