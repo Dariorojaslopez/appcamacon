@@ -33,6 +33,7 @@ import {
   IconCalendar,
   IconClock,
   IconTabulacion,
+  IconLogout,
 } from './icons';
 import { InformeSearchableSelect } from './InformeSearchableSelect';
 import {
@@ -2245,6 +2246,17 @@ export default function DashboardPage() {
       return () => document.removeEventListener('click', handleClickOutside);
     }
   }, [informeDropdownOpen]);
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    } catch {
+      /* seguir con la salida aunque falle la red */
+    }
+    setMenuOpen(false);
+    router.push('/');
+    router.refresh();
+  };
 
   const handleInstallClick = async () => {
     if (!installPrompt) return;
@@ -5367,6 +5379,10 @@ export default function DashboardPage() {
               <span>Como instalar</span>
             </button>
           )}
+          <button type="button" className="topbar-link topbar-link-danger" onClick={handleLogout} title="Cerrar sesión">
+            <IconLogout />
+            <span>Cerrar sesión</span>
+          </button>
         </nav>
       </header>
 
@@ -5478,6 +5494,11 @@ export default function DashboardPage() {
                 <IconChevronRight />
               </button>
             )}
+            <button type="button" className="nav-item nav-item-danger" onClick={handleLogout}>
+              <IconLogout />
+              <span>Cerrar sesión</span>
+              <IconChevronRight />
+            </button>
           </div>
         </nav>
       )}

@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { buildContentSecurityPolicy, generateNonce } from './src/lib/csp';
 
-const PUBLIC_PATHS = ['/', '/api/auth/login', '/api/auth/forgot-password', '/offline.html'];
+const PUBLIC_PATHS = [
+  '/',
+  '/api/auth/login',
+  '/api/auth/logout',
+  '/api/auth/forgot-password',
+  '/offline.html',
+];
 
 function nextWithCsp(req: NextRequest): NextResponse {
   const nonce = generateNonce();
