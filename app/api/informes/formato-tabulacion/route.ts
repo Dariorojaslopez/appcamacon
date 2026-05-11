@@ -54,6 +54,11 @@ export async function GET(req: NextRequest) {
       prisma.itemCatalog.findMany({
         where: { projectId, isActive: true },
         orderBy: [{ orden: 'asc' }, { codigo: 'asc' }],
+        include: {
+          subchapter: {
+            include: { chapter: { select: { codigo: true, nombre: true } } },
+          },
+        },
       }),
       prisma.jornadaCatalog.findFirst({ where: { id: jr.id }, select: { nombre: true } }),
     ]);
@@ -62,13 +67,22 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Obra no encontrada' }, { status: 404 });
     }
 
-    const items = (itemsRaw as any[]).map((it) => ({
-      codigo: String(it.codigo ?? ''),
-      descripcion: String(it.descripcion ?? ''),
-      unidad: it.unidad ?? null,
-      cantidad: it.cantidad != null ? Number(it.cantidad) : null,
-      precioUnitario: it.precioUnitario != null ? Number(it.precioUnitario) : null,
-    }));
+    const items = (itemsRaw as any[]).map((it) => {
+      const ch = it.subchapter?.chapter;
+      const sub = it.subchapter;
+      const rubro =
+        ch && sub
+          ? `${String(ch.codigo).trim()} ${String(ch.nombre).trim()} › ${String(sub.nombre).trim()}`
+          : null;
+      return {
+        codigo: String(it.codigo ?? ''),
+        descripcion: String(it.descripcion ?? ''),
+        unidad: it.unidad ?? null,
+        cantidad: it.cantidad != null ? Number(it.cantidad) : null,
+        precioUnitario: it.precioUnitario != null ? Number(it.precioUnitario) : null,
+        rubro,
+      };
+    });
 
     const actividades = (informe?.actividadesObra ?? []).map((a: any) => ({
       pk: String(a.pk ?? ''),

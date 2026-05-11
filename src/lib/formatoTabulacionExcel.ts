@@ -19,6 +19,8 @@ export type TabulacionItemRow = {
   unidad: string | null;
   cantidad: number | null;
   precioUnitario: number | null;
+  /** Capítulo › subcapítulo (presupuesto jerárquico) */
+  rubro?: string | null;
 };
 
 export type TabulacionActividadRow = {
@@ -126,6 +128,13 @@ export async function buildFormatoTabulacionWorkbookBuffer(opts: {
   const byPrecio = precioMap(opts.items);
   const byItemMeta = itemMetaMap(opts.items);
   const byActividadQty = actividadCantidadMap(opts.actividades);
+  const rubroByCodigo = new Map<string, string>();
+  for (const it of opts.items) {
+    const c = String(it.codigo ?? '').trim();
+    if (!c) continue;
+    const r = it.rubro != null && String(it.rubro).trim() ? String(it.rubro).trim() : RUBRO_DEFAULT;
+    rubroByCodigo.set(c, r);
+  }
 
   // RESUMEN (solo detalle de ítems en hoja 1)
   const wsR = wb.addWorksheet('RESUMEN');
@@ -242,7 +251,7 @@ export async function buildFormatoTabulacionWorkbookBuffer(opts: {
       a.pk ?? '',
       pmt,
       code,
-      RUBRO_DEFAULT,
+      rubroByCodigo.get(code) ?? RUBRO_DEFAULT,
       itemMeta?.descripcion || a.descripcion || '',
       a.observacionTexto ?? '',
       qty,

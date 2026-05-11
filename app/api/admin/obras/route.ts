@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessToken } from '../../../../src/infrastructure/auth/tokens';
 import prisma from '../../../../src/lib/prisma';
+import { ensureDefaultBudgetHierarchy } from '../../../../src/lib/budgetHierarchy';
 
 export async function GET(req: NextRequest) {
   try {
@@ -87,6 +88,8 @@ export async function POST(req: NextRequest) {
             : null,
       },
     });
+
+    await ensureDefaultBudgetHierarchy(prisma, obra.id);
 
     return NextResponse.json(
       {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessToken } from '../../../../../src/infrastructure/auth/tokens';
 import prisma from '../../../../../src/lib/prisma';
+import { assertSubchapterBelongsToProject, ensureDefaultBudgetHierarchy } from '../../../../../src/lib/budgetHierarchy';
 
 type ParsedItem = {
   codigo: string;
@@ -86,10 +87,20 @@ export async function GET(req: NextRequest) {
     const itemsRaw = await prisma.itemCatalog.findMany({
       where: projectId ? { projectId } : undefined,
       orderBy: [{ orden: 'asc' }, { codigo: 'asc' }],
+      include: {
+        subchapter: {
+          include: { chapter: { select: { id: true, codigo: true, nombre: true } } },
+        },
+      },
     });
     const items = (itemsRaw as any[]).map((it) => ({
       id: it.id,
       projectId: it.projectId,
+      subchapterId: it.subchapterId,
+      chapterId: it.subchapter?.chapter?.id ?? null,
+      chapterCodigo: it.subchapter?.chapter?.codigo ?? null,
+      chapterNombre: it.subchapter?.chapter?.nombre ?? null,
+      subchapterNombre: it.subchapter?.nombre ?? null,
       codigo: it.codigo,
       descripcion: it.descripcion,
       unidad: it.unidad ?? null,
@@ -120,6 +131,7 @@ export async function POST(req: NextRequest) {
 
     const body = (await req.json()) as {
       projectId?: string;
+      subchapterId?: string;
       codigo?: string;
       descripcion?: string;
       unidad?: string | null;
@@ -147,6 +159,15 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'No se detectaron ítems válidos en el texto.' }, { status: 400 });
       }
 
+      let subchapterId = String(body.subchapterId ?? '').trim();
+      if (!subchapterId) {
+        const def = await ensureDefaultBudgetHierarchy(prisma, projectId);
+        subchapterId = def.subchapterId;
+      } else {
+        const ok = await assertSubchapterBelongsToProject(prisma, projectId, subchapterId);
+        if (!ok) return NextResponse.json({ error: 'Subcapítulo no válido para esta obra' }, { status: 400 });
+      }
+
       try {
         await prisma.$transaction(
           parsed.map((it, idx) =>
@@ -154,6 +175,7 @@ export async function POST(req: NextRequest) {
               where: { projectId_codigo: { projectId, codigo: it.codigo } },
               create: {
                 projectId,
+                subchapterId,
                 codigo: it.codigo,
                 descripcion: it.descripcion,
                 unidad: it.unidad,
@@ -167,6 +189,7 @@ export async function POST(req: NextRequest) {
                 isActive: true,
               } as any,
               update: {
+                subchapterId,
                 descripcion: it.descripcion,
                 unidad: it.unidad,
                 precioUnitario: it.precioUnitario,
@@ -188,6 +211,7 @@ export async function POST(req: NextRequest) {
               where: { projectId_codigo: { projectId, codigo: it.codigo } },
               create: {
                 projectId,
+                subchapterId,
                 codigo: it.codigo,
                 descripcion: it.descripcion,
                 unidad: it.unidad,
@@ -196,6 +220,7 @@ export async function POST(req: NextRequest) {
                 isActive: true,
               },
               update: {
+                subchapterId,
                 descripcion: it.descripcion,
                 unidad: it.unidad,
                 precioUnitario: it.precioUnitario,
@@ -236,6 +261,15 @@ export async function POST(req: NextRequest) {
     if (ancho != null && !Number.isFinite(ancho)) return NextResponse.json({ error: 'Ancho inválido' }, { status: 400 });
     if (altura != null && !Number.isFinite(altura)) return NextResponse.json({ error: 'Altura inválida' }, { status: 400 });
 
+    let subchapterId = String(body.subchapterId ?? '').trim();
+    if (!subchapterId) {
+      const def = await ensureDefaultBudgetHierarchy(prisma, projectId);
+      subchapterId = def.subchapterId;
+    } else {
+      const ok = await assertSubchapterBelongsToProject(prisma, projectId, subchapterId);
+      if (!ok) return NextResponse.json({ error: 'Subcapítulo no válido para esta obra' }, { status: 400 });
+    }
+
     try {
       const maxRow = await prisma.itemCatalog.aggregate({
         where: { projectId },
@@ -247,6 +281,7 @@ export async function POST(req: NextRequest) {
         item = await prisma.itemCatalog.create({
           data: {
             projectId,
+            subchapterId,
             codigo,
             descripcion,
             unidad: unidad || null,
@@ -265,6 +300,7 @@ export async function POST(req: NextRequest) {
         item = await prisma.itemCatalog.create({
           data: {
             projectId,
+            subchapterId,
             codigo,
             descripcion,
             unidad: unidad || null,

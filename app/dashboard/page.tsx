@@ -4,6 +4,7 @@ import {
   useState,
   useEffect,
   useMemo,
+  useCallback,
   useRef,
   type CSSProperties,
   type Dispatch,
@@ -257,6 +258,64 @@ function nextAutonumericItemCatalogCodigo(items: { codigo: string }[]): string {
     }
   }
   return String(max + 1);
+}
+
+/** Ítem del catálogo en árbol presupuesto (capítulo → subcapítulo → ítem). */
+type ItemCatalogNode = {
+  id: string;
+  projectId: string;
+  subchapterId: string;
+  codigo: string;
+  descripcion: string;
+  unidad?: string | null;
+  precioUnitario?: number | null;
+  cantidad?: number | null;
+  largo?: number | null;
+  ancho?: number | null;
+  altura?: number | null;
+  imagenUrl?: string | null;
+  orden: number;
+  isActive: boolean;
+};
+
+type BudgetSubchapterTree = {
+  id: string;
+  chapterId: string;
+  nombre: string;
+  orden: number;
+  isActive: boolean;
+  items: ItemCatalogNode[];
+};
+
+type BudgetChapterTree = {
+  id: string;
+  projectId: string;
+  codigo: string;
+  nombre: string;
+  orden: number;
+  isActive: boolean;
+  subchapters: BudgetSubchapterTree[];
+};
+
+function flattenItemCatalogTree(
+  chapters: BudgetChapterTree[],
+): Array<ItemCatalogNode & { chapterCodigo: string; chapterNombre: string; subchapterNombre: string }> {
+  const rows: Array<
+    ItemCatalogNode & { chapterCodigo: string; chapterNombre: string; subchapterNombre: string }
+  > = [];
+  for (const ch of chapters) {
+    for (const sub of ch.subchapters) {
+      for (const it of sub.items) {
+        rows.push({
+          ...it,
+          chapterCodigo: ch.codigo,
+          chapterNombre: ch.nombre,
+          subchapterNombre: sub.nombre,
+        });
+      }
+    }
+  }
+  return rows;
 }
 
 const emptyPersonalDraft = () => ({
@@ -630,6 +689,7 @@ export default function DashboardPage() {
       ancho?: number | null;
       altura?: number | null;
       imagenUrl?: string | null;
+      rubro?: string | null;
     }[]
   >([]);
   const [loadingCatalogos, setLoadingCatalogos] = useState(false);
@@ -668,23 +728,12 @@ export default function DashboardPage() {
   const [editingCargoId, setEditingCargoId] = useState<string | null>(null);
   const [editingCargoNombre, setEditingCargoNombre] = useState('');
   const [deletingCargoId, setDeletingCargoId] = useState<string | null>(null);
-  const [itemsAdmin, setItemsAdmin] = useState<
-    {
-      id: string;
-      projectId: string;
-      codigo: string;
-      descripcion: string;
-      unidad?: string | null;
-      precioUnitario?: number | null;
-      cantidad?: number | null;
-      largo?: number | null;
-      ancho?: number | null;
-      altura?: number | null;
-      imagenUrl?: string | null;
-      orden: number;
-      isActive: boolean;
-    }[]
-  >([]);
+  const [itemsBudgetChapters, setItemsBudgetChapters] = useState<BudgetChapterTree[]>([]);
+  const [itemsTargetSubchapterId, setItemsTargetSubchapterId] = useState('');
+  const [budgetChapterCodigo, setBudgetChapterCodigo] = useState('');
+  const [budgetChapterNombre, setBudgetChapterNombre] = useState('');
+  const [budgetSubchapterChapterId, setBudgetSubchapterChapterId] = useState('');
+  const [budgetSubchapterNombre, setBudgetSubchapterNombre] = useState('');
   const [itemsFilterProjectId, setItemsFilterProjectId] = useState('');
   const [itemsSaving, setItemsSaving] = useState(false);
   const [itemsError, setItemsError] = useState<string | null>(null);
@@ -709,8 +758,21 @@ export default function DashboardPage() {
     altura: '',
     imagenUrl: '',
     isActive: true,
+    subchapterId: '',
   });
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
+
+  const itemsAdminFlat = useMemo(() => flattenItemCatalogTree(itemsBudgetChapters), [itemsBudgetChapters]);
+
+  const subchapterPickerOptions = useMemo(() => {
+    const opts: { id: string; label: string }[] = [];
+    for (const ch of itemsBudgetChapters) {
+      for (const sub of ch.subchapters) {
+        opts.push({ id: sub.id, label: `${ch.codigo} · ${ch.nombre} › ${sub.nombre}` });
+      }
+    }
+    return opts;
+  }, [itemsBudgetChapters]);
 
   const [frentesObraObrasOptions, setFrentesObraObrasOptions] = useState<
     { id: string; code: string; name: string }[]
@@ -1232,19 +1294,34 @@ export default function DashboardPage() {
         setItemsError(null);
         try {
           if (!itemsFilterProjectId) {
-            setItemsAdmin([]);
+            setItemsBudgetChapters([]);
+            setItemsTargetSubchapterId('');
             return;
           }
           const res = await fetch(
-            `/api/admin/catalogos/items?projectId=${encodeURIComponent(itemsFilterProjectId)}`,
+            `/api/admin/catalogos/items-tree?projectId=${encodeURIComponent(itemsFilterProjectId)}`,
             { credentials: 'include' },
           );
           const data = await res.json();
           if (!res.ok) throw new Error(data?.error ?? 'Error');
-          setItemsAdmin(Array.isArray(data.items) ? data.items : []);
+          const chapters = Array.isArray(data.chapters) ? (data.chapters as BudgetChapterTree[]) : [];
+          setItemsBudgetChapters(chapters);
+          const subIds = new Set<string>();
+          for (const ch of chapters) {
+            for (const s of ch.subchapters) subIds.add(s.id);
+          }
+          setItemsTargetSubchapterId((prev) => {
+            if (prev && subIds.has(prev)) return prev;
+            return chapters[0]?.subchapters?.[0]?.id ?? '';
+          });
+          setBudgetSubchapterChapterId((prev) => {
+            if (prev && chapters.some((c) => c.id === prev)) return prev;
+            return chapters[0]?.id ?? '';
+          });
         } catch {
-          setItemsAdmin([]);
-          setItemsError('Error al cargar ítems.');
+          setItemsBudgetChapters([]);
+          setItemsTargetSubchapterId('');
+          setItemsError('Error al cargar estructura de presupuesto (ítems).');
         }
       }
     };
@@ -2765,6 +2842,146 @@ export default function DashboardPage() {
     }
   };
 
+  const reloadItemsBudgetTree = useCallback(async () => {
+    if (!itemsFilterProjectId) return;
+    try {
+      const res = await fetch(
+        `/api/admin/catalogos/items-tree?projectId=${encodeURIComponent(itemsFilterProjectId)}`,
+        { credentials: 'include' },
+      );
+      const data = await res.json();
+      if (!res.ok) return;
+      const chapters = Array.isArray(data.chapters) ? (data.chapters as BudgetChapterTree[]) : [];
+      setItemsBudgetChapters(chapters);
+      const subIds = new Set<string>();
+      for (const ch of chapters) {
+        for (const s of ch.subchapters) subIds.add(s.id);
+      }
+      setItemsTargetSubchapterId((prev) => {
+        if (prev && subIds.has(prev)) return prev;
+        return chapters[0]?.subchapters?.[0]?.id ?? '';
+      });
+      setBudgetSubchapterChapterId((prev) => {
+        if (prev && chapters.some((c) => c.id === prev)) return prev;
+        return chapters[0]?.id ?? '';
+      });
+    } catch {
+      /* silencioso: errores ya se muestran en otras acciones */
+    }
+  }, [itemsFilterProjectId]);
+
+  const createBudgetChapter = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!itemsFilterProjectId) {
+      setItemsError('Seleccione una obra.');
+      return;
+    }
+    const cod = budgetChapterCodigo.trim();
+    const nom = budgetChapterNombre.trim();
+    if (!cod || !nom) {
+      setItemsError('Indique código y nombre del capítulo.');
+      return;
+    }
+    setItemsSaving(true);
+    setItemsError(null);
+    try {
+      const res = await fetch('/api/admin/catalogos/budget-chapters', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ projectId: itemsFilterProjectId, codigo: cod, nombre: nom }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setItemsError(data.error ?? 'No se pudo crear el capítulo');
+        return;
+      }
+      setBudgetChapterCodigo('');
+      setBudgetChapterNombre('');
+      await reloadItemsBudgetTree();
+    } catch {
+      setItemsError('Error de conexión.');
+    } finally {
+      setItemsSaving(false);
+    }
+  };
+
+  const createBudgetSubchapter = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const nom = budgetSubchapterNombre.trim();
+    const chId = budgetSubchapterChapterId.trim();
+    if (!chId || !nom) {
+      setItemsError('Seleccione capítulo padre y nombre del subcapítulo.');
+      return;
+    }
+    setItemsSaving(true);
+    setItemsError(null);
+    try {
+      const res = await fetch('/api/admin/catalogos/budget-subchapters', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ chapterId: chId, nombre: nom }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setItemsError(data.error ?? 'No se pudo crear el subcapítulo');
+        return;
+      }
+      setBudgetSubchapterNombre('');
+      if (data.subchapter?.id) setItemsTargetSubchapterId(String(data.subchapter.id));
+      await reloadItemsBudgetTree();
+    } catch {
+      setItemsError('Error de conexión.');
+    } finally {
+      setItemsSaving(false);
+    }
+  };
+
+  const deleteBudgetChapter = async (id: string, label: string) => {
+    if (!confirm(`¿Eliminar el capítulo "${label}" y todos sus subcapítulos e ítems asociados?`)) return;
+    setItemsSaving(true);
+    setItemsError(null);
+    try {
+      const res = await fetch(`/api/admin/catalogos/budget-chapters/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setItemsError(data.error ?? 'No se pudo eliminar');
+        return;
+      }
+      await reloadItemsBudgetTree();
+    } catch {
+      setItemsError('Error de conexión.');
+    } finally {
+      setItemsSaving(false);
+    }
+  };
+
+  const deleteBudgetSubchapter = async (id: string, label: string) => {
+    if (!confirm(`¿Eliminar el subcapítulo "${label}" y todos los ítems que contiene?`)) return;
+    setItemsSaving(true);
+    setItemsError(null);
+    try {
+      const res = await fetch(`/api/admin/catalogos/budget-subchapters/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setItemsError(data.error ?? 'No se pudo eliminar');
+        return;
+      }
+      await reloadItemsBudgetTree();
+    } catch {
+      setItemsError('Error de conexión.');
+    } finally {
+      setItemsSaving(false);
+    }
+  };
+
   const createItemCatalog = async (e: React.FormEvent) => {
     e.preventDefault();
     setItemsError(null);
@@ -2772,6 +2989,10 @@ export default function DashboardPage() {
     try {
       if (!itemsFilterProjectId) {
         setItemsError('Seleccione una obra.');
+        return;
+      }
+      if (!itemsTargetSubchapterId) {
+        setItemsError('Seleccione el subcapítulo donde se creará el ítem (estructura de presupuesto).');
         return;
       }
       if (!itemNewUnidad.trim()) {
@@ -2800,13 +3021,14 @@ export default function DashboardPage() {
         itemNewAltura,
         itemNewCantidad,
       );
-      const codigoAuto = nextAutonumericItemCatalogCodigo(itemsAdmin);
+      const codigoAuto = nextAutonumericItemCatalogCodigo(itemsAdminFlat);
       const res = await fetch('/api/admin/catalogos/items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           projectId: itemsFilterProjectId,
+          subchapterId: itemsTargetSubchapterId,
           codigo: codigoAuto,
           descripcion: itemNewDescripcion.trim(),
           unidad: icPayload.unidad,
@@ -2823,7 +3045,7 @@ export default function DashboardPage() {
         setItemsError(data.error ?? 'No se pudo crear');
         return;
       }
-      setItemsAdmin((prev) => [...prev, data.item]);
+      await reloadItemsBudgetTree();
       setItemNewDescripcion('');
       setItemNewUnidad('');
       setItemNewPrecio('');
@@ -2848,6 +3070,10 @@ export default function DashboardPage() {
       setItemsError('Pegue o cargue el texto del listado primero.');
       return;
     }
+    if (!itemsTargetSubchapterId) {
+      setItemsError('Seleccione el subcapítulo destino de la importación.');
+      return;
+    }
     setItemsSaving(true);
     setItemsError(null);
     try {
@@ -2857,6 +3083,7 @@ export default function DashboardPage() {
         credentials: 'include',
         body: JSON.stringify({
           projectId: itemsFilterProjectId,
+          subchapterId: itemsTargetSubchapterId,
           rawText: itemsImportRaw,
         }),
       });
@@ -2865,12 +3092,7 @@ export default function DashboardPage() {
         setItemsError(data.error ?? 'No se pudo importar');
         return;
       }
-      const rr = await fetch(
-        `/api/admin/catalogos/items?projectId=${encodeURIComponent(itemsFilterProjectId)}`,
-        { credentials: 'include' },
-      );
-      const dd = await rr.json();
-      if (rr.ok && Array.isArray(dd.items)) setItemsAdmin(dd.items);
+      await reloadItemsBudgetTree();
       setItemsError(`Importación completada (${data.imported ?? 0} ítems).`);
     } catch {
       setItemsError('Error de conexión.');
@@ -2914,6 +3136,7 @@ export default function DashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
+          subchapterId: editingItemForm.subchapterId.trim() || undefined,
           codigo: editingItemForm.codigo.trim(),
           descripcion: editingItemForm.descripcion.trim(),
           unidad: icEdit.unidad,
@@ -2933,7 +3156,7 @@ export default function DashboardPage() {
         setItemsError(data.error ?? 'No se pudo guardar');
         return;
       }
-      setItemsAdmin((prev) => prev.map((x) => (x.id === id ? data.item : x)));
+      await reloadItemsBudgetTree();
       setEditingItemId(null);
       setEditingItemForm({
         codigo: '',
@@ -2946,6 +3169,7 @@ export default function DashboardPage() {
         altura: '',
         imagenUrl: '',
         isActive: true,
+        subchapterId: '',
       });
     } catch {
       setItemsError('Error de conexión.');
@@ -2965,7 +3189,7 @@ export default function DashboardPage() {
         setItemsError(data.error ?? 'No se pudo eliminar');
         return;
       }
-      setItemsAdmin((prev) => prev.filter((x) => x.id !== id));
+      await reloadItemsBudgetTree();
       if (editingItemId === id) {
         setEditingItemId(null);
         setEditingItemForm({
@@ -2979,6 +3203,7 @@ export default function DashboardPage() {
           altura: '',
           imagenUrl: '',
           isActive: true,
+          subchapterId: '',
         });
       }
     } catch {
@@ -6398,8 +6623,9 @@ export default function DashboardPage() {
                   Ítems contractuales (por obra)
                 </h2>
                 <p className="shell-text">
-                  Aquí administra el listado de ítems para <strong>Actividades desarrolladas</strong>. Puede crear ítems
-                  manualmente o importar el texto de tus listados (`items1.txt` / `items2.txt`).
+                  El presupuesto se organiza en <strong>capítulos</strong>, <strong>subcapítulos</strong> e{' '}
+                  <strong>ítems</strong> (actividades medibles y cobrables), alineado a estructuras tipo licitación y
+                  APU. Los ítems se usan en <strong>Actividades desarrolladas</strong> del informe diario.
                 </p>
                 {itemsError && <p className={itemsError.startsWith('Importación completada') ? 'feedback feedback-success' : 'feedback feedback-error'}>{itemsError}</p>}
 
@@ -6422,6 +6648,111 @@ export default function DashboardPage() {
                     )}
                   </select>
                 </div>
+
+                {itemsFilterProjectId ? (
+                  <>
+                    <h3 className="shell-title" style={{ fontSize: '1rem', marginTop: '0.25rem' }}>
+                      Estructura del presupuesto
+                    </h3>
+                    <p className="shell-text-muted" style={{ marginBottom: '0.75rem' }}>
+                      Capítulo (rubro mayor) → subcapítulo (agrupación) → ítems. Las importaciones y los ítems nuevos
+                      se ubican en el subcapítulo que elija abajo.
+                    </p>
+                    <div className="form-field" style={{ marginBottom: '1rem' }}>
+                      <label className="form-label" htmlFor="items-target-subchapter">
+                        Subcapítulo destino (importar / crear ítem aquí)
+                      </label>
+                      <select
+                        id="items-target-subchapter"
+                        className="form-input"
+                        value={itemsTargetSubchapterId}
+                        onChange={(e) => setItemsTargetSubchapterId(e.target.value)}
+                        disabled={itemsSaving || subchapterPickerOptions.length === 0}
+                      >
+                        {subchapterPickerOptions.length === 0 ? (
+                          <option value="">— Cree un capítulo y subcapítulo —</option>
+                        ) : (
+                          subchapterPickerOptions.map((o) => (
+                            <option key={o.id} value={o.id}>
+                              {o.label}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+                    <div
+                      className="form-row-inline"
+                      style={{ marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'flex-end' }}
+                    >
+                      <form className="auth-form" onSubmit={createBudgetChapter} style={{ flex: '1 1 280px', margin: 0 }}>
+                        <h4 className="shell-title" style={{ fontSize: '0.92rem' }}>Nuevo capítulo</h4>
+                        <div className="form-row-inline">
+                          <div className="form-field" style={{ marginBottom: 0, minWidth: '6rem' }}>
+                            <label className="form-label" htmlFor="budget-ch-codigo">Código</label>
+                            <input
+                              id="budget-ch-codigo"
+                              className="form-input"
+                              placeholder="ej. 1000"
+                              value={budgetChapterCodigo}
+                              onChange={(e) => setBudgetChapterCodigo(e.target.value)}
+                              disabled={itemsSaving}
+                            />
+                          </div>
+                          <div className="form-field" style={{ marginBottom: 0, flex: 1, minWidth: '10rem' }}>
+                            <label className="form-label" htmlFor="budget-ch-nombre">Nombre</label>
+                            <input
+                              id="budget-ch-nombre"
+                              className="form-input"
+                              placeholder="Ej. Mantenimiento rutinario ciclorruta"
+                              value={budgetChapterNombre}
+                              onChange={(e) => setBudgetChapterNombre(e.target.value)}
+                              disabled={itemsSaving}
+                            />
+                          </div>
+                          <button type="submit" className="btn-secondary" disabled={itemsSaving} style={{ marginTop: '1.35rem' }}>
+                            + Capítulo
+                          </button>
+                        </div>
+                      </form>
+                      <form className="auth-form" onSubmit={createBudgetSubchapter} style={{ flex: '1 1 300px', margin: 0 }}>
+                        <h4 className="shell-title" style={{ fontSize: '0.92rem' }}>Nuevo subcapítulo</h4>
+                        <div className="form-row-inline">
+                          <div className="form-field" style={{ marginBottom: 0, minWidth: '10rem' }}>
+                            <label className="form-label" htmlFor="budget-sub-ch">Capítulo padre</label>
+                            <select
+                              id="budget-sub-ch"
+                              className="form-input"
+                              value={budgetSubchapterChapterId}
+                              onChange={(e) => setBudgetSubchapterChapterId(e.target.value)}
+                              disabled={itemsSaving || itemsBudgetChapters.length === 0}
+                            >
+                              <option value="">— Seleccione —</option>
+                              {itemsBudgetChapters.map((ch) => (
+                                <option key={ch.id} value={ch.id}>
+                                  {ch.codigo} · {ch.nombre}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="form-field" style={{ marginBottom: 0, flex: 1, minWidth: '8rem' }}>
+                            <label className="form-label" htmlFor="budget-sub-nombre">Nombre</label>
+                            <input
+                              id="budget-sub-nombre"
+                              className="form-input"
+                              placeholder="Ej. Ciclorruta en adoquín"
+                              value={budgetSubchapterNombre}
+                              onChange={(e) => setBudgetSubchapterNombre(e.target.value)}
+                              disabled={itemsSaving}
+                            />
+                          </div>
+                          <button type="submit" className="btn-secondary" disabled={itemsSaving} style={{ marginTop: '1.35rem' }}>
+                            + Subcapítulo
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </>
+                ) : null}
 
                 <div className="form-field" style={{ marginBottom: '1rem' }}>
                   <label className="form-label" htmlFor="items-import-file">Importar listado de ítems (.txt)</label>
@@ -6456,7 +6787,9 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   className="btn-primary"
-                  disabled={!itemsFilterProjectId || itemsSaving || !itemsImportRaw.trim()}
+                  disabled={
+                    !itemsFilterProjectId || !itemsTargetSubchapterId || itemsSaving || !itemsImportRaw.trim()
+                  }
                   onClick={importItemsCatalog}
                   style={{ marginBottom: '1.25rem' }}
                 >
@@ -6476,7 +6809,7 @@ export default function DashboardPage() {
                         aria-readonly="true"
                         value={
                           itemsFilterProjectId
-                            ? nextAutonumericItemCatalogCodigo(itemsAdmin)
+                            ? nextAutonumericItemCatalogCodigo(itemsAdminFlat)
                             : '—'
                         }
                         title="Se asigna automáticamente al crear el ítem (siguiente número disponible en esta obra)."
@@ -6634,7 +6967,11 @@ export default function DashboardPage() {
                     <label className="form-label">Descripción</label>
                     <input className="form-input" type="text" required value={itemNewDescripcion} onChange={(e) => setItemNewDescripcion(e.target.value)} />
                   </div>
-                  <button type="submit" className="btn-primary" disabled={itemsSaving || !itemsFilterProjectId}>
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    disabled={itemsSaving || !itemsFilterProjectId || !itemsTargetSubchapterId}
+                  >
                     {itemsSaving ? 'Guardando...' : 'Crear ítem'}
                   </button>
                 </form>
@@ -6644,15 +6981,64 @@ export default function DashboardPage() {
                   <p className="shell-text-muted" style={{ padding: '1rem' }}>
                     Seleccione una obra para ver o crear ítems.
                   </p>
-                ) : itemsAdmin.length === 0 ? (
+                ) : itemsBudgetChapters.length === 0 ? (
                   <p className="shell-text-muted" style={{ padding: '1rem' }}>
-                    No hay ítems para esta obra. Importe o cree uno arriba.
+                    No se pudo cargar la jerarquía de presupuesto. Compruebe la base de datos (migración Prisma).
                   </p>
                 ) : (
+                  <>
+                    <details className="items-budget-manage" style={{ marginBottom: '1rem' }}>
+                      <summary className="shell-text" style={{ cursor: 'pointer', fontWeight: 600 }}>
+                        Gestionar capítulos y subcapítulos (eliminar)
+                      </summary>
+                      <div style={{ marginTop: '0.75rem' }}>
+                        {itemsBudgetChapters.map((ch) => (
+                          <div key={ch.id} className="shell-text" style={{ marginBottom: '0.85rem' }}>
+                            <strong>{ch.codigo}</strong> — {ch.nombre}{' '}
+                            <button
+                              type="button"
+                              className="danger"
+                              style={{ marginLeft: '0.35rem', fontSize: '0.78rem' }}
+                              disabled={itemsSaving}
+                              onClick={() => deleteBudgetChapter(ch.id, `${ch.codigo} ${ch.nombre}`)}
+                            >
+                              Eliminar capítulo
+                            </button>
+                            <ul style={{ margin: '0.35rem 0 0 1rem', padding: 0, listStyle: 'disc' }}>
+                              {ch.subchapters.map((sub) => (
+                                <li key={sub.id} style={{ marginBottom: '0.25rem' }}>
+                                  {sub.nombre}{' '}
+                                  <span className="shell-text-muted">({sub.items.length} ítems)</span>{' '}
+                                  <button
+                                    type="button"
+                                    className="danger"
+                                    style={{ fontSize: '0.78rem' }}
+                                    disabled={itemsSaving}
+                                    onClick={() => deleteBudgetSubchapter(sub.id, sub.nombre)}
+                                  >
+                                    Eliminar subcapítulo
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                    {itemsAdminFlat.length === 0 ? (
+                      <p className="shell-text-muted" style={{ padding: '1rem' }}>
+                        Aún no hay ítems en ningún subcapítulo. Importe un listado o cree un ítem arriba.
+                      </p>
+                    ) : null}
+                  </>
+                )}
+                {itemsFilterProjectId && itemsBudgetChapters.length > 0 && itemsAdminFlat.length > 0 ? (
                   <div className="users-table-wrap">
                     <table className="users-table">
                       <thead>
                         <tr>
+                          <th>Capítulo</th>
+                          <th>Subcapítulo</th>
                           <th>Código</th>
                           <th>Descripción</th>
                           <th>Unidad</th>
@@ -6668,8 +7054,40 @@ export default function DashboardPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {itemsAdmin.map((it) => (
+                        {itemsAdminFlat.map((it) => (
                           <tr key={it.id}>
+                            <td style={{ maxWidth: '9rem', verticalAlign: 'top' }}>
+                              {editingItemId === it.id ? (
+                                <span className="shell-text-muted" style={{ fontSize: '0.78rem' }}>
+                                  {it.chapterCodigo} · {it.chapterNombre}
+                                </span>
+                              ) : (
+                                <>
+                                  <div style={{ fontWeight: 600 }}>{it.chapterCodigo}</div>
+                                  <div className="shell-text-muted" style={{ fontSize: '0.78rem', lineHeight: 1.25 }}>
+                                    {it.chapterNombre}
+                                  </div>
+                                </>
+                              )}
+                            </td>
+                            <td style={{ maxWidth: '10rem', verticalAlign: 'top' }}>
+                              {editingItemId === it.id ? (
+                                <select
+                                  className="form-input"
+                                  style={{ minWidth: '9rem', fontSize: '0.78rem' }}
+                                  value={editingItemForm.subchapterId}
+                                  onChange={(e) => setEditingItemForm((p) => ({ ...p, subchapterId: e.target.value }))}
+                                >
+                                  {subchapterPickerOptions.map((o) => (
+                                    <option key={o.id} value={o.id}>
+                                      {o.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                it.subchapterNombre
+                              )}
+                            </td>
                             <td>
                               {editingItemId === it.id ? (
                                 <input className="form-input" type="text" value={editingItemForm.codigo} onChange={(e) => setEditingItemForm((p) => ({ ...p, codigo: e.target.value }))} />
@@ -6882,6 +7300,7 @@ export default function DashboardPage() {
                                         altura: it.altura != null ? String(it.altura) : '',
                                         imagenUrl: it.imagenUrl ?? '',
                                         isActive: it.isActive,
+                                        subchapterId: it.subchapterId,
                                       });
                                     }}
                                   >
@@ -6898,7 +7317,7 @@ export default function DashboardPage() {
                       </tbody>
                     </table>
                   </div>
-                )}
+                ) : null}
               </>
             )}
           </section>
@@ -8902,7 +9321,7 @@ export default function DashboardPage() {
                       value={actividadDraft.itemContractual}
                       options={itemsCatalogOptions.map((it) => ({
                         value: it.codigo,
-                        label: `${it.codigo} - ${it.descripcion}${it.unidad ? ` (${it.unidad})` : ''}`,
+                        label: `${it.codigo} - ${it.descripcion}${it.unidad ? ` (${it.unidad})` : ''}${it.rubro ? ` — ${it.rubro}` : ''}`,
                       }))}
                       onChange={(codigo) => {
                         if (!codigo) {

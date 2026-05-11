@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessToken } from '../../../../../../src/infrastructure/auth/tokens';
 import prisma from '../../../../../../src/lib/prisma';
+import { assertSubchapterBelongsToProject } from '../../../../../../src/lib/budgetHierarchy';
 
 function unauthorized(req: NextRequest) {
   const authCookie = req.cookies.get('access_token')?.value;
@@ -27,6 +28,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
     const { id } = await params;
     const body = (await req.json()) as {
+      subchapterId?: string;
       codigo?: string;
       descripcion?: string;
       unidad?: string | null;
@@ -40,7 +42,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       orden?: number;
     };
 
+    const existing = await prisma.itemCatalog.findFirst({
+      where: { id },
+      select: { projectId: true },
+    });
+    if (!existing) return NextResponse.json({ error: 'Ítem no encontrado' }, { status: 404 });
+
     const data: Record<string, unknown> = {};
+    if (body.subchapterId !== undefined) {
+      const sid = String(body.subchapterId).trim();
+      if (!sid) return NextResponse.json({ error: 'subchapterId inválido' }, { status: 400 });
+      const ok = await assertSubchapterBelongsToProject(prisma, existing.projectId, sid);
+      if (!ok) return NextResponse.json({ error: 'Subcapítulo no válido para la obra de este ítem' }, { status: 400 });
+      data.subchapterId = sid;
+    }
     if (body.codigo !== undefined) {
       const codigo = String(body.codigo).trim();
       if (!codigo) return NextResponse.json({ error: 'El código es requerido' }, { status: 400 });

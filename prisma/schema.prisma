@@ -43,6 +43,41 @@ model Project {
   encargadosCatalog EncargadoReporteCatalog[]
   cargosCatalog     CargoCatalog[]
   itemsCatalog      ItemCatalog[]
+  budgetChapters    BudgetChapter[]
+}
+
+/// Capítulo de presupuesto (nivel 1: rubros tipo licitación / APU).
+model BudgetChapter {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  codigo      String
+  nombre      String
+  orden       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  subchapters BudgetSubchapter[]
+
+  @@unique([projectId, codigo])
+  @@index([projectId, orden])
+}
+
+/// Subcapítulo (nivel 2) dentro de un capítulo.
+model BudgetSubchapter {
+  id        String   @id @default(cuid())
+  chapterId String
+  chapter   BudgetChapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  nombre    String
+  orden     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items ItemCatalog[]
+
+  @@index([chapterId, orden])
 }
 
 // Frentes de obra por proyecto. Configurables en administración; el informe referencia el ítem del catálogo.
@@ -384,6 +419,9 @@ model ItemCatalog {
   projectId     String
   project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
+  subchapterId  String
+  subchapter    BudgetSubchapter @relation(fields: [subchapterId], references: [id], onDelete: Cascade)
+
   codigo        String
   descripcion   String
   unidad        String?
@@ -401,6 +439,7 @@ model ItemCatalog {
 
   @@unique([projectId, codigo])
   @@index([projectId, isActive, orden, codigo])
+  @@index([subchapterId, orden])
 }
 
 model RoleMenuPermission {
