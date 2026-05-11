@@ -6658,8 +6658,8 @@ export default function DashboardPage() {
                     </h3>
                     <p className="shell-text-muted" style={{ marginBottom: '0.75rem' }}>
                       <strong>Paso 1:</strong> cree al menos un capítulo y un subcapítulo. <strong>Paso 2:</strong>{' '}
-                      elija el subcapítulo donde irán los ítems nuevos. <strong>Paso 3:</strong> use el formulario «Crear
-                      ítem manual» más abajo.
+                      elija el subcapítulo donde irán los ítems nuevos. También puede cambiarlo directamente en el
+                      formulario «Crear ítem manual» más abajo.
                     </p>
                     <div className="form-field" style={{ marginBottom: '1rem' }}>
                       <label className="form-label" htmlFor="items-target-subchapter">
@@ -6766,6 +6766,32 @@ export default function DashboardPage() {
 
                 <form className="auth-form" onSubmit={createItemCatalog} style={{ marginBottom: '1.5rem' }}>
                   <h3 className="shell-title" style={{ fontSize: '1rem' }}>Crear ítem manual</h3>
+                  <div className="form-field" style={{ marginBottom: '0.75rem' }}>
+                    <label className="form-label" htmlFor="item-new-subchapter">
+                      Capítulo / subcapítulo donde se guardará este ítem
+                    </label>
+                    <select
+                      id="item-new-subchapter"
+                      className="form-input"
+                      required
+                      value={itemsTargetSubchapterId}
+                      onChange={(e) => setItemsTargetSubchapterId(e.target.value)}
+                      disabled={itemsSaving || subchapterPickerOptions.length === 0}
+                    >
+                      {subchapterPickerOptions.length === 0 ? (
+                        <option value="">— Primero cree un capítulo y un subcapítulo —</option>
+                      ) : (
+                        subchapterPickerOptions.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.label}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                    <p className="shell-text-muted" style={{ marginTop: '0.35rem', marginBottom: 0 }}>
+                      El ítem quedará asociado al subcapítulo seleccionado aquí.
+                    </p>
+                  </div>
                   <div className="form-row-inline">
                     <div className="form-field" style={{ marginBottom: 0 }}>
                       <label className="form-label" htmlFor="item-new-codigo">Código</label>
