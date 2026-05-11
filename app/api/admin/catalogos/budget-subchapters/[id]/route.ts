@@ -15,8 +15,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const a = auth(req);
     if (a) return NextResponse.json({ error: a.error }, { status: a.status });
     const { id } = await params;
-    const body = (await req.json()) as { nombre?: string; orden?: number; isActive?: boolean };
+    const body = (await req.json()) as { chapterId?: string; nombre?: string; orden?: number; isActive?: boolean };
     const data: Record<string, unknown> = {};
+    if (body.chapterId !== undefined) {
+      const chapterId = String(body.chapterId).trim();
+      if (!chapterId) return NextResponse.json({ error: 'chapterId inválido' }, { status: 400 });
+      const current = await prisma.budgetSubchapter.findUnique({
+        where: { id },
+        select: { chapter: { select: { projectId: true } } },
+      });
+      if (!current) return NextResponse.json({ error: 'Subcapítulo no encontrado' }, { status: 404 });
+      const target = await prisma.budgetChapter.findUnique({
+        where: { id: chapterId },
+        select: { projectId: true },
+      });
+      if (!target || target.projectId !== current.chapter.projectId) {
+        return NextResponse.json({ error: 'Capítulo padre no válido para esta obra' }, { status: 400 });
+      }
+      data.chapterId = chapterId;
+    }
     if (body.nombre !== undefined) {
       const n = String(body.nombre).trim();
       if (!n) return NextResponse.json({ error: 'Nombre inválido' }, { status: 400 });

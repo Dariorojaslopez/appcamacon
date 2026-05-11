@@ -319,6 +319,22 @@ function flattenItemCatalogTree(
   return rows;
 }
 
+function flattenBudgetSubchapters(
+  chapters: BudgetChapterTree[],
+): Array<BudgetSubchapterTree & { chapterCodigo: string; chapterNombre: string }> {
+  const rows: Array<BudgetSubchapterTree & { chapterCodigo: string; chapterNombre: string }> = [];
+  for (const ch of chapters) {
+    for (const sub of ch.subchapters) {
+      rows.push({
+        ...sub,
+        chapterCodigo: ch.codigo,
+        chapterNombre: ch.nombre,
+      });
+    }
+  }
+  return rows;
+}
+
 const emptyPersonalDraft = () => ({
   nombre: '',
   cargo: '',
@@ -738,6 +754,20 @@ export default function DashboardPage() {
   const [itemsFilterProjectId, setItemsFilterProjectId] = useState('');
   const [itemsSaving, setItemsSaving] = useState(false);
   const [itemsError, setItemsError] = useState<string | null>(null);
+  const [editingBudgetChapterId, setEditingBudgetChapterId] = useState<string | null>(null);
+  const [editingBudgetChapterForm, setEditingBudgetChapterForm] = useState({
+    codigo: '',
+    nombre: '',
+    orden: 0,
+    isActive: true,
+  });
+  const [editingBudgetSubchapterId, setEditingBudgetSubchapterId] = useState<string | null>(null);
+  const [editingBudgetSubchapterForm, setEditingBudgetSubchapterForm] = useState({
+    chapterId: '',
+    nombre: '',
+    orden: 0,
+    isActive: true,
+  });
   const [itemNewDescripcion, setItemNewDescripcion] = useState('');
   const [itemNewUnidad, setItemNewUnidad] = useState('');
   const [itemNewPrecio, setItemNewPrecio] = useState('');
@@ -763,6 +793,7 @@ export default function DashboardPage() {
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
 
   const itemsAdminFlat = useMemo(() => flattenItemCatalogTree(itemsBudgetChapters), [itemsBudgetChapters]);
+  const budgetSubchaptersFlat = useMemo(() => flattenBudgetSubchapters(itemsBudgetChapters), [itemsBudgetChapters]);
 
   const subchapterPickerOptions = useMemo(() => {
     const opts: { id: string; label: string }[] = [];
@@ -2960,6 +2991,80 @@ export default function DashboardPage() {
     }
   };
 
+  const saveEditBudgetChapter = async (id: string) => {
+    const codigo = editingBudgetChapterForm.codigo.trim();
+    const nombre = editingBudgetChapterForm.nombre.trim();
+    if (!codigo || !nombre) {
+      setItemsError('Indique código y nombre del capítulo.');
+      return;
+    }
+    setItemsSaving(true);
+    setItemsError(null);
+    try {
+      const res = await fetch(`/api/admin/catalogos/budget-chapters/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          codigo,
+          nombre,
+          orden: editingBudgetChapterForm.orden,
+          isActive: editingBudgetChapterForm.isActive,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setItemsError(data.error ?? 'No se pudo guardar el capítulo');
+        return;
+      }
+      await reloadItemsBudgetTree();
+      setEditingBudgetChapterId(null);
+      setEditingBudgetChapterForm({ codigo: '', nombre: '', orden: 0, isActive: true });
+      setItemsError('Capítulo actualizado correctamente.');
+    } catch {
+      setItemsError('Error de conexión.');
+    } finally {
+      setItemsSaving(false);
+    }
+  };
+
+  const saveEditBudgetSubchapter = async (id: string) => {
+    const chapterId = editingBudgetSubchapterForm.chapterId.trim();
+    const nombre = editingBudgetSubchapterForm.nombre.trim();
+    if (!chapterId || !nombre) {
+      setItemsError('Seleccione capítulo padre y nombre del subcapítulo.');
+      return;
+    }
+    setItemsSaving(true);
+    setItemsError(null);
+    try {
+      const res = await fetch(`/api/admin/catalogos/budget-subchapters/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          chapterId,
+          nombre,
+          orden: editingBudgetSubchapterForm.orden,
+          isActive: editingBudgetSubchapterForm.isActive,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setItemsError(data.error ?? 'No se pudo guardar el subcapítulo');
+        return;
+      }
+      await reloadItemsBudgetTree();
+      setEditingBudgetSubchapterId(null);
+      setEditingBudgetSubchapterForm({ chapterId: '', nombre: '', orden: 0, isActive: true });
+      setItemsError('Subcapítulo actualizado correctamente.');
+    } catch {
+      setItemsError('Error de conexión.');
+    } finally {
+      setItemsSaving(false);
+    }
+  };
+
   const deleteBudgetChapter = async (id: string, label: string) => {
     if (!confirm(`¿Eliminar el capítulo "${label}" y todos sus subcapítulos e ítems asociados?`)) return;
     setItemsSaving(true);
@@ -2975,6 +3080,10 @@ export default function DashboardPage() {
         return;
       }
       await reloadItemsBudgetTree();
+      if (editingBudgetChapterId === id) {
+        setEditingBudgetChapterId(null);
+        setEditingBudgetChapterForm({ codigo: '', nombre: '', orden: 0, isActive: true });
+      }
     } catch {
       setItemsError('Error de conexión.');
     } finally {
@@ -2997,6 +3106,10 @@ export default function DashboardPage() {
         return;
       }
       await reloadItemsBudgetTree();
+      if (editingBudgetSubchapterId === id) {
+        setEditingBudgetSubchapterId(null);
+        setEditingBudgetSubchapterForm({ chapterId: '', nombre: '', orden: 0, isActive: true });
+      }
     } catch {
       setItemsError('Error de conexión.');
     } finally {
@@ -6653,113 +6766,380 @@ export default function DashboardPage() {
 
                 {itemsFilterProjectId ? (
                   <>
-                    <h3 className="shell-title" style={{ fontSize: '1rem', marginTop: '0.25rem' }}>
-                      Estructura del presupuesto
-                    </h3>
-                    <p className="shell-text-muted" style={{ marginBottom: '0.75rem' }}>
-                      <strong>Paso 1:</strong> cree al menos un capítulo y un subcapítulo. <strong>Paso 2:</strong>{' '}
-                      elija el subcapítulo donde irán los ítems nuevos. También puede cambiarlo directamente en el
-                      formulario «Crear ítem manual» más abajo.
-                    </p>
-                    <div className="form-field" style={{ marginBottom: '1rem' }}>
-                      <label className="form-label" htmlFor="items-target-subchapter">
-                        Subcapítulo donde se crearán los ítems nuevos
-                      </label>
-                      <select
-                        id="items-target-subchapter"
-                        className="form-input"
-                        value={itemsTargetSubchapterId}
-                        onChange={(e) => setItemsTargetSubchapterId(e.target.value)}
-                        disabled={itemsSaving || subchapterPickerOptions.length === 0}
-                      >
-                        {subchapterPickerOptions.length === 0 ? (
-                          <option value="">— Cree un capítulo y subcapítulo —</option>
-                        ) : (
-                          subchapterPickerOptions.map((o) => (
-                            <option key={o.id} value={o.id}>
-                              {o.label}
-                            </option>
-                          ))
-                        )}
-                      </select>
-                    </div>
                     <div className="budget-hierarchy-forms">
-                      <form className="budget-inline-form" onSubmit={createBudgetChapter}>
+                      <section className="budget-inline-form">
                         <h4 className="shell-title" style={{ fontSize: '0.92rem', margin: 0 }}>
-                          Nuevo capítulo
+                          Configuración de capítulos
                         </h4>
                         <p className="shell-text-muted" style={{ margin: 0, fontSize: '0.78rem' }}>
-                          Rubro mayor del presupuesto (ej. 1000, 2000…).
+                          Cree los rubros mayores del presupuesto y adminístrelos desde la tabla.
                         </p>
-                        <div className="form-row-inline">
-                          <div className="form-field" style={{ marginBottom: 0, minWidth: '6rem' }}>
-                            <label className="form-label" htmlFor="budget-ch-codigo">Código</label>
-                            <input
-                              id="budget-ch-codigo"
-                              className="form-input"
-                              placeholder="ej. 1000"
-                              value={budgetChapterCodigo}
-                              onChange={(e) => setBudgetChapterCodigo(e.target.value)}
-                              disabled={itemsSaving}
-                            />
+                        <form onSubmit={createBudgetChapter}>
+                          <div className="form-row-inline">
+                            <div className="form-field" style={{ marginBottom: 0, minWidth: '6rem' }}>
+                              <label className="form-label" htmlFor="budget-ch-codigo">Código</label>
+                              <input
+                                id="budget-ch-codigo"
+                                className="form-input"
+                                placeholder="ej. 1000"
+                                value={budgetChapterCodigo}
+                                onChange={(e) => setBudgetChapterCodigo(e.target.value)}
+                                disabled={itemsSaving}
+                              />
+                            </div>
+                            <div className="form-field" style={{ marginBottom: 0, flex: '1 1 10rem', minWidth: 0 }}>
+                              <label className="form-label" htmlFor="budget-ch-nombre">Nombre</label>
+                              <input
+                                id="budget-ch-nombre"
+                                className="form-input"
+                                placeholder="Ej. Mantenimiento rutinario ciclorruta"
+                                value={budgetChapterNombre}
+                                onChange={(e) => setBudgetChapterNombre(e.target.value)}
+                                disabled={itemsSaving}
+                              />
+                            </div>
+                            <button type="submit" className="btn-primary" disabled={itemsSaving}>
+                              Crear capítulo
+                            </button>
                           </div>
-                          <div className="form-field" style={{ marginBottom: 0, flex: '1 1 10rem', minWidth: 0 }}>
-                            <label className="form-label" htmlFor="budget-ch-nombre">Nombre</label>
-                            <input
-                              id="budget-ch-nombre"
-                              className="form-input"
-                              placeholder="Ej. Mantenimiento rutinario ciclorruta"
-                              value={budgetChapterNombre}
-                              onChange={(e) => setBudgetChapterNombre(e.target.value)}
-                              disabled={itemsSaving}
-                            />
+                        </form>
+                        {itemsBudgetChapters.length === 0 ? (
+                          <p className="shell-text-muted" style={{ margin: 0 }}>
+                            Aún no hay capítulos para esta obra.
+                          </p>
+                        ) : (
+                          <div className="users-table-wrap">
+                            <table className="users-table">
+                              <thead>
+                                <tr>
+                                  <th>Código</th>
+                                  <th>Nombre</th>
+                                  <th>Orden</th>
+                                  <th>Activo</th>
+                                  <th>Subcapítulos</th>
+                                  <th>Acciones</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {itemsBudgetChapters.map((ch) => (
+                                  <tr key={ch.id}>
+                                    <td>
+                                      {editingBudgetChapterId === ch.id ? (
+                                        <input
+                                          className="form-input"
+                                          type="text"
+                                          value={editingBudgetChapterForm.codigo}
+                                          onChange={(e) =>
+                                            setEditingBudgetChapterForm((p) => ({ ...p, codigo: e.target.value }))
+                                          }
+                                        />
+                                      ) : (
+                                        ch.codigo
+                                      )}
+                                    </td>
+                                    <td>
+                                      {editingBudgetChapterId === ch.id ? (
+                                        <input
+                                          className="form-input"
+                                          type="text"
+                                          value={editingBudgetChapterForm.nombre}
+                                          onChange={(e) =>
+                                            setEditingBudgetChapterForm((p) => ({ ...p, nombre: e.target.value }))
+                                          }
+                                        />
+                                      ) : (
+                                        ch.nombre
+                                      )}
+                                    </td>
+                                    <td>
+                                      {editingBudgetChapterId === ch.id ? (
+                                        <input
+                                          className="form-input"
+                                          type="number"
+                                          value={editingBudgetChapterForm.orden}
+                                          onChange={(e) =>
+                                            setEditingBudgetChapterForm((p) => ({
+                                              ...p,
+                                              orden: Number(e.target.value) || 0,
+                                            }))
+                                          }
+                                        />
+                                      ) : (
+                                        ch.orden
+                                      )}
+                                    </td>
+                                    <td>
+                                      {editingBudgetChapterId === ch.id ? (
+                                        <input
+                                          type="checkbox"
+                                          checked={editingBudgetChapterForm.isActive}
+                                          onChange={(e) =>
+                                            setEditingBudgetChapterForm((p) => ({ ...p, isActive: e.target.checked }))
+                                          }
+                                        />
+                                      ) : ch.isActive ? (
+                                        'Sí'
+                                      ) : (
+                                        'No'
+                                      )}
+                                    </td>
+                                    <td>{ch.subchapters.length}</td>
+                                    <td>
+                                      {editingBudgetChapterId === ch.id ? (
+                                        <div className="users-table-actions">
+                                          <button
+                                            type="button"
+                                            onClick={() => saveEditBudgetChapter(ch.id)}
+                                            disabled={itemsSaving}
+                                          >
+                                            {itemsSaving ? 'Guardando...' : 'Guardar'}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="btn-cancel"
+                                            onClick={() => {
+                                              setEditingBudgetChapterId(null);
+                                              setEditingBudgetChapterForm({
+                                                codigo: '',
+                                                nombre: '',
+                                                orden: 0,
+                                                isActive: true,
+                                              });
+                                            }}
+                                          >
+                                            Cancelar
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <div className="users-table-actions">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setEditingBudgetChapterId(ch.id);
+                                              setEditingBudgetChapterForm({
+                                                codigo: ch.codigo,
+                                                nombre: ch.nombre,
+                                                orden: ch.orden,
+                                                isActive: ch.isActive,
+                                              });
+                                            }}
+                                          >
+                                            <IconEdit /> Editar
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="danger"
+                                            disabled={itemsSaving}
+                                            onClick={() => deleteBudgetChapter(ch.id, `${ch.codigo} ${ch.nombre}`)}
+                                          >
+                                            <IconTrash /> Eliminar
+                                          </button>
+                                        </div>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
                           </div>
-                          <button type="submit" className="btn-primary" disabled={itemsSaving}>
-                            Crear capítulo
-                          </button>
-                        </div>
-                      </form>
-                      <form className="budget-inline-form" onSubmit={createBudgetSubchapter}>
+                        )}
+                      </section>
+                      <section className="budget-inline-form">
                         <h4 className="shell-title" style={{ fontSize: '0.92rem', margin: 0 }}>
-                          Nuevo subcapítulo
+                          Configuración de subcapítulos
                         </h4>
                         <p className="shell-text-muted" style={{ margin: 0, fontSize: '0.78rem' }}>
-                          Agrupación dentro del capítulo (ej. tipo de pavimento o intervención).
+                          Cree agrupaciones y asígnelas al capítulo que corresponda.
                         </p>
-                        <div className="form-row-inline">
-                          <div className="form-field" style={{ marginBottom: 0, minWidth: '10rem', flex: '1 1 40%' }}>
-                            <label className="form-label" htmlFor="budget-sub-ch">Capítulo padre</label>
-                            <select
-                              id="budget-sub-ch"
-                              className="form-input"
-                              value={budgetSubchapterChapterId}
-                              onChange={(e) => setBudgetSubchapterChapterId(e.target.value)}
-                              disabled={itemsSaving || itemsBudgetChapters.length === 0}
-                            >
-                              <option value="">— Seleccione —</option>
-                              {itemsBudgetChapters.map((ch) => (
-                                <option key={ch.id} value={ch.id}>
-                                  {ch.codigo} · {ch.nombre}
-                                </option>
-                              ))}
-                            </select>
+                        <form onSubmit={createBudgetSubchapter}>
+                          <div className="form-row-inline">
+                            <div className="form-field" style={{ marginBottom: 0, minWidth: '10rem', flex: '1 1 40%' }}>
+                              <label className="form-label" htmlFor="budget-sub-ch">Capítulo padre</label>
+                              <select
+                                id="budget-sub-ch"
+                                className="form-input"
+                                value={budgetSubchapterChapterId}
+                                onChange={(e) => setBudgetSubchapterChapterId(e.target.value)}
+                                disabled={itemsSaving || itemsBudgetChapters.length === 0}
+                              >
+                                <option value="">— Seleccione —</option>
+                                {itemsBudgetChapters.map((ch) => (
+                                  <option key={ch.id} value={ch.id}>
+                                    {ch.codigo} · {ch.nombre}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="form-field" style={{ marginBottom: 0, flex: '1 1 8rem', minWidth: 0 }}>
+                              <label className="form-label" htmlFor="budget-sub-nombre">Nombre</label>
+                              <input
+                                id="budget-sub-nombre"
+                                className="form-input"
+                                placeholder="Ej. Ciclorruta en adoquín"
+                                value={budgetSubchapterNombre}
+                                onChange={(e) => setBudgetSubchapterNombre(e.target.value)}
+                                disabled={itemsSaving}
+                              />
+                            </div>
+                            <button type="submit" className="btn-primary" disabled={itemsSaving || itemsBudgetChapters.length === 0}>
+                              Crear subcapítulo
+                            </button>
                           </div>
-                          <div className="form-field" style={{ marginBottom: 0, flex: '1 1 8rem', minWidth: 0 }}>
-                            <label className="form-label" htmlFor="budget-sub-nombre">Nombre</label>
-                            <input
-                              id="budget-sub-nombre"
-                              className="form-input"
-                              placeholder="Ej. Ciclorruta en adoquín"
-                              value={budgetSubchapterNombre}
-                              onChange={(e) => setBudgetSubchapterNombre(e.target.value)}
-                              disabled={itemsSaving}
-                            />
+                        </form>
+                        {budgetSubchaptersFlat.length === 0 ? (
+                          <p className="shell-text-muted" style={{ margin: 0 }}>
+                            Cree al menos un subcapítulo para poder asociar ítems.
+                          </p>
+                        ) : (
+                          <div className="users-table-wrap">
+                            <table className="users-table">
+                              <thead>
+                                <tr>
+                                  <th>Capítulo</th>
+                                  <th>Subcapítulo</th>
+                                  <th>Orden</th>
+                                  <th>Activo</th>
+                                  <th>Ítems</th>
+                                  <th>Acciones</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {budgetSubchaptersFlat.map((sub) => (
+                                  <tr key={sub.id}>
+                                    <td>
+                                      {editingBudgetSubchapterId === sub.id ? (
+                                        <select
+                                          className="form-input"
+                                          value={editingBudgetSubchapterForm.chapterId}
+                                          onChange={(e) =>
+                                            setEditingBudgetSubchapterForm((p) => ({
+                                              ...p,
+                                              chapterId: e.target.value,
+                                            }))
+                                          }
+                                        >
+                                          {itemsBudgetChapters.map((ch) => (
+                                            <option key={ch.id} value={ch.id}>
+                                              {ch.codigo} · {ch.nombre}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      ) : (
+                                        <>
+                                          <div style={{ fontWeight: 600 }}>{sub.chapterCodigo}</div>
+                                          <div className="shell-text-muted" style={{ fontSize: '0.78rem', lineHeight: 1.25 }}>
+                                            {sub.chapterNombre}
+                                          </div>
+                                        </>
+                                      )}
+                                    </td>
+                                    <td>
+                                      {editingBudgetSubchapterId === sub.id ? (
+                                        <input
+                                          className="form-input"
+                                          type="text"
+                                          value={editingBudgetSubchapterForm.nombre}
+                                          onChange={(e) =>
+                                            setEditingBudgetSubchapterForm((p) => ({ ...p, nombre: e.target.value }))
+                                          }
+                                        />
+                                      ) : (
+                                        sub.nombre
+                                      )}
+                                    </td>
+                                    <td>
+                                      {editingBudgetSubchapterId === sub.id ? (
+                                        <input
+                                          className="form-input"
+                                          type="number"
+                                          value={editingBudgetSubchapterForm.orden}
+                                          onChange={(e) =>
+                                            setEditingBudgetSubchapterForm((p) => ({
+                                              ...p,
+                                              orden: Number(e.target.value) || 0,
+                                            }))
+                                          }
+                                        />
+                                      ) : (
+                                        sub.orden
+                                      )}
+                                    </td>
+                                    <td>
+                                      {editingBudgetSubchapterId === sub.id ? (
+                                        <input
+                                          type="checkbox"
+                                          checked={editingBudgetSubchapterForm.isActive}
+                                          onChange={(e) =>
+                                            setEditingBudgetSubchapterForm((p) => ({ ...p, isActive: e.target.checked }))
+                                          }
+                                        />
+                                      ) : sub.isActive ? (
+                                        'Sí'
+                                      ) : (
+                                        'No'
+                                      )}
+                                    </td>
+                                    <td>{sub.items.length}</td>
+                                    <td>
+                                      {editingBudgetSubchapterId === sub.id ? (
+                                        <div className="users-table-actions">
+                                          <button
+                                            type="button"
+                                            onClick={() => saveEditBudgetSubchapter(sub.id)}
+                                            disabled={itemsSaving}
+                                          >
+                                            {itemsSaving ? 'Guardando...' : 'Guardar'}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="btn-cancel"
+                                            onClick={() => {
+                                              setEditingBudgetSubchapterId(null);
+                                              setEditingBudgetSubchapterForm({
+                                                chapterId: '',
+                                                nombre: '',
+                                                orden: 0,
+                                                isActive: true,
+                                              });
+                                            }}
+                                          >
+                                            Cancelar
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <div className="users-table-actions">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setEditingBudgetSubchapterId(sub.id);
+                                              setEditingBudgetSubchapterForm({
+                                                chapterId: sub.chapterId,
+                                                nombre: sub.nombre,
+                                                orden: sub.orden,
+                                                isActive: sub.isActive,
+                                              });
+                                            }}
+                                          >
+                                            <IconEdit /> Editar
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="danger"
+                                            disabled={itemsSaving}
+                                            onClick={() => deleteBudgetSubchapter(sub.id, sub.nombre)}
+                                          >
+                                            <IconTrash /> Eliminar
+                                          </button>
+                                        </div>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
                           </div>
-                          <button type="submit" className="btn-primary" disabled={itemsSaving}>
-                            Crear subcapítulo
-                          </button>
-                        </div>
-                      </form>
+                        )}
+                      </section>
                     </div>
                   </>
                 ) : null}
@@ -6979,53 +7359,11 @@ export default function DashboardPage() {
                   <p className="shell-text-muted" style={{ padding: '1rem' }}>
                     No se pudo cargar la jerarquía de presupuesto. Compruebe la base de datos (migración Prisma).
                   </p>
-                ) : (
-                  <>
-                    <details className="items-budget-manage" style={{ marginBottom: '1rem' }}>
-                      <summary className="shell-text" style={{ cursor: 'pointer', fontWeight: 600 }}>
-                        Gestionar capítulos y subcapítulos (eliminar)
-                      </summary>
-                      <div style={{ marginTop: '0.75rem' }}>
-                        {itemsBudgetChapters.map((ch) => (
-                          <div key={ch.id} className="shell-text" style={{ marginBottom: '0.85rem' }}>
-                            <strong>{ch.codigo}</strong> — {ch.nombre}{' '}
-                            <button
-                              type="button"
-                              className="danger"
-                              style={{ marginLeft: '0.35rem', fontSize: '0.78rem' }}
-                              disabled={itemsSaving}
-                              onClick={() => deleteBudgetChapter(ch.id, `${ch.codigo} ${ch.nombre}`)}
-                            >
-                              Eliminar capítulo
-                            </button>
-                            <ul style={{ margin: '0.35rem 0 0 1rem', padding: 0, listStyle: 'disc' }}>
-                              {ch.subchapters.map((sub) => (
-                                <li key={sub.id} style={{ marginBottom: '0.25rem' }}>
-                                  {sub.nombre}{' '}
-                                  <span className="shell-text-muted">({sub.items.length} ítems)</span>{' '}
-                                  <button
-                                    type="button"
-                                    className="danger"
-                                    style={{ fontSize: '0.78rem' }}
-                                    disabled={itemsSaving}
-                                    onClick={() => deleteBudgetSubchapter(sub.id, sub.nombre)}
-                                  >
-                                    Eliminar subcapítulo
-                                  </button>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        ))}
-                      </div>
-                    </details>
-                    {itemsAdminFlat.length === 0 ? (
-                      <p className="shell-text-muted" style={{ padding: '1rem' }}>
-                        Aún no hay ítems en ningún subcapítulo. Importe un listado o cree un ítem arriba.
-                      </p>
-                    ) : null}
-                  </>
-                )}
+                ) : itemsAdminFlat.length === 0 ? (
+                  <p className="shell-text-muted" style={{ padding: '1rem' }}>
+                    Aún no hay ítems en ningún subcapítulo. Cree un ítem arriba y asígnelo al subcapítulo correspondiente.
+                  </p>
+                ) : null}
                 {itemsFilterProjectId && itemsBudgetChapters.length > 0 && itemsAdminFlat.length > 0 ? (
                   <div className="users-table-wrap">
                     <table className="users-table">
