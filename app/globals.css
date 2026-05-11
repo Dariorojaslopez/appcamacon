@@ -2232,6 +2232,13 @@ ul.informe-searchable-list {
   filter: brightness(1.04);
 }
 
+.calidad-file-input:disabled::file-selector-button,
+.calidad-file-input:disabled::-webkit-file-upload-button {
+  opacity: 0.65;
+  cursor: default;
+  filter: none;
+}
+
 @media (max-width: 479px) {
   .calidad-mobile-only {
     display: block;

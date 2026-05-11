@@ -6427,7 +6427,7 @@ export default function DashboardPage() {
                   <label className="form-label" htmlFor="items-import-file">Importar listado de ítems (.txt)</label>
                   <input
                     id="items-import-file"
-                    className="form-input"
+                    className="form-input calidad-file-input"
                     type="file"
                     accept=".txt,text/plain"
                     disabled={!itemsFilterProjectId || itemsSaving}
