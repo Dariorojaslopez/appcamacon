@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessToken } from '../../../../../src/infrastructure/auth/tokens';
+import {
+  BUDGET_HIERARCHY_DB_MISSING_MESSAGE,
+  isBudgetHierarchySchemaMissingError,
+} from '../../../../../src/lib/budgetHierarchy';
 import prisma from '../../../../../src/lib/prisma';
 
 async function ensureAdmin(req: NextRequest) {
@@ -38,6 +42,9 @@ export async function GET(req: NextRequest) {
     const err = error as { name?: string };
     if (err?.name === 'TokenExpiredError' || err?.name === 'JsonWebTokenError') {
       return NextResponse.json({ error: 'Sesión expirada' }, { status: 401 });
+    }
+    if (isBudgetHierarchySchemaMissingError(error)) {
+      return NextResponse.json({ error: BUDGET_HIERARCHY_DB_MISSING_MESSAGE }, { status: 503 });
     }
     console.error(error);
     return NextResponse.json({ error: 'Error al cargar estructura de presupuesto' }, { status: 500 });

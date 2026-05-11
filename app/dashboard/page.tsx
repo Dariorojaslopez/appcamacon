@@ -1318,10 +1318,12 @@ export default function DashboardPage() {
             if (prev && chapters.some((c) => c.id === prev)) return prev;
             return chapters[0]?.id ?? '';
           });
-        } catch {
+        } catch (e) {
           setItemsBudgetChapters([]);
           setItemsTargetSubchapterId('');
-          setItemsError('Error al cargar estructura de presupuesto (ítems).');
+          const fallback = 'Error al cargar estructura de presupuesto (ítems).';
+          const msg = e instanceof Error ? e.message.trim() : '';
+          setItemsError(msg && msg !== 'Error' ? msg : fallback);
         }
       }
     };
@@ -2861,7 +2863,14 @@ export default function DashboardPage() {
         { credentials: 'include' },
       );
       const data = await res.json();
-      if (!res.ok) return;
+      if (!res.ok) {
+        setItemsError(
+          typeof data?.error === 'string' && data.error.trim()
+            ? data.error.trim()
+            : 'Error al cargar estructura de presupuesto (ítems).',
+        );
+        return;
+      }
       const chapters = Array.isArray(data.chapters) ? (data.chapters as BudgetChapterTree[]) : [];
       setItemsBudgetChapters(chapters);
       const subIds = new Set<string>();

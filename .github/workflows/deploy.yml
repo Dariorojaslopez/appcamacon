@@ -19,7 +19,9 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
 
           script: |
+            set -e
             cd /root/apps/appcamacon
             git pull
+            bash scripts/apply-prod-migrations.sh
             docker-compose down
             docker-compose up -d --build

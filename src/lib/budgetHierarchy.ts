@@ -56,3 +56,26 @@ export async function assertSubchapterBelongsToProject(
   });
   return Boolean(row);
 }
+
+/** Mensaje para admin cuando falta migración de presupuesto jerárquico. */
+export const BUDGET_HIERARCHY_DB_MISSING_MESSAGE =
+  'La base de datos no tiene las tablas de presupuesto jerárquico. En el servidor ejecute: npx prisma migrate deploy';
+
+/**
+ * Errores de Prisma/driver típicos cuando no existen tablas/columnas del presupuesto
+ * (migración `budget_chapters_hierarchy` no aplicada).
+ */
+export function isBudgetHierarchySchemaMissingError(e: unknown): boolean {
+  const pe = e as { code?: string; message?: string };
+  const msg = String(pe.message ?? '');
+  if (/BudgetChapter|BudgetSubchapter|ItemCatalog/i.test(msg) && /does not exist|no existe|Unknown model|42P01/i.test(msg)) {
+    return true;
+  }
+  if (/subchapterId/i.test(msg) && /does not exist|no existe|42P01|Unknown column/i.test(msg)) {
+    return true;
+  }
+  if (/underlying table.*does not exist/i.test(msg)) {
+    return true;
+  }
+  return false;
+}
