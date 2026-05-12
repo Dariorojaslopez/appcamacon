@@ -994,11 +994,41 @@ body {
   background: #fafafa;
 }
 
+.evidencias-fase-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
 .evidencias-fase-title {
   font-weight: 700;
   color: #111827;
-  margin-bottom: 0.5rem;
   font-size: 0.95rem;
+}
+
+.evidencias-fase-count {
+  border-radius: 999px;
+  background: #fff7ed;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: #92400e;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.5rem;
+  white-space: nowrap;
+}
+
+.evidencias-fase-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+}
+
+@media (min-width: 480px) {
+  .evidencias-fase-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .evidencias-fase-choose-btn {
@@ -1013,6 +1043,11 @@ body {
   font-size: 0.95rem;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+}
+
+.evidencias-fase-camera-btn {
+  background: #fff;
+  border: 1px solid rgba(245, 158, 11, 0.65);
 }
 
 .evidencias-fase-choose-btn:active {
@@ -1145,6 +1180,107 @@ body {
   justify-content: center;
   cursor: pointer;
   padding: 0;
+}
+
+.evidencias-fase-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+}
+
+.evidencias-fase-list-item {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+  border: 1px solid rgba(209, 213, 219, 0.95);
+  border-radius: 12px;
+  background: #fff;
+  padding: 0.55rem;
+}
+
+.evidencias-fase-list-item-active {
+  border-color: rgba(245, 158, 11, 0.8);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.12);
+}
+
+.evidencias-fase-list-main {
+  min-width: 0;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0;
+  text-align: left;
+  color: #111827;
+  cursor: pointer;
+}
+
+.evidencias-fase-list-thumb-wrap {
+  width: 3.25rem;
+  height: 3.25rem;
+  min-width: 3.25rem;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f3f4f6;
+  border: 1px solid rgba(229, 231, 235, 0.95);
+}
+
+.evidencias-fase-list-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.evidencias-fase-list-main strong,
+.evidencias-fase-list-main small {
+  display: block;
+}
+
+.evidencias-fase-list-main small {
+  color: #6b7280;
+  font-size: 0.75rem;
+  margin-top: 0.15rem;
+}
+
+.evidencias-fase-list-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 0.4rem;
+}
+
+.evidencias-fase-list-action,
+.evidencias-fase-list-delete {
+  min-height: 2.4rem;
+  border-radius: 10px;
+  border: 1px solid rgba(209, 213, 219, 0.95);
+  background: #fff;
+  color: #111827;
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.evidencias-fase-list-delete {
+  width: 2.4rem;
+  color: #b91c1c;
+}
+
+.evidencias-fase-empty {
+  margin: 0.65rem 0 0;
+  border: 1px dashed rgba(209, 213, 219, 0.95);
+  border-radius: 12px;
+  padding: 0.75rem;
+  color: #6b7280;
+  font-size: 0.82rem;
+  text-align: center;
+  background: #fff;
 }
 
 .form-actions-row {

@@ -51,6 +51,7 @@ export async function GET(req: NextRequest) {
         materialActividad: e.materialActividad,
         tipoEnsayo: e.tipoEnsayo,
         idMuestra: e.idMuestra,
+        descripcion: e.descripcion ?? '',
         laboratorio: e.laboratorio,
         localizacion: e.localizacion,
         resultado: e.resultado,
@@ -89,6 +90,7 @@ export async function POST(req: NextRequest) {
         materialActividad: string;
         tipoEnsayo: string;
         idMuestra: string;
+        descripcion?: string | null;
         laboratorio: string;
         localizacion: string;
         resultado: string;
@@ -122,6 +124,7 @@ export async function POST(req: NextRequest) {
         const materialActividad = String(e.materialActividad ?? '').trim();
         const tipoEnsayo = String(e.tipoEnsayo ?? '').trim();
         const idMuestra = String(e.idMuestra ?? '').trim();
+        const descripcion = typeof e.descripcion === 'string' ? e.descripcion.trim() : null;
         const laboratorio = String(e.laboratorio ?? '').trim();
         const localizacion = String(e.localizacion ?? '').trim();
         const resultado = String(e.resultado ?? '').trim();
@@ -140,6 +143,7 @@ export async function POST(req: NextRequest) {
           materialActividad,
           tipoEnsayo,
           idMuestra,
+          descripcion,
           laboratorio,
           localizacion,
           resultado,
@@ -215,6 +219,7 @@ export async function POST(req: NextRequest) {
         materialActividad: e.materialActividad,
         tipoEnsayo: e.tipoEnsayo,
         idMuestra: e.idMuestra,
+        descripcion: e.descripcion ?? '',
         laboratorio: e.laboratorio,
         localizacion: e.localizacion,
         resultado: e.resultado,

@@ -50,6 +50,7 @@ export async function GET(req: NextRequest) {
         id: n.id,
         noConformidad: n.noConformidad,
         detalle: n.detalle,
+        origen: n.origen ?? '',
         estado: n.estado,
         imagenUrl: n.imagenUrl,
         imagenLatitud: n.imagenLatitud,
@@ -84,6 +85,7 @@ export async function POST(req: NextRequest) {
       noConformidades?: Array<{
         noConformidad: string;
         detalle: string;
+        origen?: string | null;
         estado: string;
         imagenUrl?: string | null;
         imagenLatitud?: number | null;
@@ -113,6 +115,7 @@ export async function POST(req: NextRequest) {
       .map((n) => {
         const noConformidad = String(n.noConformidad ?? '').trim();
         const detalle = String(n.detalle ?? '').trim();
+        const origen = typeof n.origen === 'string' ? n.origen.trim() : null;
         const estado = String(n.estado ?? '').trim();
         const imagenUrl = typeof n.imagenUrl === 'string' ? n.imagenUrl.trim() : null;
         const imagenLatitud =
@@ -126,6 +129,7 @@ export async function POST(req: NextRequest) {
         return {
           noConformidad,
           detalle,
+          origen,
           estado,
           imagenUrl,
           imagenLatitud,
@@ -197,6 +201,7 @@ export async function POST(req: NextRequest) {
         id: n.id,
         noConformidad: n.noConformidad,
         detalle: n.detalle,
+        origen: n.origen ?? '',
         estado: n.estado,
         imagenUrl: n.imagenUrl,
         imagenLatitud: n.imagenLatitud,

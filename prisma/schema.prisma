@@ -359,6 +359,7 @@ model EnsayoObra {
   materialActividad String
   tipoEnsayo     String
   idMuestra      String
+  descripcion    String?
 
   laboratorio     String
   localizacion   String
@@ -407,6 +408,7 @@ model NoConformidadObra {
 
   noConformidad String
   detalle        String
+  origen         String?
   estado         String
   imagenUrl      String?
   imagenLatitud  Float?

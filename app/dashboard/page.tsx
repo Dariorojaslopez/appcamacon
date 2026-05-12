@@ -654,6 +654,7 @@ const emptyEnsayoDraft = () => ({
   materialActividad: '',
   tipoEnsayo: '',
   idMuestra: '',
+  descripcion: '',
   laboratorio: '',
   localizacion: '',
   resultado: '',
@@ -676,6 +677,7 @@ const emptyDanoDraft = () => ({
 const emptyNoConformidadDraft = () => ({
   noConformidad: '',
   detalle: '',
+  origen: '',
   estado: '',
   imagenUrl: '',
   ...emptyFotoGeoFields(),
@@ -702,7 +704,7 @@ const INFORME_STEPS = [
   { id: 'personal' as const, label: 'Personal en obra', Icon: IconHardHat },
   { id: 'equipos' as const, label: 'Equipos y materiales', Icon: IconTruck },
   { id: 'actividades' as const, label: 'Actividades desarrolladas', Icon: IconHammer },
-  { id: 'calidad' as const, label: 'Calidad e incidentes', Icon: IconAlert },
+  { id: 'calidad' as const, label: 'Calidad y afectaciones', Icon: IconAlert },
   { id: 'evidencias' as const, label: 'Evidencias y cierre', Icon: IconCamera },
   { id: 'tabulacion' as const, label: 'Formato de tabulación', Icon: IconTabulacion },
 ] as const;
@@ -1308,6 +1310,11 @@ export default function DashboardPage() {
     durante: null,
     despues: null,
   });
+  const evidenciaCameraInputRefs = useRef<Record<EvidenciaFase, HTMLInputElement | null>>({
+    antes: null,
+    durante: null,
+    despues: null,
+  });
 
   const [ingresoRows, setIngresoRows] = useState<
     Array<{
@@ -1389,6 +1396,7 @@ export default function DashboardPage() {
       materialActividad: string;
       tipoEnsayo: string;
       idMuestra: string;
+      descripcion: string;
       laboratorio: string;
       localizacion: string;
       resultado: string;
@@ -1435,6 +1443,7 @@ export default function DashboardPage() {
       id?: string;
       noConformidad: string;
       detalle: string;
+      origen: string;
       estado: string;
       imagenUrl?: string | null;
       imagenLatitud?: number | null;
@@ -2247,6 +2256,7 @@ export default function DashboardPage() {
                 materialActividad: '',
                 tipoEnsayo: '',
                 idMuestra: '',
+                descripcion: '',
                 laboratorio: '',
                 localizacion: '',
                 resultado: '',
@@ -2263,6 +2273,7 @@ export default function DashboardPage() {
               materialActividad: e.materialActividad ?? '',
               tipoEnsayo: e.tipoEnsayo ?? '',
               idMuestra: e.idMuestra ?? '',
+              descripcion: e.descripcion ?? '',
               laboratorio: e.laboratorio ?? '',
               localizacion: e.localizacion ?? '',
               resultado: e.resultado ?? '',
@@ -2332,6 +2343,7 @@ export default function DashboardPage() {
               {
                 noConformidad: '',
                 detalle: '',
+                origen: '',
                 estado: '',
                 imagenUrl: '',
                 ...emptyFotoGeoFields(),
@@ -2344,6 +2356,7 @@ export default function DashboardPage() {
               id: n.id,
               noConformidad: n.noConformidad ?? '',
               detalle: n.detalle ?? '',
+              origen: n.origen ?? '',
               estado: n.estado ?? '',
               imagenUrl: n.imagenUrl ?? '',
               ...fotoGeoFromSource(n),
@@ -4231,6 +4244,34 @@ export default function DashboardPage() {
       | 'entregaDraftUnidad'
       | 'entregaDraftContratista'
       | 'entregaDraftObservacion'
+      | 'ensayoDraftMaterialActividad'
+      | 'ensayoDraftTipoEnsayo'
+      | 'ensayoDraftIdMuestra'
+      | 'ensayoDraftDescripcion'
+      | 'ensayoDraftLaboratorio'
+      | 'ensayoDraftLocalizacion'
+      | 'ensayoDraftResultado'
+      | 'ensayoDraftObservacion'
+      | 'ensayoMaterialActividad'
+      | 'ensayoTipoEnsayo'
+      | 'ensayoIdMuestra'
+      | 'ensayoDescripcion'
+      | 'ensayoLaboratorio'
+      | 'ensayoLocalizacion'
+      | 'ensayoResultado'
+      | 'ensayoObservacion'
+      | 'danoDraftDireccion'
+      | 'danoDraftTipoDano'
+      | 'danoDraftEntidad'
+      | 'danoDraftNoReporte'
+      | 'danoDraftObservacion'
+      | 'danoDireccion'
+      | 'danoTipoDano'
+      | 'danoEntidad'
+      | 'danoNoReporte'
+      | 'danoObservacion'
+      | 'noConformidadDraftDetalle'
+      | 'noConformidadDetalle'
       | 'actividadDraftObservacion'
       | 'actividadObservacion',
     actividadIdx?: number,
@@ -4255,9 +4296,15 @@ export default function DashboardPage() {
                   field === 'entregaDraftContratista' ||
                   field === 'entregaDraftObservacion'
                 ? setEntregaError
-                : field === 'actividadDraftObservacion' || field === 'actividadObservacion'
-                ? setActividadError
-                : setInformeError;
+                : field.startsWith('ensayo')
+                  ? setEnsayosError
+                  : field.startsWith('dano')
+                    ? setDanosError
+                    : field.startsWith('noConformidad')
+                      ? setNoConformidadesError
+                  : field === 'actividadDraftObservacion' || field === 'actividadObservacion'
+                    ? setActividadError
+                    : setInformeError;
 
     const allowInsecureLanVoice = voiceInsecureDevOriginMatch();
     if (typeof window !== 'undefined' && !window.isSecureContext && !allowInsecureLanVoice) {
@@ -4387,6 +4434,120 @@ export default function DashboardPage() {
         if (field === 'entregaDraftObservacion') {
           setEntregaDraft((d) => ({ ...d, observacion: text }));
           return;
+        }
+        if (field === 'ensayoDraftMaterialActividad') {
+          setEnsayoDraft((d) => ({ ...d, materialActividad: text }));
+          return;
+        }
+        if (field === 'ensayoDraftTipoEnsayo') {
+          setEnsayoDraft((d) => ({ ...d, tipoEnsayo: text }));
+          return;
+        }
+        if (field === 'ensayoDraftIdMuestra') {
+          setEnsayoDraft((d) => ({ ...d, idMuestra: text }));
+          return;
+        }
+        if (field === 'ensayoDraftDescripcion') {
+          setEnsayoDraft((d) => ({ ...d, descripcion: text }));
+          return;
+        }
+        if (field === 'ensayoDraftLaboratorio') {
+          setEnsayoDraft((d) => ({ ...d, laboratorio: text }));
+          return;
+        }
+        if (field === 'ensayoDraftLocalizacion') {
+          setEnsayoDraft((d) => ({ ...d, localizacion: text }));
+          return;
+        }
+        if (field === 'ensayoDraftResultado') {
+          setEnsayoDraft((d) => ({ ...d, resultado: text }));
+          return;
+        }
+        if (field === 'ensayoDraftObservacion') {
+          setEnsayoDraft((d) => ({ ...d, observacion: text }));
+          return;
+        }
+        if (field === 'danoDraftDireccion') {
+          setDanoDraft((d) => ({ ...d, direccion: text }));
+          return;
+        }
+        if (field === 'danoDraftTipoDano') {
+          setDanoDraft((d) => ({ ...d, tipoDano: text }));
+          return;
+        }
+        if (field === 'danoDraftEntidad') {
+          setDanoDraft((d) => ({ ...d, entidad: text }));
+          return;
+        }
+        if (field === 'danoDraftNoReporte') {
+          setDanoDraft((d) => ({ ...d, noReporte: text }));
+          return;
+        }
+        if (field === 'danoDraftObservacion') {
+          setDanoDraft((d) => ({ ...d, observacion: text }));
+          return;
+        }
+        if (field === 'noConformidadDraftDetalle') {
+          setNoConformidadDraft((d) => ({ ...d, detalle: text }));
+          return;
+        }
+        if (typeof actividadIdx === 'number') {
+          if (field === 'ensayoMaterialActividad') {
+            updateEnsayoRow(actividadIdx, { materialActividad: text });
+            return;
+          }
+          if (field === 'ensayoTipoEnsayo') {
+            updateEnsayoRow(actividadIdx, { tipoEnsayo: text });
+            return;
+          }
+          if (field === 'ensayoIdMuestra') {
+            updateEnsayoRow(actividadIdx, { idMuestra: text });
+            return;
+          }
+          if (field === 'ensayoDescripcion') {
+            updateEnsayoRow(actividadIdx, { descripcion: text });
+            return;
+          }
+          if (field === 'ensayoLaboratorio') {
+            updateEnsayoRow(actividadIdx, { laboratorio: text });
+            return;
+          }
+          if (field === 'ensayoLocalizacion') {
+            updateEnsayoRow(actividadIdx, { localizacion: text });
+            return;
+          }
+          if (field === 'ensayoResultado') {
+            updateEnsayoRow(actividadIdx, { resultado: text });
+            return;
+          }
+          if (field === 'ensayoObservacion') {
+            updateEnsayoRow(actividadIdx, { observacion: text });
+            return;
+          }
+          if (field === 'danoDireccion') {
+            updateDanoRow(actividadIdx, { direccion: text });
+            return;
+          }
+          if (field === 'danoTipoDano') {
+            updateDanoRow(actividadIdx, { tipoDano: text });
+            return;
+          }
+          if (field === 'danoEntidad') {
+            updateDanoRow(actividadIdx, { entidad: text });
+            return;
+          }
+          if (field === 'danoNoReporte') {
+            updateDanoRow(actividadIdx, { noReporte: text });
+            return;
+          }
+          if (field === 'danoObservacion') {
+            updateDanoRow(actividadIdx, { observacion: text });
+            return;
+          }
+          if (field === 'noConformidadDetalle') {
+            updateNoConformidadRow(actividadIdx, { detalle: text });
+            return;
+          }
         }
         if (field === 'actividadDraftObservacion') {
           updateActividadDraft({ observacion: text });
@@ -5628,6 +5789,7 @@ export default function DashboardPage() {
         materialActividad: '',
         tipoEnsayo: '',
         idMuestra: '',
+        descripcion: '',
         laboratorio: '',
         localizacion: '',
         resultado: '',
@@ -5713,12 +5875,13 @@ export default function DashboardPage() {
             materialActividad: e.materialActividad,
             tipoEnsayo: e.tipoEnsayo,
             idMuestra: e.idMuestra,
+            descripcion: e.descripcion || null,
             laboratorio: e.laboratorio,
             localizacion: e.localizacion,
             resultado: e.resultado,
             observacion: e.observacion || null,
             imagenUrl: e.imagenUrl || null,
-          ...fotoGeoPayload(e),
+            ...fotoGeoPayload(e),
           })),
         }),
       });
@@ -5736,6 +5899,7 @@ export default function DashboardPage() {
           materialActividad: e.materialActividad ?? '',
           tipoEnsayo: e.tipoEnsayo ?? '',
           idMuestra: e.idMuestra ?? '',
+          descripcion: e.descripcion ?? '',
           laboratorio: e.laboratorio ?? '',
           localizacion: e.localizacion ?? '',
           resultado: e.resultado ?? '',
@@ -5884,6 +6048,7 @@ export default function DashboardPage() {
       {
         noConformidad: '',
         detalle: '',
+        origen: '',
         estado: '',
         imagenUrl: '',
         ...emptyFotoGeoFields(),
@@ -5895,9 +6060,10 @@ export default function DashboardPage() {
     if (
       !noConformidadDraft.noConformidad.trim() ||
       !noConformidadDraft.detalle.trim() ||
+      !noConformidadDraft.origen.trim() ||
       !noConformidadDraft.estado.trim()
     ) {
-      setNoConformidadesError('Completa No. no conformidad, Detalle y Estado.');
+      setNoConformidadesError('Completa No. no conformidad, Detalle, Origen y Estado.');
       return;
     }
     setNoConformidadesError(null);
@@ -5935,10 +6101,10 @@ export default function DashboardPage() {
     }
 
     const invalid = noConformidadesRows.some(
-      (r) => !r.noConformidad.trim() || !r.detalle.trim() || !r.estado.trim(),
+      (r) => !r.noConformidad.trim() || !r.detalle.trim() || !r.origen.trim() || !r.estado.trim(),
     );
     if (invalid) {
-      setNoConformidadesError('Completa No. no conformidad, Detalle y Estado.');
+      setNoConformidadesError('Completa No. no conformidad, Detalle, Origen y Estado.');
       return;
     }
 
@@ -5956,6 +6122,7 @@ export default function DashboardPage() {
           noConformidades: noConformidadesRows.map((n) => ({
             noConformidad: n.noConformidad,
             detalle: n.detalle,
+            origen: n.origen,
             estado: n.estado,
             imagenUrl: n.imagenUrl || null,
             ...fotoGeoPayload(n),
@@ -5974,6 +6141,7 @@ export default function DashboardPage() {
           id: n.id,
           noConformidad: n.noConformidad ?? '',
           detalle: n.detalle ?? '',
+          origen: n.origen ?? '',
           estado: n.estado ?? '',
           imagenUrl: n.imagenUrl ?? '',
           ...fotoGeoFromSource(n),
@@ -6124,6 +6292,38 @@ export default function DashboardPage() {
       return { ...prev, [fase]: nextArr };
     });
   };
+
+  const ensayoMicInput = ({
+    value,
+    placeholder,
+    onChange,
+    voiceField,
+    rowIndex,
+  }: {
+    value: string;
+    placeholder: string;
+    onChange: (value: string) => void;
+    voiceField: Parameters<typeof startVoiceCapture>[0];
+    rowIndex?: number;
+  }) => (
+    <div className="informe-input-wrap">
+      <input
+        className="personal-input personal-input-with-mic"
+        type="text"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <button
+        type="button"
+        className="informe-icon-button"
+        aria-label={`Dictar ${placeholder}`}
+        onClick={() => void startVoiceCapture(voiceField, rowIndex)}
+      >
+        <IconMic />
+      </button>
+    </div>
+  );
 
   return (
     <div className="shell">
@@ -11435,7 +11635,7 @@ export default function DashboardPage() {
 
         {activeSection === 'calidad' && (
           <section className="shell-card shell-card-wide">
-            <h1 className="shell-title">Informe diario - Calidad e incidentes</h1>
+            <h1 className="shell-title">Informe diario - Calidad y afectaciones</h1>
 
             <div className="users-tabs">
               <button
@@ -11479,13 +11679,54 @@ export default function DashboardPage() {
                     <div className="calidad-mobile-only">
                       <div className="calidad-mobile-form">
                         <div className="calidad-mobile-grid">
-                          <input className="personal-input" type="text" placeholder="Material / actividad" value={ensayoDraft.materialActividad} onChange={(e) => setEnsayoDraft((prev) => ({ ...prev, materialActividad: e.target.value }))} />
-                          <input className="personal-input" type="text" placeholder="Tipo de ensayo" value={ensayoDraft.tipoEnsayo} onChange={(e) => setEnsayoDraft((prev) => ({ ...prev, tipoEnsayo: e.target.value }))} />
-                          <input className="personal-input" type="text" placeholder="ID muestra" value={ensayoDraft.idMuestra} onChange={(e) => setEnsayoDraft((prev) => ({ ...prev, idMuestra: e.target.value }))} />
-                          <input className="personal-input" type="text" placeholder="Laboratorio" value={ensayoDraft.laboratorio} onChange={(e) => setEnsayoDraft((prev) => ({ ...prev, laboratorio: e.target.value }))} />
-                          <input className="personal-input" type="text" placeholder="Localización" value={ensayoDraft.localizacion} onChange={(e) => setEnsayoDraft((prev) => ({ ...prev, localizacion: e.target.value }))} />
-                          <input className="personal-input" type="text" placeholder="Resultado" value={ensayoDraft.resultado} onChange={(e) => setEnsayoDraft((prev) => ({ ...prev, resultado: e.target.value }))} />
-                          <input className="personal-input" type="text" placeholder="Observación (opcional)" value={ensayoDraft.observacion} onChange={(e) => setEnsayoDraft((prev) => ({ ...prev, observacion: e.target.value }))} />
+                          {ensayoMicInput({
+                            value: ensayoDraft.materialActividad,
+                            placeholder: 'Material / actividad',
+                            voiceField: 'ensayoDraftMaterialActividad',
+                            onChange: (value) => setEnsayoDraft((prev) => ({ ...prev, materialActividad: value })),
+                          })}
+                          {ensayoMicInput({
+                            value: ensayoDraft.tipoEnsayo,
+                            placeholder: 'Tipo de ensayo',
+                            voiceField: 'ensayoDraftTipoEnsayo',
+                            onChange: (value) => setEnsayoDraft((prev) => ({ ...prev, tipoEnsayo: value })),
+                          })}
+                          {ensayoMicInput({
+                            value: ensayoDraft.idMuestra,
+                            placeholder: 'ID muestra',
+                            voiceField: 'ensayoDraftIdMuestra',
+                            onChange: (value) => setEnsayoDraft((prev) => ({ ...prev, idMuestra: value })),
+                          })}
+                          {ensayoMicInput({
+                            value: ensayoDraft.descripcion,
+                            placeholder: 'Descripción',
+                            voiceField: 'ensayoDraftDescripcion',
+                            onChange: (value) => setEnsayoDraft((prev) => ({ ...prev, descripcion: value })),
+                          })}
+                          {ensayoMicInput({
+                            value: ensayoDraft.laboratorio,
+                            placeholder: 'Laboratorio',
+                            voiceField: 'ensayoDraftLaboratorio',
+                            onChange: (value) => setEnsayoDraft((prev) => ({ ...prev, laboratorio: value })),
+                          })}
+                          {ensayoMicInput({
+                            value: ensayoDraft.localizacion,
+                            placeholder: 'Localización',
+                            voiceField: 'ensayoDraftLocalizacion',
+                            onChange: (value) => setEnsayoDraft((prev) => ({ ...prev, localizacion: value })),
+                          })}
+                          {ensayoMicInput({
+                            value: ensayoDraft.resultado,
+                            placeholder: 'Resultado',
+                            voiceField: 'ensayoDraftResultado',
+                            onChange: (value) => setEnsayoDraft((prev) => ({ ...prev, resultado: value })),
+                          })}
+                          {ensayoMicInput({
+                            value: ensayoDraft.observacion,
+                            placeholder: 'Observación (opcional)',
+                            voiceField: 'ensayoDraftObservacion',
+                            onChange: (value) => setEnsayoDraft((prev) => ({ ...prev, observacion: value })),
+                          })}
                           <div>
                             <input
                               className="personal-input calidad-file-input"
@@ -11525,6 +11766,7 @@ export default function DashboardPage() {
                             </div>
                             <p><strong>Tipo:</strong> {r.tipoEnsayo}</p>
                             <p><strong>ID:</strong> {r.idMuestra}</p>
+                            {r.descripcion && <p><strong>Descripción:</strong> {r.descripcion}</p>}
                             <p><strong>Laboratorio:</strong> {r.laboratorio}</p>
                             <p><strong>Localización:</strong> {r.localizacion}</p>
                             <p><strong>Resultado:</strong> {r.resultado}</p>
@@ -11546,6 +11788,7 @@ export default function DashboardPage() {
                             <th>MATERIAL / ACTIVIDAD</th>
                             <th>TIPO DE ENSAYO</th>
                             <th>ID MUESTRA</th>
+                            <th>DESCRIPCIÓN</th>
                             <th>LABORATORIO</th>
                             <th>LOCALIZACIÓN</th>
                             <th>RESULTADO</th>
@@ -11557,13 +11800,14 @@ export default function DashboardPage() {
                         <tbody>
                           {ensayosRows.map((r, idx) => (
                             <tr key={r.id ?? idx}>
-                              <td><input className="personal-input" type="text" placeholder="Material" value={r.materialActividad} onChange={(e) => updateEnsayoRow(idx, { materialActividad: e.target.value })} /></td>
-                              <td><input className="personal-input" type="text" placeholder="Ensayo" value={r.tipoEnsayo} onChange={(e) => updateEnsayoRow(idx, { tipoEnsayo: e.target.value })} /></td>
-                              <td><input className="personal-input" type="text" placeholder="ID" value={r.idMuestra} onChange={(e) => updateEnsayoRow(idx, { idMuestra: e.target.value })} /></td>
-                              <td><input className="personal-input" type="text" placeholder="Laboratorio" value={r.laboratorio} onChange={(e) => updateEnsayoRow(idx, { laboratorio: e.target.value })} /></td>
-                              <td><input className="personal-input" type="text" placeholder="Localización" value={r.localizacion} onChange={(e) => updateEnsayoRow(idx, { localizacion: e.target.value })} /></td>
-                              <td><input className="personal-input" type="text" placeholder="Resultado" value={r.resultado} onChange={(e) => updateEnsayoRow(idx, { resultado: e.target.value })} /></td>
-                              <td><input className="personal-input" type="text" placeholder="Observación" value={r.observacion} onChange={(e) => updateEnsayoRow(idx, { observacion: e.target.value })} /></td>
+                              <td>{ensayoMicInput({ value: r.materialActividad, placeholder: 'Material', voiceField: 'ensayoMaterialActividad', rowIndex: idx, onChange: (value) => updateEnsayoRow(idx, { materialActividad: value }) })}</td>
+                              <td>{ensayoMicInput({ value: r.tipoEnsayo, placeholder: 'Ensayo', voiceField: 'ensayoTipoEnsayo', rowIndex: idx, onChange: (value) => updateEnsayoRow(idx, { tipoEnsayo: value }) })}</td>
+                              <td>{ensayoMicInput({ value: r.idMuestra, placeholder: 'ID', voiceField: 'ensayoIdMuestra', rowIndex: idx, onChange: (value) => updateEnsayoRow(idx, { idMuestra: value }) })}</td>
+                              <td>{ensayoMicInput({ value: r.descripcion, placeholder: 'Descripción', voiceField: 'ensayoDescripcion', rowIndex: idx, onChange: (value) => updateEnsayoRow(idx, { descripcion: value }) })}</td>
+                              <td>{ensayoMicInput({ value: r.laboratorio, placeholder: 'Laboratorio', voiceField: 'ensayoLaboratorio', rowIndex: idx, onChange: (value) => updateEnsayoRow(idx, { laboratorio: value }) })}</td>
+                              <td>{ensayoMicInput({ value: r.localizacion, placeholder: 'Localización', voiceField: 'ensayoLocalizacion', rowIndex: idx, onChange: (value) => updateEnsayoRow(idx, { localizacion: value }) })}</td>
+                              <td>{ensayoMicInput({ value: r.resultado, placeholder: 'Resultado', voiceField: 'ensayoResultado', rowIndex: idx, onChange: (value) => updateEnsayoRow(idx, { resultado: value }) })}</td>
+                              <td>{ensayoMicInput({ value: r.observacion, placeholder: 'Observación', voiceField: 'ensayoObservacion', rowIndex: idx, onChange: (value) => updateEnsayoRow(idx, { observacion: value }) })}</td>
                               <td>
                                 <input
                                   className="personal-input calidad-file-input"
@@ -11637,11 +11881,36 @@ export default function DashboardPage() {
                     <div className="calidad-mobile-form">
                       <div className="calidad-mobile-grid">
                         <input className="personal-input" type="time" value={danoDraft.horaReporte} onChange={(e) => setDanoDraft((prev) => ({ ...prev, horaReporte: e.target.value }))} />
-                        <input className="personal-input" type="text" placeholder="Dirección" value={danoDraft.direccion} onChange={(e) => setDanoDraft((prev) => ({ ...prev, direccion: e.target.value }))} />
-                        <input className="personal-input" type="text" placeholder="Tipo daño" value={danoDraft.tipoDano} onChange={(e) => setDanoDraft((prev) => ({ ...prev, tipoDano: e.target.value }))} />
-                        <input className="personal-input" type="text" placeholder="Entidad" value={danoDraft.entidad} onChange={(e) => setDanoDraft((prev) => ({ ...prev, entidad: e.target.value }))} />
-                        <input className="personal-input" type="text" placeholder="No. reporte" value={danoDraft.noReporte} onChange={(e) => setDanoDraft((prev) => ({ ...prev, noReporte: e.target.value }))} />
-                        <input className="personal-input" type="text" placeholder="Observación (opcional)" value={danoDraft.observacion} onChange={(e) => setDanoDraft((prev) => ({ ...prev, observacion: e.target.value }))} />
+                        {ensayoMicInput({
+                          value: danoDraft.direccion,
+                          placeholder: 'Dirección',
+                          voiceField: 'danoDraftDireccion',
+                          onChange: (value) => setDanoDraft((prev) => ({ ...prev, direccion: value })),
+                        })}
+                        {ensayoMicInput({
+                          value: danoDraft.tipoDano,
+                          placeholder: 'Tipo daño',
+                          voiceField: 'danoDraftTipoDano',
+                          onChange: (value) => setDanoDraft((prev) => ({ ...prev, tipoDano: value })),
+                        })}
+                        {ensayoMicInput({
+                          value: danoDraft.entidad,
+                          placeholder: 'Entidad',
+                          voiceField: 'danoDraftEntidad',
+                          onChange: (value) => setDanoDraft((prev) => ({ ...prev, entidad: value })),
+                        })}
+                        {ensayoMicInput({
+                          value: danoDraft.noReporte,
+                          placeholder: 'No. reporte',
+                          voiceField: 'danoDraftNoReporte',
+                          onChange: (value) => setDanoDraft((prev) => ({ ...prev, noReporte: value })),
+                        })}
+                        {ensayoMicInput({
+                          value: danoDraft.observacion,
+                          placeholder: 'Observación (opcional)',
+                          voiceField: 'danoDraftObservacion',
+                          onChange: (value) => setDanoDraft((prev) => ({ ...prev, observacion: value })),
+                        })}
                         <div>
                           <input
                             className="personal-input calidad-file-input"
@@ -11720,49 +11989,49 @@ export default function DashboardPage() {
                               />
                             </td>
                             <td>
-                              <input
-                                className="personal-input"
-                                type="text"
-                                placeholder="Dirección"
-                                value={r.direccion}
-                                onChange={(e) => updateDanoRow(idx, { direccion: e.target.value })}
-                              />
+                              {ensayoMicInput({
+                                value: r.direccion,
+                                placeholder: 'Dirección',
+                                voiceField: 'danoDireccion',
+                                rowIndex: idx,
+                                onChange: (value) => updateDanoRow(idx, { direccion: value }),
+                              })}
                             </td>
                             <td>
-                              <input
-                                className="personal-input"
-                                type="text"
-                                placeholder="Tipo"
-                                value={r.tipoDano}
-                                onChange={(e) => updateDanoRow(idx, { tipoDano: e.target.value })}
-                              />
+                              {ensayoMicInput({
+                                value: r.tipoDano,
+                                placeholder: 'Tipo',
+                                voiceField: 'danoTipoDano',
+                                rowIndex: idx,
+                                onChange: (value) => updateDanoRow(idx, { tipoDano: value }),
+                              })}
                             </td>
                             <td>
-                              <input
-                                className="personal-input"
-                                type="text"
-                                placeholder="Entidad"
-                                value={r.entidad}
-                                onChange={(e) => updateDanoRow(idx, { entidad: e.target.value })}
-                              />
+                              {ensayoMicInput({
+                                value: r.entidad,
+                                placeholder: 'Entidad',
+                                voiceField: 'danoEntidad',
+                                rowIndex: idx,
+                                onChange: (value) => updateDanoRow(idx, { entidad: value }),
+                              })}
                             </td>
                             <td>
-                              <input
-                                className="personal-input"
-                                type="text"
-                                placeholder="No. reporte"
-                                value={r.noReporte}
-                                onChange={(e) => updateDanoRow(idx, { noReporte: e.target.value })}
-                              />
+                              {ensayoMicInput({
+                                value: r.noReporte,
+                                placeholder: 'No. reporte',
+                                voiceField: 'danoNoReporte',
+                                rowIndex: idx,
+                                onChange: (value) => updateDanoRow(idx, { noReporte: value }),
+                              })}
                             </td>
                             <td>
-                              <input
-                                className="personal-input"
-                                type="text"
-                                placeholder="Observación"
-                                value={r.observacion}
-                                onChange={(e) => updateDanoRow(idx, { observacion: e.target.value })}
-                              />
+                              {ensayoMicInput({
+                                value: r.observacion,
+                                placeholder: 'Observación',
+                                voiceField: 'danoObservacion',
+                                rowIndex: idx,
+                                onChange: (value) => updateDanoRow(idx, { observacion: value }),
+                              })}
                             </td>
                             <td>
                               <input
@@ -11846,7 +12115,17 @@ export default function DashboardPage() {
                     <div className="calidad-mobile-form">
                       <div className="calidad-mobile-grid">
                         <input className="personal-input" type="text" placeholder="No. no conformidad" value={noConformidadDraft.noConformidad} onChange={(e) => setNoConformidadDraft((prev) => ({ ...prev, noConformidad: e.target.value }))} />
-                        <input className="personal-input" type="text" placeholder="Detalle" value={noConformidadDraft.detalle} onChange={(e) => setNoConformidadDraft((prev) => ({ ...prev, detalle: e.target.value }))} />
+                        {ensayoMicInput({
+                          value: noConformidadDraft.detalle,
+                          placeholder: 'Detalle',
+                          voiceField: 'noConformidadDraftDetalle',
+                          onChange: (value) => setNoConformidadDraft((prev) => ({ ...prev, detalle: value })),
+                        })}
+                        <select className="personal-input" value={noConformidadDraft.origen} onChange={(e) => setNoConformidadDraft((prev) => ({ ...prev, origen: e.target.value }))}>
+                          <option value="">Seleccione origen...</option>
+                          <option value="INTERNO">Interno</option>
+                          <option value="EXTERNA">Externa</option>
+                        </select>
                         <select className="personal-input" value={noConformidadDraft.estado} onChange={(e) => setNoConformidadDraft((prev) => ({ ...prev, estado: e.target.value }))}>
                           <option value="">Seleccione estado...</option>
                           <option value="PENDIENTE">Pendiente</option>
@@ -11891,6 +12170,7 @@ export default function DashboardPage() {
                             </button>
                           </div>
                           <p><strong>Detalle:</strong> {r.detalle}</p>
+                          <p><strong>Origen:</strong> {r.origen}</p>
                           <p><strong>Estado:</strong> {r.estado}</p>
                           {r.imagenUrl ? (
                             <p>
@@ -11908,6 +12188,7 @@ export default function DashboardPage() {
                         <tr>
                           <th>NO. DE NO CONFORMIDAD</th>
                           <th>DETALLE</th>
+                          <th>ORIGEN</th>
                           <th>ESTADO</th>
                           <th>REGISTRO FOTOGRÁFICO</th>
                           <th>ACCIÓN</th>
@@ -11926,13 +12207,24 @@ export default function DashboardPage() {
                               />
                             </td>
                             <td>
-                              <input
+                              {ensayoMicInput({
+                                value: r.detalle,
+                                placeholder: 'Detalle',
+                                voiceField: 'noConformidadDetalle',
+                                rowIndex: idx,
+                                onChange: (value) => updateNoConformidadRow(idx, { detalle: value }),
+                              })}
+                            </td>
+                            <td>
+                              <select
                                 className="personal-input"
-                                type="text"
-                                placeholder="Detalle"
-                                value={r.detalle}
-                                onChange={(e) => updateNoConformidadRow(idx, { detalle: e.target.value })}
-                              />
+                                value={r.origen}
+                                onChange={(e) => updateNoConformidadRow(idx, { origen: e.target.value })}
+                              >
+                                <option value="">Seleccione...</option>
+                                <option value="INTERNO">Interno</option>
+                                <option value="EXTERNA">Externa</option>
+                              </select>
                             </td>
                             <td>
                               <select
@@ -12061,15 +12353,27 @@ export default function DashboardPage() {
                         const href = currentItem ? evidenciaItemUrl(currentItem) : '';
                         return (
                           <div key={key} className="evidencias-fase-card">
-                            <div className="evidencias-fase-title">{label}</div>
-                            <button
-                              type="button"
-                              className="evidencias-fase-choose-btn"
-                              onClick={() => evidenciaFileInputRefs.current[key]?.click()}
-                            >
-                              Elegir fotos
-                            </button>
-                            <p className="evidencias-fase-hint">JPG, PNG · máx. 5 MB por archivo</p>
+                            <div className="evidencias-fase-head">
+                              <div className="evidencias-fase-title">{label}</div>
+                              <span className="evidencias-fase-count">{n} foto{n === 1 ? '' : 's'}</span>
+                            </div>
+                            <div className="evidencias-fase-actions">
+                              <button
+                                type="button"
+                                className="evidencias-fase-choose-btn"
+                                onClick={() => evidenciaFileInputRefs.current[key]?.click()}
+                              >
+                                Elegir fotos
+                              </button>
+                              <button
+                                type="button"
+                                className="evidencias-fase-choose-btn evidencias-fase-camera-btn"
+                                onClick={() => evidenciaCameraInputRefs.current[key]?.click()}
+                              >
+                                Tomar foto
+                              </button>
+                            </div>
+                            <p className="evidencias-fase-hint">Puedes agregar varias fotos por categoría. JPG, PNG · máx. 5 MB por archivo</p>
                             <input
                               ref={(el) => {
                                 evidenciaFileInputRefs.current[key] = el;
@@ -12077,6 +12381,19 @@ export default function DashboardPage() {
                               type="file"
                               accept="image/png,image/jpeg"
                               multiple
+                              style={{ display: 'none' }}
+                              onChange={(e) => {
+                                void uploadEvidenciasFotos(e.target.files, key);
+                                e.target.value = '';
+                              }}
+                            />
+                            <input
+                              ref={(el) => {
+                                evidenciaCameraInputRefs.current[key] = el;
+                              }}
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
                               style={{ display: 'none' }}
                               onChange={(e) => {
                                 void uploadEvidenciasFotos(e.target.files, key);
@@ -12172,6 +12489,71 @@ export default function DashboardPage() {
                                   Abrir en el navegador
                                 </a>
                               </div>
+                            )}
+                            {n > 0 ? (
+                              <div className="evidencias-fase-list" aria-label={`Listado de fotos ${label}`}>
+                                {items.map((item, itemIdx) => {
+                                  const itemHref = evidenciaItemUrl(item);
+                                  const itemSrc = evidenciaCarouselImgSrc(item);
+                                  return (
+                                    <div
+                                      key={`${key}-${itemHref}-${itemIdx}`}
+                                      className={`evidencias-fase-list-item ${itemIdx === slideIdx ? 'evidencias-fase-list-item-active' : ''}`}
+                                    >
+                                      <button
+                                        type="button"
+                                        className="evidencias-fase-list-main"
+                                        onClick={() =>
+                                          setEvidenciaCarouselIndex((prev) => ({
+                                            ...prev,
+                                            [key]: itemIdx,
+                                          }))
+                                        }
+                                      >
+                                        <span className="evidencias-fase-list-thumb-wrap">
+                                          <img
+                                            src={itemSrc}
+                                            alt={`${label} foto ${itemIdx + 1}`}
+                                            className="evidencias-fase-list-thumb"
+                                            loading="lazy"
+                                          />
+                                        </span>
+                                        <span>
+                                          <strong>Foto {itemIdx + 1}</strong>
+                                          <small>{itemIdx === slideIdx ? 'Seleccionada' : 'Tocar para ver arriba'}</small>
+                                        </span>
+                                      </button>
+                                      <div className="evidencias-fase-list-actions">
+                                        <button
+                                          type="button"
+                                          className="evidencias-fase-list-action"
+                                          onClick={() => setRegistroFotoPreviewUrl(itemSrc)}
+                                        >
+                                          Ver
+                                        </button>
+                                        <a
+                                          className="evidencias-fase-list-action"
+                                          href={itemHref}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                        >
+                                          Link
+                                        </a>
+                                        <button
+                                          type="button"
+                                          className="evidencias-fase-list-delete"
+                                          aria-label={`Eliminar foto ${itemIdx + 1} de ${label}`}
+                                          onClick={() => removeEvidenciaUrl(key, itemIdx)}
+                                        >
+                                          <IconTrash />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <p className="evidencias-fase-empty">Aún no hay fotos en esta categoría.</p>
                             )}
                           </div>
                         );
