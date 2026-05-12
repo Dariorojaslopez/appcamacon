@@ -392,6 +392,7 @@ const emptyEquipoDraft = () => ({
   placaRef: '',
   propiedad: '',
   estado: '',
+  observacion: '',
   horaIngreso: '',
   horaSalida: '',
   horasTrabajadas: 0,
@@ -1068,6 +1069,7 @@ export default function DashboardPage() {
       placaRef: string;
       propiedad: string;
       estado: string;
+      observacion: string;
       horaIngreso: string;
       horaSalida: string;
       horasTrabajadas: number;
@@ -2202,6 +2204,7 @@ export default function DashboardPage() {
                 placaRef: e.placaRef ?? '',
                 propiedad: e.propiedad ?? '',
                 estado: e.estado ?? '',
+                observacion: e.observacion ?? '',
                 horaIngreso: fallbackHorarios[0]?.horaIngreso ?? '',
                 horaSalida: fallbackHorarios[fallbackHorarios.length - 1]?.horaSalida ?? '',
                 horasTrabajadas: sumEquipoHorarios(fallbackHorarios),
@@ -3948,6 +3951,7 @@ export default function DashboardPage() {
       | 'personalDraftSubcontratista'
       | 'equipoDraftDescripcion'
       | 'equipoDraftPlaca'
+      | 'equipoDraftObservacion'
       | 'ingresoDraftProveedor'
       | 'ingresoDraftTipoMaterial'
       | 'ingresoDraftNoRemision'
@@ -3966,7 +3970,7 @@ export default function DashboardPage() {
             field === 'personalDraftCargo' ||
             field === 'personalDraftSubcontratista'
           ? setPersonalError
-          : field === 'equipoDraftDescripcion' || field === 'equipoDraftPlaca'
+          : field === 'equipoDraftDescripcion' || field === 'equipoDraftPlaca' || field === 'equipoDraftObservacion'
             ? setEquiposError
             : field === 'ingresoDraftProveedor' ||
                 field === 'ingresoDraftTipoMaterial' ||
@@ -4068,6 +4072,10 @@ export default function DashboardPage() {
         }
         if (field === 'equipoDraftPlaca') {
           setEquipoDraft((d) => ({ ...d, placaRef: text }));
+          return;
+        }
+        if (field === 'equipoDraftObservacion') {
+          setEquipoDraft((d) => ({ ...d, observacion: text }));
           return;
         }
         if (field === 'ingresoDraftProveedor') {
@@ -4528,6 +4536,7 @@ export default function DashboardPage() {
       placaRef: r.placaRef,
       propiedad: r.propiedad,
       estado: r.estado,
+      observacion: r.observacion,
       horaIngreso: '',
       horaSalida: '',
       horasTrabajadas: 0,
@@ -4573,6 +4582,7 @@ export default function DashboardPage() {
                 placaRef: equipoDraft.placaRef.trim(),
                 propiedad: equipoDraft.propiedad,
                 estado: equipoDraft.estado,
+                observacion: equipoDraft.observacion.trim(),
                 horaIngreso: nextHorarios[0]?.horaIngreso ?? '',
                 horaSalida: nextHorarios[nextHorarios.length - 1]?.horaSalida ?? '',
                 horasTrabajadas: sumEquipoHorarios(nextHorarios),
@@ -4590,6 +4600,7 @@ export default function DashboardPage() {
           placaRef: equipoDraft.placaRef.trim(),
           propiedad: equipoDraft.propiedad,
           estado: equipoDraft.estado,
+          observacion: equipoDraft.observacion.trim(),
           horaIngreso: nextHorarios[0]?.horaIngreso ?? '',
           horaSalida: nextHorarios[nextHorarios.length - 1]?.horaSalida ?? '',
           horasTrabajadas: sumEquipoHorarios(nextHorarios),
@@ -4636,6 +4647,7 @@ export default function DashboardPage() {
             placaRef: e.placaRef,
             propiedad: e.propiedad,
             estado: e.estado,
+            observacion: e.observacion,
             horaIngreso: e.horaIngreso,
             horaSalida: e.horaSalida,
             horasTrabajadas: Number(e.horasTrabajadas),
@@ -4680,6 +4692,7 @@ export default function DashboardPage() {
             placaRef: e.placaRef ?? '',
             propiedad: e.propiedad ?? '',
             estado: e.estado ?? '',
+            observacion: e.observacion ?? '',
             horaIngreso: fallbackHorarios[0]?.horaIngreso ?? '',
             horaSalida: fallbackHorarios[fallbackHorarios.length - 1]?.horaSalida ?? '',
             horasTrabajadas: sumEquipoHorarios(fallbackHorarios),
@@ -9890,10 +9903,35 @@ export default function DashboardPage() {
                           <option value="FUERA_DE_SERVICIO">Fuera de servicio</option>
                         </select>
                       </div>
-                      <div className="form-row-inline" style={{ alignItems: 'flex-end' }}>
-                        <div className="informe-field">
+                      <div className="informe-field">
+                        <label className="informe-label" htmlFor="equipo-draft-observacion">
+                          Observación
+                        </label>
+                        <div className="informe-input-wrap">
+                          <textarea
+                            id="equipo-draft-observacion"
+                            className="personal-input personal-input-with-mic textarea-input equipo-observacion-textarea"
+                            placeholder="Observación del equipo"
+                            rows={3}
+                            value={equipoDraft.observacion}
+                            onChange={(e) =>
+                              setEquipoDraft((d) => ({ ...d, observacion: e.target.value }))
+                            }
+                          />
+                          <button
+                            type="button"
+                            className="informe-icon-button textarea-mic"
+                            aria-label="Dictar observación"
+                            onClick={() => void startVoiceCapture('equipoDraftObservacion')}
+                          >
+                            <IconMic />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="form-row-inline equipo-horarios-row">
+                        <div className="informe-field equipo-horarios-field">
                           <label className="informe-label" htmlFor="equipo-draft-h-in">
-                            Hora ingreso
+                            Hora inicial
                           </label>
                           <div className="personal-time-wrap">
                             <input
@@ -9910,9 +9948,9 @@ export default function DashboardPage() {
                             </span>
                           </div>
                         </div>
-                        <div className="informe-field">
+                        <div className="informe-field equipo-horarios-field">
                           <label className="informe-label" htmlFor="equipo-draft-h-out">
-                            Hora salida
+                            Hora final
                           </label>
                           <div className="personal-time-wrap">
                             <input
@@ -9929,7 +9967,7 @@ export default function DashboardPage() {
                             </span>
                           </div>
                         </div>
-                        <div className="informe-field" style={{ minWidth: '9rem' }}>
+                        <div className="informe-field equipo-horarios-field equipo-horarios-total-field">
                           <label className="informe-label" htmlFor="equipo-draft-horas">
                             Horas trabajadas
                           </label>
@@ -9945,20 +9983,19 @@ export default function DashboardPage() {
                         </div>
                         <button
                           type="button"
-                          className="btn-secondary"
-                          style={{ width: 'auto', minWidth: '8rem' }}
+                          className="btn-secondary equipo-horarios-add-btn"
                           onClick={addEquipoHorarioDraft}
                         >
                           Agregar horario
                         </button>
                       </div>
                       {equipoDraft.horarios.length > 0 ? (
-                        <div className="users-table-wrap" style={{ marginTop: 0 }}>
+                        <div className="users-table-wrap equipo-horarios-table-wrap">
                           <table className="users-table">
                             <thead>
                               <tr>
-                                <th>Ingreso</th>
-                                <th>Salida</th>
+                                <th>Hora inicial</th>
+                                <th>Hora final</th>
                                 <th>Horas</th>
                                 <th>Acciones</th>
                               </tr>
@@ -9969,7 +10006,7 @@ export default function DashboardPage() {
                                   <td>{h.horaIngreso}</td>
                                   <td>{h.horaSalida}</td>
                                   <td>{formatEquipoHoras(h.horasTrabajadas)}</td>
-                                  <td>
+                                  <td className="users-table-actions equipo-horarios-actions">
                                     <button
                                       type="button"
                                       className="danger"
@@ -10051,6 +10088,9 @@ export default function DashboardPage() {
                                 <strong>Estado:</strong> {equipoEstadoLabel(r.estado)}
                               </div>
                               <div>
+                                <strong>Observación:</strong> {r.observacion.trim() || '—'}
+                              </div>
+                              <div>
                                 <strong>Horarios:</strong>{' '}
                                 {r.horarios.length > 0 ? `${r.horarios.length} registro(s)` : '—'}
                               </div>
@@ -10064,8 +10104,8 @@ export default function DashboardPage() {
                                 <table className="users-table">
                                   <thead>
                                     <tr>
-                                      <th>Ingreso</th>
-                                      <th>Salida</th>
+                                      <th>Hora inicial</th>
+                                      <th>Hora final</th>
                                       <th>Horas</th>
                                     </tr>
                                   </thead>

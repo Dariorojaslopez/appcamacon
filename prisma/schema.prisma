@@ -244,6 +244,7 @@ model EquipoObra {
   placaRef      String?
   propiedad     String?  // PROPIO / ALQUILADO
   estado        String?  // Selección libre (ej. Operativo / Fuera de servicio)
+  observacion   String?
   horasTrabajadas Float?
   horaIngreso   String?  // "HH:mm"
   horaSalida    String?  // "HH:mm"

@@ -1907,6 +1907,62 @@ ul.informe-searchable-list {
   height: 1.35rem;
   accent-color: #f59e0b;
 }
+
+.equipo-horarios-row {
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.equipo-horarios-row .equipo-horarios-field {
+  flex: 1 1 10rem;
+  margin-bottom: 0;
+}
+
+.equipo-horarios-row .equipo-horarios-total-field {
+  flex: 0 1 11rem;
+}
+
+.equipo-horarios-row .personal-input,
+.equipo-horarios-row .equipo-horarios-add-btn {
+  min-height: 2.45rem;
+}
+
+.equipo-horarios-add-btn.btn-secondary {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 9.5rem;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.equipo-horarios-table-wrap {
+  margin-top: 0;
+}
+
+.equipo-observacion-textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.equipo-horarios-actions {
+  justify-content: flex-start;
+}
+
+@media (max-width: 639px) {
+  .equipo-horarios-row {
+    align-items: stretch;
+  }
+
+  .equipo-horarios-row .equipo-horarios-field,
+  .equipo-horarios-row .equipo-horarios-total-field,
+  .equipo-horarios-add-btn.btn-secondary {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+}
 /* Tabla usuarios / obras: scroll horizontal en móvil */
 .users-table-wrap {
   overflow-x: auto;

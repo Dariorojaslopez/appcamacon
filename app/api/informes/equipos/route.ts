@@ -56,6 +56,7 @@ export async function GET(req: NextRequest) {
         placaRef: e.placaRef,
         propiedad: e.propiedad,
         estado: e.estado,
+        observacion: e.observacion,
         horasTrabajadas: e.horasTrabajadas,
         horaIngreso: e.horaIngreso,
         horaSalida: e.horaSalida,
@@ -95,6 +96,7 @@ export async function POST(req: NextRequest) {
         placaRef?: string;
         propiedad?: string;
         estado?: string;
+        observacion?: string;
         horasTrabajadas?: number;
         horaIngreso?: string;
         horaSalida?: string;
@@ -157,6 +159,7 @@ export async function POST(req: NextRequest) {
           placaRef: e.placaRef ? String(e.placaRef).trim() : null,
           propiedad: e.propiedad ? String(e.propiedad).trim() : null,
           estado: e.estado ? String(e.estado).trim() : null,
+          observacion: e.observacion ? String(e.observacion).trim() : null,
           horasTrabajadas: totalHoras,
           horaIngreso: effectiveHorarios[0]?.horaIngreso || null,
           horaSalida: effectiveHorarios[effectiveHorarios.length - 1]?.horaSalida || null,
@@ -213,6 +216,7 @@ export async function POST(req: NextRequest) {
           placaRef: e.placaRef,
           propiedad: e.propiedad,
           estado: e.estado,
+          observacion: e.observacion,
           horasTrabajadas: e.horasTrabajadas,
           horaIngreso: e.horaIngreso,
           horaSalida: e.horaSalida,
@@ -242,6 +246,7 @@ export async function POST(req: NextRequest) {
         placaRef: e.placaRef,
         propiedad: e.propiedad,
         estado: e.estado,
+        observacion: e.observacion,
         horasTrabajadas: e.horasTrabajadas,
         horaIngreso: e.horaIngreso,
         horaSalida: e.horaSalida,
