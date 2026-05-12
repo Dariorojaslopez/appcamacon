@@ -53,6 +53,8 @@ export async function GET(req: NextRequest) {
         noRemision: m.noRemision,
         unidad: m.unidad,
         cantidad: m.cantidad,
+        observacion: m.observacion,
+        imagenUrl: m.imagenUrl,
       })),
     });
   } catch (error: unknown) {
@@ -83,6 +85,8 @@ export async function POST(req: NextRequest) {
         noRemision: string;
         unidad: string;
         cantidad?: number;
+        observacion?: string;
+        imagenUrl?: string;
       }>;
     };
 
@@ -109,6 +113,8 @@ export async function POST(req: NextRequest) {
         unidad: String(m.unidad ?? '').trim(),
         cantidad:
           typeof m.cantidad === 'number' && Number.isFinite(m.cantidad) ? m.cantidad : null,
+        observacion: m.observacion ? String(m.observacion).trim() : null,
+        imagenUrl: m.imagenUrl ? String(m.imagenUrl).trim() : null,
       }))
       .filter((m) => m.proveedor && m.tipoMaterial && m.noRemision && m.unidad);
 
@@ -175,6 +181,8 @@ export async function POST(req: NextRequest) {
         noRemision: m.noRemision,
         unidad: m.unidad,
         cantidad: m.cantidad,
+        observacion: m.observacion,
+        imagenUrl: m.imagenUrl,
       })),
     });
   } catch (error: unknown) {

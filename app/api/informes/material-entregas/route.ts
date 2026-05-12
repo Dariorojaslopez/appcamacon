@@ -53,6 +53,8 @@ export async function GET(req: NextRequest) {
         cantidad: m.cantidad,
         contratista: m.contratista,
         firmaRecibido: m.firmaRecibido,
+        observacion: m.observacion,
+        imagenUrl: m.imagenUrl,
       })),
     });
   } catch (error: unknown) {
@@ -83,6 +85,8 @@ export async function POST(req: NextRequest) {
         cantidad?: number;
         contratista: string;
         firmaRecibido?: boolean;
+        observacion?: string;
+        imagenUrl?: string;
       }>;
     };
 
@@ -109,6 +113,8 @@ export async function POST(req: NextRequest) {
           typeof m.cantidad === 'number' && Number.isFinite(m.cantidad) ? m.cantidad : null,
         contratista: String(m.contratista ?? '').trim(),
         firmaRecibido: Boolean(m.firmaRecibido),
+        observacion: m.observacion ? String(m.observacion).trim() : null,
+        imagenUrl: m.imagenUrl ? String(m.imagenUrl).trim() : null,
       }))
       .filter((m) => m.tipoMaterial && m.unidad && m.contratista);
 
@@ -175,6 +181,8 @@ export async function POST(req: NextRequest) {
         cantidad: m.cantidad,
         contratista: m.contratista,
         firmaRecibido: m.firmaRecibido,
+        observacion: m.observacion,
+        imagenUrl: m.imagenUrl,
       })),
     });
   } catch (error: unknown) {

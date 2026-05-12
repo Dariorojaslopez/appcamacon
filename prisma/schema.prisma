@@ -280,6 +280,8 @@ model MaterialIngreso {
   noRemision    String
   unidad        String
   cantidad      Float?
+  observacion   String?
+  imagenUrl     String?
 
   informeId     String
   informe       InformeDiario @relation(fields: [informeId], references: [id], onDelete: Cascade)
@@ -295,6 +297,8 @@ model MaterialEntrega {
   cantidad      Float?
   contratista   String
   firmaRecibido Boolean  @default(false)
+  observacion   String?
+  imagenUrl     String?
 
   informeId     String
   informe       InformeDiario @relation(fields: [informeId], references: [id], onDelete: Cascade)

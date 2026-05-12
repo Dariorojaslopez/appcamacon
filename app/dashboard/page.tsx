@@ -434,6 +434,8 @@ const emptyIngresoDraft = () => ({
   noRemision: '',
   unidad: '',
   cantidad: 0,
+  observacion: '',
+  imagenUrl: '',
 });
 
 const emptyEntregaDraft = () => ({
@@ -442,6 +444,8 @@ const emptyEntregaDraft = () => ({
   cantidad: 0,
   contratista: '',
   firmaRecibido: false,
+  observacion: '',
+  imagenUrl: '',
 });
 
 const emptyActividadDraft = () => ({
@@ -1108,6 +1112,8 @@ export default function DashboardPage() {
       noRemision: string;
       unidad: string;
       cantidad: number;
+      observacion: string;
+      imagenUrl: string;
     }>
   >([]);
   const [loadingIngreso, setLoadingIngreso] = useState(false);
@@ -1123,6 +1129,8 @@ export default function DashboardPage() {
       cantidad: number;
       contratista: string;
       firmaRecibido: boolean;
+      observacion: string;
+      imagenUrl: string;
     }>
   >([]);
   const [loadingEntrega, setLoadingEntrega] = useState(false);
@@ -2251,6 +2259,8 @@ export default function DashboardPage() {
               noRemision: m.noRemision ?? '',
               unidad: m.unidad ?? '',
               cantidad: Number(m.cantidad ?? 0),
+              observacion: m.observacion ?? '',
+              imagenUrl: m.imagenUrl ?? '',
             })),
           );
           setIngresoDraft(emptyIngresoDraft());
@@ -2280,6 +2290,8 @@ export default function DashboardPage() {
               cantidad: Number(m.cantidad ?? 0),
               contratista: m.contratista ?? '',
               firmaRecibido: Boolean(m.firmaRecibido),
+              observacion: m.observacion ?? '',
+              imagenUrl: m.imagenUrl ?? '',
             })),
           );
           setEntregaDraft(emptyEntregaDraft());
@@ -3959,9 +3971,11 @@ export default function DashboardPage() {
       | 'ingresoDraftTipoMaterial'
       | 'ingresoDraftNoRemision'
       | 'ingresoDraftUnidad'
+      | 'ingresoDraftObservacion'
       | 'entregaDraftTipoMaterial'
       | 'entregaDraftUnidad'
       | 'entregaDraftContratista'
+      | 'entregaDraftObservacion'
       | 'actividadDraftObservacion'
       | 'actividadObservacion',
     actividadIdx?: number,
@@ -3978,11 +3992,13 @@ export default function DashboardPage() {
             : field === 'ingresoDraftProveedor' ||
                 field === 'ingresoDraftTipoMaterial' ||
                 field === 'ingresoDraftNoRemision' ||
-                field === 'ingresoDraftUnidad'
+                field === 'ingresoDraftUnidad' ||
+                field === 'ingresoDraftObservacion'
               ? setIngresoError
               : field === 'entregaDraftTipoMaterial' ||
                   field === 'entregaDraftUnidad' ||
-                  field === 'entregaDraftContratista'
+                  field === 'entregaDraftContratista' ||
+                  field === 'entregaDraftObservacion'
                 ? setEntregaError
                 : field === 'actividadDraftObservacion' || field === 'actividadObservacion'
                 ? setActividadError
@@ -4097,6 +4113,10 @@ export default function DashboardPage() {
           setIngresoDraft((d) => ({ ...d, unidad: text }));
           return;
         }
+        if (field === 'ingresoDraftObservacion') {
+          setIngresoDraft((d) => ({ ...d, observacion: text }));
+          return;
+        }
         if (field === 'entregaDraftTipoMaterial') {
           setEntregaDraft((d) => ({ ...d, tipoMaterial: text }));
           return;
@@ -4107,6 +4127,10 @@ export default function DashboardPage() {
         }
         if (field === 'entregaDraftContratista') {
           setEntregaDraft((d) => ({ ...d, contratista: text }));
+          return;
+        }
+        if (field === 'entregaDraftObservacion') {
+          setEntregaDraft((d) => ({ ...d, observacion: text }));
           return;
         }
         if (field === 'actividadDraftObservacion') {
@@ -4734,6 +4758,8 @@ export default function DashboardPage() {
       noRemision: r.noRemision,
       unidad: r.unidad,
       cantidad: r.cantidad,
+      observacion: r.observacion,
+      imagenUrl: r.imagenUrl,
     });
     setIngresoEditingIndex(idx);
     setIngresoError(null);
@@ -4757,6 +4783,8 @@ export default function DashboardPage() {
                 noRemision: ingresoDraft.noRemision.trim(),
                 unidad: ingresoDraft.unidad.trim(),
                 cantidad: Number(ingresoDraft.cantidad) || 0,
+                observacion: ingresoDraft.observacion.trim(),
+                imagenUrl: ingresoDraft.imagenUrl.trim(),
               }
             : row,
         ),
@@ -4771,6 +4799,8 @@ export default function DashboardPage() {
           noRemision: ingresoDraft.noRemision.trim(),
           unidad: ingresoDraft.unidad.trim(),
           cantidad: Number(ingresoDraft.cantidad) || 0,
+          observacion: ingresoDraft.observacion.trim(),
+          imagenUrl: ingresoDraft.imagenUrl.trim(),
         },
       ]);
     }
@@ -4814,6 +4844,8 @@ export default function DashboardPage() {
             noRemision: m.noRemision,
             unidad: m.unidad,
             cantidad: Number(m.cantidad),
+            observacion: m.observacion,
+            imagenUrl: m.imagenUrl,
           })),
         }),
       });
@@ -4831,6 +4863,8 @@ export default function DashboardPage() {
           noRemision: m.noRemision ?? '',
           unidad: m.unidad ?? '',
           cantidad: Number(m.cantidad ?? 0),
+          observacion: m.observacion ?? '',
+          imagenUrl: m.imagenUrl ?? '',
         })),
       );
       setIngresoMessage('Ingreso de material guardado.');
@@ -4859,6 +4893,8 @@ export default function DashboardPage() {
       cantidad: r.cantidad,
       contratista: r.contratista,
       firmaRecibido: r.firmaRecibido,
+      observacion: r.observacion,
+      imagenUrl: r.imagenUrl,
     });
     setEntregaEditingIndex(idx);
     setEntregaError(null);
@@ -4882,6 +4918,8 @@ export default function DashboardPage() {
                 cantidad: Number(entregaDraft.cantidad) || 0,
                 contratista: entregaDraft.contratista.trim(),
                 firmaRecibido: entregaDraft.firmaRecibido,
+                observacion: entregaDraft.observacion.trim(),
+                imagenUrl: entregaDraft.imagenUrl.trim(),
               }
             : row,
         ),
@@ -4896,6 +4934,8 @@ export default function DashboardPage() {
           cantidad: Number(entregaDraft.cantidad) || 0,
           contratista: entregaDraft.contratista.trim(),
           firmaRecibido: entregaDraft.firmaRecibido,
+          observacion: entregaDraft.observacion.trim(),
+          imagenUrl: entregaDraft.imagenUrl.trim(),
         },
       ]);
     }
@@ -4939,6 +4979,8 @@ export default function DashboardPage() {
             cantidad: Number(m.cantidad),
             contratista: m.contratista,
             firmaRecibido: m.firmaRecibido,
+            observacion: m.observacion,
+            imagenUrl: m.imagenUrl,
           })),
         }),
       });
@@ -4956,6 +4998,8 @@ export default function DashboardPage() {
           cantidad: Number(m.cantidad ?? 0),
           contratista: m.contratista ?? '',
           firmaRecibido: Boolean(m.firmaRecibido),
+          observacion: m.observacion ?? '',
+          imagenUrl: m.imagenUrl ?? '',
         })),
       );
       setEntregaMessage('Material entregado guardado.');
@@ -10356,6 +10400,72 @@ export default function DashboardPage() {
                           />
                         </div>
                       </div>
+                      <div className="informe-field">
+                        <label className="informe-label" htmlFor="ingreso-draft-observacion">
+                          Observación
+                        </label>
+                        <div className="informe-input-wrap">
+                          <textarea
+                            id="ingreso-draft-observacion"
+                            className="personal-input personal-input-with-mic textarea-input equipo-observacion-textarea"
+                            placeholder="Observación del ingreso"
+                            rows={3}
+                            value={ingresoDraft.observacion}
+                            onChange={(e) =>
+                              setIngresoDraft((d) => ({ ...d, observacion: e.target.value }))
+                            }
+                          />
+                          <button
+                            type="button"
+                            className="informe-icon-button textarea-mic"
+                            aria-label="Dictar observación"
+                            onClick={() => void startVoiceCapture('ingresoDraftObservacion')}
+                          >
+                            <IconMic />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="informe-field">
+                        <label className="informe-label" htmlFor="ingreso-draft-imagen">
+                          Registro fotográfico
+                        </label>
+                        <input
+                          id="ingreso-draft-imagen"
+                          className="personal-input calidad-file-input equipo-imagen-input"
+                          type="file"
+                          accept="image/*"
+                          disabled={informeBloqueado || !selectedObraId}
+                          onChange={async (e) => {
+                            const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+                            try {
+                              setIngresoError(null);
+                              const url = await uploadEquipoImagen(file);
+                              if (url) setIngresoDraft((d) => ({ ...d, imagenUrl: url }));
+                            } catch (err) {
+                              setIngresoError(err instanceof Error ? err.message : 'Error al subir imagen.');
+                            } finally {
+                              e.target.value = '';
+                            }
+                          }}
+                        />
+                        {ingresoDraft.imagenUrl ? (
+                          <div className="equipo-imagen-preview">
+                            <img
+                              src={ingresoDraft.imagenUrl}
+                              alt="Registro fotográfico del ingreso"
+                              className="calidad-mobile-thumb"
+                            />
+                            <button
+                              type="button"
+                              className="equipo-imagen-remove-btn"
+                              disabled={informeBloqueado}
+                              onClick={() => setIngresoDraft((d) => ({ ...d, imagenUrl: '' }))}
+                            >
+                              Quitar imagen
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
                       <div className="personal-form-actions">
                         <button type="button" className="btn-primary" onClick={commitIngresoDraft}>
                           {ingresoEditingIndex !== null ? 'Guardar cambios' : 'Agregar a la lista'}
@@ -10419,6 +10529,21 @@ export default function DashboardPage() {
                               <div>
                                 <strong>Cantidad:</strong> {r.cantidad}{' '}
                                 {r.unidad.trim() ? r.unidad.trim() : ''}
+                              </div>
+                              <div>
+                                <strong>Observación:</strong> {r.observacion.trim() || '—'}
+                              </div>
+                              <div>
+                                <strong>Registro fotográfico:</strong>{' '}
+                                {r.imagenUrl ? (
+                                  <img
+                                    src={r.imagenUrl}
+                                    alt="Registro fotográfico del ingreso"
+                                    className="calidad-table-thumb"
+                                  />
+                                ) : (
+                                  '—'
+                                )}
                               </div>
                             </div>
                           </div>
@@ -10565,6 +10690,72 @@ export default function DashboardPage() {
                           }
                         />
                       </div>
+                      <div className="informe-field">
+                        <label className="informe-label" htmlFor="entrega-draft-observacion">
+                          Observación
+                        </label>
+                        <div className="informe-input-wrap">
+                          <textarea
+                            id="entrega-draft-observacion"
+                            className="personal-input personal-input-with-mic textarea-input equipo-observacion-textarea"
+                            placeholder="Observación de la entrega"
+                            rows={3}
+                            value={entregaDraft.observacion}
+                            onChange={(e) =>
+                              setEntregaDraft((d) => ({ ...d, observacion: e.target.value }))
+                            }
+                          />
+                          <button
+                            type="button"
+                            className="informe-icon-button textarea-mic"
+                            aria-label="Dictar observación"
+                            onClick={() => void startVoiceCapture('entregaDraftObservacion')}
+                          >
+                            <IconMic />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="informe-field">
+                        <label className="informe-label" htmlFor="entrega-draft-imagen">
+                          Registro fotográfico
+                        </label>
+                        <input
+                          id="entrega-draft-imagen"
+                          className="personal-input calidad-file-input equipo-imagen-input"
+                          type="file"
+                          accept="image/*"
+                          disabled={informeBloqueado || !selectedObraId}
+                          onChange={async (e) => {
+                            const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+                            try {
+                              setEntregaError(null);
+                              const url = await uploadEquipoImagen(file);
+                              if (url) setEntregaDraft((d) => ({ ...d, imagenUrl: url }));
+                            } catch (err) {
+                              setEntregaError(err instanceof Error ? err.message : 'Error al subir imagen.');
+                            } finally {
+                              e.target.value = '';
+                            }
+                          }}
+                        />
+                        {entregaDraft.imagenUrl ? (
+                          <div className="equipo-imagen-preview">
+                            <img
+                              src={entregaDraft.imagenUrl}
+                              alt="Registro fotográfico de la entrega"
+                              className="calidad-mobile-thumb"
+                            />
+                            <button
+                              type="button"
+                              className="equipo-imagen-remove-btn"
+                              disabled={informeBloqueado}
+                              onClick={() => setEntregaDraft((d) => ({ ...d, imagenUrl: '' }))}
+                            >
+                              Quitar imagen
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
                       <div className="personal-form-actions">
                         <button type="button" className="btn-primary" onClick={commitEntregaDraft}>
                           {entregaEditingIndex !== null ? 'Guardar cambios' : 'Agregar a la lista'}
@@ -10628,6 +10819,21 @@ export default function DashboardPage() {
                               </div>
                               <div>
                                 <strong>Firma recibido:</strong> {r.firmaRecibido ? 'Sí' : 'No'}
+                              </div>
+                              <div>
+                                <strong>Observación:</strong> {r.observacion.trim() || '—'}
+                              </div>
+                              <div>
+                                <strong>Registro fotográfico:</strong>{' '}
+                                {r.imagenUrl ? (
+                                  <img
+                                    src={r.imagenUrl}
+                                    alt="Registro fotográfico de la entrega"
+                                    className="calidad-table-thumb"
+                                  />
+                                ) : (
+                                  '—'
+                                )}
                               </div>
                             </div>
                           </div>
