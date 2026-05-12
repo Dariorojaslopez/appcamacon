@@ -1312,6 +1312,35 @@ body {
   white-space: nowrap;
 }
 
+.bitacora-filter-card {
+  align-items: end;
+  background: #fff;
+  border: 1px solid rgba(209, 213, 219, 0.95);
+  border-radius: 16px;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr;
+  padding: 0.9rem;
+}
+
+@media (min-width: 860px) {
+  .bitacora-filter-card {
+    grid-template-columns: minmax(220px, 1.4fr) minmax(150px, 0.7fr) minmax(220px, 1fr) auto;
+  }
+}
+
+.bitacora-filter-actions {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 480px) {
+  .bitacora-filter-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .bitacora-panel {
   display: grid;
   gap: 1rem;
@@ -1324,7 +1353,7 @@ body {
 }
 
 .bitacora-metric-card,
-.bitacora-clima-card,
+.bitacora-readonly-card,
 .bitacora-pdf-card,
 .bitacora-evidencia-card {
   border: 1px solid rgba(209, 213, 219, 0.95);
@@ -1348,10 +1377,42 @@ body {
   margin-top: 0.25rem;
 }
 
-.bitacora-clima-card h2,
+.bitacora-info-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 760px) {
+  .bitacora-info-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.bitacora-readonly-card h2,
 .bitacora-pdf-card h2 {
   font-size: 1rem;
   margin: 0 0 0.75rem;
+}
+
+.bitacora-readonly-card dl {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0.75rem 0 0;
+}
+
+.bitacora-readonly-card dt {
+  color: #6b7280;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.bitacora-readonly-card dd {
+  color: #111827;
+  font-weight: 700;
+  margin: 0.15rem 0 0;
+  overflow-wrap: anywhere;
 }
 
 .bitacora-timeline {
@@ -1423,6 +1484,67 @@ body {
 .bitacora-event-observacion {
   color: #4b5563;
   font-size: 0.82rem;
+}
+
+.bitacora-event-detail-grid {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: 1fr;
+  margin-top: 0.65rem;
+}
+
+@media (min-width: 720px) {
+  .bitacora-event-detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.bitacora-event-detail-grid div {
+  background: #f9fafb;
+  border: 1px solid rgba(229, 231, 235, 0.95);
+  border-radius: 10px;
+  min-width: 0;
+  padding: 0.5rem;
+}
+
+.bitacora-event-detail-grid span {
+  color: #6b7280;
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.bitacora-event-detail-grid strong {
+  color: #111827;
+  display: block;
+  font-size: 0.82rem;
+  margin-top: 0.12rem;
+  overflow-wrap: anywhere;
+}
+
+.bitacora-mini-map {
+  border: 1px solid rgba(209, 213, 219, 0.95);
+  border-radius: 12px;
+  margin-top: 0.65rem;
+  overflow: hidden;
+}
+
+.bitacora-mini-map iframe {
+  border: 0;
+  display: block;
+  height: 150px;
+  width: 100%;
+}
+
+.bitacora-mini-map a {
+  background: #fff;
+  color: #2563eb;
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 0.5rem;
+  text-align: center;
 }
 
 .bitacora-event-location a,

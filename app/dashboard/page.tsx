@@ -921,14 +921,7 @@ export default function DashboardPage() {
   const [bitacoraTab, setBitacoraTab] = useState<BitacoraTab>('dashboard');
   const [bitacoraEventos, setBitacoraEventos] = useState<BitacoraEventoUi[]>([]);
   const [bitacoraMetrics, setBitacoraMetrics] = useState<any>(null);
-  const [bitacoraClima, setBitacoraClima] = useState({
-    tipo: '',
-    temperatura: '',
-    humedad: '',
-    observaciones: '',
-  });
   const [loadingBitacora, setLoadingBitacora] = useState(false);
-  const [savingBitacoraClima, setSavingBitacoraClima] = useState(false);
   const [bitacoraMessage, setBitacoraMessage] = useState<string | null>(null);
   const [bitacoraError, setBitacoraError] = useState<string | null>(null);
   const [creatingUser, setCreatingUser] = useState(false);
@@ -1600,7 +1593,30 @@ export default function DashboardPage() {
     };
   }, [isAppInstalled]);
 
-  const canSee = (menuKey: string) => allowedMenus.length === 0 || allowedMenus.includes(menuKey);
+  const canSee = (menuKey: string) =>
+    menuKey === 'bitacora' || allowedMenus.length === 0 || allowedMenus.includes(menuKey);
+
+  async function bitacoraGeoHeaders(): Promise<Record<string, string>> {
+    if (typeof window === 'undefined' || !navigator.geolocation) return {};
+    if (!window.isSecureContext && !voiceInsecureDevOriginMatch()) return {};
+    if (!browserPermissionPolicyAllows('geolocation')) return {};
+    return new Promise((resolve) => {
+      try {
+        navigator.geolocation.getCurrentPosition(
+          (pos) =>
+            resolve({
+              'x-sigocc-latitude': String(pos.coords.latitude),
+              'x-sigocc-longitude': String(pos.coords.longitude),
+              'x-sigocc-accuracy': String(pos.coords.accuracy),
+            }),
+          () => resolve({}),
+          { enableHighAccuracy: true, timeout: 7000, maximumAge: 60000 },
+        );
+      } catch {
+        resolve({});
+      }
+    });
+  }
 
   const loadBitacoraDigital = useCallback(async () => {
     if (!selectedObraId || !selectedJornadaId) {
@@ -1613,27 +1629,17 @@ export default function DashboardPage() {
     setLoadingBitacora(true);
     setBitacoraError(null);
     try {
-      const [dashboardRes, eventosRes, climaRes] = await Promise.all([
-        fetch(`/api/bitacora/dashboard?${qs}`, { credentials: 'include' }),
-        fetch(`/api/bitacora/eventos?${qs}`, { credentials: 'include' }),
-        fetch(`/api/bitacora/clima?${qs}`, { credentials: 'include' }),
+      const geoHeaders = await bitacoraGeoHeaders();
+      const [dashboardRes, eventosRes] = await Promise.all([
+        fetch(`/api/bitacora/dashboard?${qs}`, { credentials: 'include', headers: geoHeaders }),
+        fetch(`/api/bitacora/eventos?${qs}`, { credentials: 'include', headers: geoHeaders }),
       ]);
       const dashboardData = await dashboardRes.json();
       const eventosData = await eventosRes.json();
-      const climaData = await climaRes.json();
       if (!dashboardRes.ok) throw new Error(dashboardData?.error ?? 'No se pudo cargar dashboard de bitácora');
       if (!eventosRes.ok) throw new Error(eventosData?.error ?? 'No se pudo cargar eventos de bitácora');
       setBitacoraMetrics(dashboardData.metrics ?? null);
       setBitacoraEventos(Array.isArray(eventosData.eventos) ? eventosData.eventos : []);
-      const clima = climaData?.clima;
-      if (clima) {
-        setBitacoraClima({
-          tipo: clima.tipo ?? '',
-          temperatura: clima.temperatura != null ? String(clima.temperatura) : '',
-          humedad: clima.humedad != null ? String(clima.humedad) : '',
-          observaciones: clima.observaciones ?? '',
-        });
-      }
     } catch (err) {
       setBitacoraError(err instanceof Error ? err.message : 'Error al cargar bitácora digital.');
     } finally {
@@ -1646,42 +1652,6 @@ export default function DashboardPage() {
       void loadBitacoraDigital();
     }
   }, [activeSection, loadBitacoraDigital]);
-
-  const saveBitacoraClima = async () => {
-    if (!selectedObraId || !selectedJornadaId) {
-      setBitacoraError('Seleccione obra y jornada.');
-      return;
-    }
-    const date = datosGeneralesForm.fechaReporte || new Date().toISOString().slice(0, 10);
-    setSavingBitacoraClima(true);
-    setBitacoraError(null);
-    setBitacoraMessage(null);
-    try {
-      const res = await fetch('/api/bitacora/clima', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          projectId: selectedObraId,
-          date,
-          jornadaId: selectedJornadaId,
-          tipo: bitacoraClima.tipo,
-          temperatura: bitacoraClima.temperatura ? Number(bitacoraClima.temperatura) : null,
-          humedad: bitacoraClima.humedad ? Number(bitacoraClima.humedad) : null,
-          observaciones: bitacoraClima.observaciones,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error ?? 'No se pudo guardar clima.');
-      setBitacoraMessage('Clima de bitácora guardado.');
-      setTimeout(() => setBitacoraMessage(null), 2500);
-      await loadBitacoraDigital();
-    } catch (err) {
-      setBitacoraError(err instanceof Error ? err.message : 'Error al guardar clima.');
-    } finally {
-      setSavingBitacoraClima(false);
-    }
-  };
 
   const openBitacoraPdf = () => {
     if (!selectedObraId || !selectedJornadaId) {
@@ -2091,7 +2061,8 @@ export default function DashboardPage() {
       activeSection === 'actividades' ||
       activeSection === 'calidad' ||
       activeSection === 'evidencias' ||
-      activeSection === 'tabulacion'
+      activeSection === 'tabulacion' ||
+      activeSection === 'bitacora'
     ) {
       setLoadingObrasForInforme(true);
       (async () => {
@@ -2856,7 +2827,7 @@ export default function DashboardPage() {
     if (
       allowedMenus.length > 0 &&
       activeSection !== 'home' &&
-      !allowedMenus.includes(activeSection)
+      !canSee(activeSection)
     ) {
       setActiveSection('home');
     }
@@ -6485,6 +6456,19 @@ export default function DashboardPage() {
   const bitacoraEventosConFotos = bitacoraEventos.filter(
     (e) => (e.evidencias?.length ?? 0) > 0 || e.evidenciaFotografica,
   );
+  const bitacoraUltimoEvento = bitacoraEventos.length > 0 ? bitacoraEventos[bitacoraEventos.length - 1] : null;
+  const bitacoraClimaConsolidado = bitacoraMetrics?.clima ?? null;
+  const bitacoraMapsUrl = (evento: BitacoraEventoUi) =>
+    evento.latitud != null && evento.longitud != null
+      ? `https://www.google.com/maps?q=${evento.latitud},${evento.longitud}`
+      : '';
+  const bitacoraOsmEmbedUrl = (evento: BitacoraEventoUi) => {
+    if (evento.latitud == null || evento.longitud == null) return '';
+    const lat = Number(evento.latitud);
+    const lon = Number(evento.longitud);
+    const delta = 0.003;
+    return `https://www.openstreetmap.org/export/embed.html?bbox=${lon - delta}%2C${lat - delta}%2C${lon + delta}%2C${lat + delta}&layer=mapnik&marker=${lat}%2C${lon}`;
+  };
 
   return (
     <div className="shell">
@@ -6798,6 +6782,64 @@ export default function DashboardPage() {
             {bitacoraMessage && <p className="feedback feedback-success">{bitacoraMessage}</p>}
             {bitacoraError && <p className="feedback feedback-error">{bitacoraError}</p>}
 
+            <div className="bitacora-filter-card">
+              <label className="informe-field">
+                <span>Obra</span>
+                {loadingObrasForInforme ? (
+                  <span className="shell-text-muted">Cargando obras...</span>
+                ) : (
+                  <select
+                    className="personal-input"
+                    value={selectedObraId}
+                    onChange={(e) => setSelectedObraId(e.target.value)}
+                  >
+                    <option value="">Seleccione la obra</option>
+                    {obrasForInforme.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.code} - {o.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </label>
+              <label className="informe-field">
+                <span>Fecha</span>
+                <input
+                  className="personal-input"
+                  type="date"
+                  value={datosGeneralesForm.fechaReporte || new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => setDatosGeneralesForm((prev) => ({ ...prev, fechaReporte: e.target.value }))}
+                />
+              </label>
+              <label className="informe-field">
+                <span>Jornada</span>
+                {loadingJornadasCatalog ? (
+                  <span className="shell-text-muted">Cargando jornadas...</span>
+                ) : (
+                  <select
+                    className="personal-input"
+                    value={selectedJornadaId}
+                    onChange={(e) => setSelectedJornadaId(e.target.value)}
+                  >
+                    <option value="">Seleccione la jornada</option>
+                    {jornadasCatalog.map((j) => (
+                      <option key={j.id} value={j.id}>
+                        {j.nombre} ({j.horaInicio} - {j.horaFin})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </label>
+              <div className="bitacora-filter-actions">
+                <button type="button" className="btn-secondary" onClick={() => void loadBitacoraDigital()}>
+                  Consultar
+                </button>
+                <button type="button" className="btn-primary" onClick={openBitacoraPdf}>
+                  Exportar PDF
+                </button>
+              </div>
+            </div>
+
             <div className="users-tabs bitacora-tabs">
               {BITACORA_TABS.map((tab) => (
                 <button
@@ -6826,54 +6868,65 @@ export default function DashboardPage() {
                       ))}
                     </div>
 
-                    <div className="bitacora-clima-card">
-                      <h2>Clima de la bitácora diaria</h2>
-                      <div className="form-grid">
-                        <label className="informe-field">
-                          <span>Tipo</span>
-                          <select
-                            className="personal-input"
-                            value={bitacoraClima.tipo}
-                            onChange={(e) => setBitacoraClima((prev) => ({ ...prev, tipo: e.target.value }))}
-                          >
-                            <option value="">Seleccione...</option>
-                            <option value="SOLEADO">Soleado</option>
-                            <option value="LLUVIA">Lluvia</option>
-                            <option value="NUBLADO">Nublado</option>
-                            <option value="TORMENTA">Tormenta</option>
-                          </select>
-                        </label>
-                        <label className="informe-field">
-                          <span>Temperatura °C</span>
-                          <input
-                            className="personal-input"
-                            type="number"
-                            value={bitacoraClima.temperatura}
-                            onChange={(e) => setBitacoraClima((prev) => ({ ...prev, temperatura: e.target.value }))}
-                          />
-                        </label>
-                        <label className="informe-field">
-                          <span>Humedad %</span>
-                          <input
-                            className="personal-input"
-                            type="number"
-                            value={bitacoraClima.humedad}
-                            onChange={(e) => setBitacoraClima((prev) => ({ ...prev, humedad: e.target.value }))}
-                          />
-                        </label>
+                    <div className="bitacora-info-grid">
+                      <div className="bitacora-readonly-card">
+                        <h2>Trazabilidad del registro</h2>
+                        <dl>
+                          <div>
+                            <dt>Usuario último evento</dt>
+                            <dd>{bitacoraUltimoEvento?.usuario || 'Sin eventos'}</dd>
+                          </div>
+                          <div>
+                            <dt>Fecha bitácora</dt>
+                            <dd>{informeClaveLinea.fechaFmt}</dd>
+                          </div>
+                          <div>
+                            <dt>Hora último evento</dt>
+                            <dd>{bitacoraUltimoEvento?.hora || 'N/A'}</dd>
+                          </div>
+                          <div>
+                            <dt>Geolocalización último evento</dt>
+                            <dd>
+                              {bitacoraUltimoEvento?.latitud != null && bitacoraUltimoEvento?.longitud != null
+                                ? `${bitacoraUltimoEvento.latitud}, ${bitacoraUltimoEvento.longitud}`
+                                : 'Sin GPS registrado'}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Timestamp UTC</dt>
+                            <dd>
+                              {bitacoraUltimoEvento?.timestampUtc
+                                ? new Date(bitacoraUltimoEvento.timestampUtc).toISOString()
+                                : 'N/A'}
+                            </dd>
+                          </div>
+                        </dl>
                       </div>
-                      <label className="informe-field">
-                        <span>Observaciones clima</span>
-                        <textarea
-                          className="personal-input"
-                          rows={3}
-                          value={bitacoraClima.observaciones}
-                          onChange={(e) => setBitacoraClima((prev) => ({ ...prev, observaciones: e.target.value }))}
-                        />
-                      </label>
-                      <button type="button" className="btn-primary" onClick={saveBitacoraClima} disabled={savingBitacoraClima}>
-                        {savingBitacoraClima ? 'Guardando...' : 'Guardar clima'}
-                      </button>
+
+                      <div className="bitacora-readonly-card">
+                        <h2>Clima consolidado</h2>
+                        <p className="shell-text-muted">
+                          Se toma automáticamente de “Jornada y condiciones”; aquí no se vuelve a capturar.
+                        </p>
+                        <dl>
+                          <div>
+                            <dt>Tipo</dt>
+                            <dd>{bitacoraClimaConsolidado?.tipo || 'No registrado'}</dd>
+                          </div>
+                          <div>
+                            <dt>Temperatura</dt>
+                            <dd>{bitacoraClimaConsolidado?.temperatura ?? 'N/A'}</dd>
+                          </div>
+                          <div>
+                            <dt>Humedad</dt>
+                            <dd>{bitacoraClimaConsolidado?.humedad ?? 'N/A'}</dd>
+                          </div>
+                          <div>
+                            <dt>Observaciones</dt>
+                            <dd>{bitacoraClimaConsolidado?.observaciones || 'Sin observaciones'}</dd>
+                          </div>
+                        </dl>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -6892,23 +6945,58 @@ export default function DashboardPage() {
                               <span>{evento.estado}</span>
                             </div>
                             <p>{evento.descripcion}</p>
-                            <div className="bitacora-event-meta">
-                              <span>{evento.usuario || 'Usuario no disponible'}</span>
-                              <span>{evento.rolUsuario || 'Rol no disponible'}</span>
-                              <span>{evento.dispositivo} · {evento.navegador}</span>
+                            <div className="bitacora-event-detail-grid">
+                              <div>
+                                <span>Usuario</span>
+                                <strong>{evento.usuario || 'Usuario no disponible'}</strong>
+                              </div>
+                              <div>
+                                <span>Rol</span>
+                                <strong>{evento.rolUsuario || 'Rol no disponible'}</strong>
+                              </div>
+                              <div>
+                                <span>Fecha</span>
+                                <strong>{evento.fecha ? new Date(evento.fecha).toLocaleDateString('es-CO') : 'Fecha no disponible'}</strong>
+                              </div>
+                              <div>
+                                <span>Hora</span>
+                                <strong>{evento.hora || 'N/A'}</strong>
+                              </div>
+                              <div>
+                                <span>Timestamp UTC</span>
+                                <strong>{evento.timestampUtc ? new Date(evento.timestampUtc).toISOString() : 'UTC N/A'}</strong>
+                              </div>
+                              <div>
+                                <span>Dispositivo</span>
+                                <strong>{evento.dispositivo || 'N/A'} · {evento.navegador || 'N/A'}</strong>
+                              </div>
+                              <div>
+                                <span>Geolocalización</span>
+                                <strong>
+                                  {evento.latitud != null && evento.longitud != null
+                                    ? `${evento.latitud}, ${evento.longitud}`
+                                    : 'Sin GPS registrado'}
+                                </strong>
+                              </div>
+                              <div>
+                                <span>Precisión GPS</span>
+                                <strong>{evento.precisionGps != null ? `${Math.round(evento.precisionGps)} m` : 'N/A'}</strong>
+                              </div>
                             </div>
-                            <div className="bitacora-event-location">
-                              GPS: {evento.latitud ?? 'N/A'}, {evento.longitud ?? 'N/A'}
-                              {evento.latitud != null && evento.longitud != null ? (
-                                <a
-                                  href={`https://www.google.com/maps?q=${evento.latitud},${evento.longitud}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  Ver mapa
+                            {evento.latitud != null && evento.longitud != null ? (
+                              <div className="bitacora-mini-map">
+                                <iframe
+                                  title={`Mapa evento ${evento.id}`}
+                                  src={bitacoraOsmEmbedUrl(evento)}
+                                  loading="lazy"
+                                />
+                                <a href={bitacoraMapsUrl(evento)} target="_blank" rel="noopener noreferrer">
+                                  Abrir ubicación
                                 </a>
-                              ) : null}
-                            </div>
+                              </div>
+                            ) : (
+                              <p className="bitacora-event-location">Este evento aún no tiene coordenadas GPS asociadas.</p>
+                            )}
                             {evento.observaciones ? <p className="bitacora-event-observacion">{evento.observaciones}</p> : null}
                             {(evento.evidencias ?? []).length > 0 ? (
                               <div className="bitacora-event-photos">
