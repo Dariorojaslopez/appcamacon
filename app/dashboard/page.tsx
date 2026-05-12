@@ -641,7 +641,7 @@ export default function DashboardPage() {
   const [savingRole, setSavingRole] = useState<string | null>(null);
   const [availableRoles, setAvailableRoles] = useState<{ role: string; label: string }[]>([]);
   const [settingsSubSection, setSettingsSubSection] = useState<
-    'obras' | 'jornadas' | 'frentesObra' | 'contratistas' | 'encargados' | 'cargos' | 'items'
+    'obras' | 'jornadas' | 'frentesObra' | 'contratistas' | 'encargados' | 'cargos' | 'estructuraItems' | 'items'
   >('obras');
   const [obrasList, setObrasList] = useState<
     {
@@ -1321,7 +1321,7 @@ export default function DashboardPage() {
         }
       }
 
-      if (settingsSubSection === 'items') {
+      if (settingsSubSection === 'items' || settingsSubSection === 'estructuraItems') {
         setItemsError(null);
         try {
           if (!itemsFilterProjectId) {
@@ -1419,6 +1419,7 @@ export default function DashboardPage() {
       settingsSubSection !== 'contratistas' &&
       settingsSubSection !== 'encargados' &&
       settingsSubSection !== 'cargos' &&
+      settingsSubSection !== 'estructuraItems' &&
       settingsSubSection !== 'items'
     )
       return;
@@ -5605,10 +5606,6 @@ export default function DashboardPage() {
         {activeSection === 'settings' && (
           <section className="shell-card shell-card-wide">
             <h1 className="shell-title">Configuración general</h1>
-            <p className="shell-text">
-              Los <strong>roles y permisos</strong> se gestionan en <strong>Usuarios → Administrar roles</strong>.
-              Aquí se gestionan las <strong>obras</strong>; todos los registros pertenecen a una obra.
-            </p>
             <div className="users-tabs">
               <button
                 type="button"
@@ -5660,6 +5657,14 @@ export default function DashboardPage() {
               </button>
               <button
                 type="button"
+                className={`users-tab ${settingsSubSection === 'estructuraItems' ? 'users-tab-active' : ''}`}
+                onClick={() => setSettingsSubSection('estructuraItems')}
+              >
+                <IconClipboard />
+                Capítulos
+              </button>
+              <button
+                type="button"
                 className={`users-tab ${settingsSubSection === 'items' ? 'users-tab-active' : ''}`}
                 onClick={() => setSettingsSubSection('items')}
               >
@@ -5671,11 +5676,6 @@ export default function DashboardPage() {
             {settingsSubSection === 'obras' && (
               <>
                 <h2 className="shell-title" style={{ fontSize: '1.1rem', marginTop: '0.5rem' }}>Crear obra</h2>
-                <p className="shell-text">
-                  El <strong>consecutivo</strong> y el <strong>código</strong> (ej. OB-0001) se asignan automáticamente.
-                  Opcionalmente indica el <strong>ID o enlace de la carpeta en la nube</strong> donde se guardarán las evidencias fotográficas de esta obra;
-                  si lo dejas vacío, se usa la carpeta por defecto configurada en el servidor.
-                </p>
                 {obraMessage && <p className="feedback feedback-success">{obraMessage}</p>}
                 {obraError && <p className="feedback feedback-error">{obraError}</p>}
                 <form className="auth-form" onSubmit={createObra} style={{ marginBottom: '1.5rem' }}>
@@ -5733,9 +5733,6 @@ export default function DashboardPage() {
                 </form>
 
                 <h2 className="shell-title" style={{ fontSize: '1.1rem', marginTop: '0.5rem' }}>Listado de obras</h2>
-                <p className="shell-text">
-                  Editar o eliminar obras. No se puede eliminar una obra que tenga informes asociados.
-                </p>
                 {loadingObras ? (
                   <p className="shell-text-muted">Cargando obras...</p>
                 ) : (
@@ -5858,10 +5855,6 @@ export default function DashboardPage() {
             {settingsSubSection === 'jornadas' && (
               <>
                 <h2 className="shell-title" style={{ fontSize: '1.1rem', marginTop: '0.5rem' }}>Jornadas (turnos)</h2>
-                <p className="shell-text">
-                  Define los rangos horarios (ej. Diurna 06:00–18:00). Cada informe diario queda identificado por{' '}
-                  <strong>obra + fecha + jornada</strong>.
-                </p>
                 {jornadasAdminMessage && <p className="feedback feedback-success">{jornadasAdminMessage}</p>}
                 {jornadasAdminError && <p className="feedback feedback-error">{jornadasAdminError}</p>}
 
@@ -5888,10 +5881,6 @@ export default function DashboardPage() {
                       />
                     </div>
                   </div>
-                  <p className="shell-text-muted" style={{ fontSize: '0.8rem', marginBottom: '0.35rem' }}>
-                    Horario en 24 h. En el celular, al tocar cada campo se abre el reloj del sistema para elegir la hora.
-                    La hora fin puede ser anterior a la de inicio (ej. turno nocturno 18:00–06:00).
-                  </p>
                   <div className="form-row-2 jornadas-time-row">
                     <div className="form-field">
                       <label className="form-label" htmlFor="jornada-new-hora-inicio">
@@ -6076,10 +6065,6 @@ export default function DashboardPage() {
                 <h2 className="shell-title" style={{ fontSize: '1.1rem', marginTop: '0.5rem' }}>
                   Frentes de obra (por obra)
                 </h2>
-                <p className="shell-text">
-                  Cada frente pertenece a una obra. En <strong>Datos generales</strong> solo verá los frentes de la obra
-                  seleccionada en la barra superior.
-                </p>
                 {frentesObraMessage && <p className="feedback feedback-success">{frentesObraMessage}</p>}
                 {frentesObraError && <p className="feedback feedback-error">{frentesObraError}</p>}
 
@@ -6266,10 +6251,6 @@ export default function DashboardPage() {
                 <h2 className="shell-title" style={{ fontSize: '1.1rem', marginTop: '0.5rem' }}>
                   Contratistas (por obra)
                 </h2>
-                <p className="shell-text">
-                  Cada contratista pertenece a una obra. En <strong>Datos generales</strong> solo verá los contratistas de la obra
-                  seleccionada en la barra superior.
-                </p>
                 {contratistasError && <p className="feedback feedback-error">{contratistasError}</p>}
 
                 <div className="form-field" style={{ marginBottom: '1rem' }}>
@@ -6430,10 +6411,6 @@ export default function DashboardPage() {
                 <h2 className="shell-title" style={{ fontSize: '1.1rem', marginTop: '0.5rem' }}>
                   Encargados (por obra)
                 </h2>
-                <p className="shell-text">
-                  Cada encargado pertenece a una obra (cédula y nombre). En <strong>Datos generales</strong> solo verá los encargados de la obra
-                  seleccionada en la barra superior; créelos aquí por obra para el informe diario.
-                </p>
                 {encargadosError && <p className="feedback feedback-error">{encargadosError}</p>}
 
                 <div className="form-field" style={{ marginBottom: '1rem' }}>
@@ -6594,10 +6571,6 @@ export default function DashboardPage() {
                 <h2 className="shell-title" style={{ fontSize: '1.1rem', marginTop: '0.5rem' }}>
                   Cargos (por obra)
                 </h2>
-                <p className="shell-text">
-                  Cada cargo pertenece a una obra. En <strong>Datos generales</strong> el listado usa el catálogo de la obra
-                  de la barra superior; al guardar el informe se almacena el <strong>id del catálogo</strong> y el nombre como respaldo.
-                </p>
                 {cargosError && <p className="feedback feedback-error">{cargosError}</p>}
 
                 <div className="form-field" style={{ marginBottom: '1rem' }}>
@@ -6722,16 +6695,13 @@ export default function DashboardPage() {
               </>
             )}
 
-            {settingsSubSection === 'items' && (
+            {(settingsSubSection === 'items' || settingsSubSection === 'estructuraItems') && (
               <>
                 <h2 className="shell-title" style={{ fontSize: '1.1rem', marginTop: '0.5rem' }}>
-                  Ítems contractuales (por obra)
+                  {settingsSubSection === 'estructuraItems'
+                    ? 'Capítulos y subcapítulos (por obra)'
+                    : 'Ítems contractuales (por obra)'}
                 </h2>
-                <p className="shell-text">
-                  Organice el presupuesto por <strong>capítulos</strong> y <strong>subcapítulos</strong>, y registre los{' '}
-                  <strong>ítems contractuales</strong> (código, unidad, precio, etc.). Esos ítems aparecen luego en{' '}
-                  <strong>Actividades desarrolladas</strong> del informe diario.
-                </p>
                 {itemsError ? (
                   <p
                     className={
@@ -6764,16 +6734,13 @@ export default function DashboardPage() {
                   </select>
                 </div>
 
-                {itemsFilterProjectId ? (
+                {settingsSubSection === 'estructuraItems' && itemsFilterProjectId ? (
                   <>
                     <div className="budget-hierarchy-forms">
                       <section className="budget-inline-form">
                         <h4 className="shell-title" style={{ fontSize: '0.92rem', margin: 0 }}>
                           Configuración de capítulos
                         </h4>
-                        <p className="shell-text-muted" style={{ margin: 0, fontSize: '0.78rem' }}>
-                          Cree los rubros mayores del presupuesto y adminístrelos desde la tabla.
-                        </p>
                         <form onSubmit={createBudgetChapter}>
                           <div className="form-row-inline">
                             <div className="form-field" style={{ marginBottom: 0, minWidth: '6rem' }}>
@@ -6948,9 +6915,6 @@ export default function DashboardPage() {
                         <h4 className="shell-title" style={{ fontSize: '0.92rem', margin: 0 }}>
                           Configuración de subcapítulos
                         </h4>
-                        <p className="shell-text-muted" style={{ margin: 0, fontSize: '0.78rem' }}>
-                          Cree agrupaciones y asígnelas al capítulo que corresponda.
-                        </p>
                         <form onSubmit={createBudgetSubchapter}>
                           <div className="form-row-inline">
                             <div className="form-field" style={{ marginBottom: 0, minWidth: '10rem', flex: '1 1 40%' }}>
@@ -7144,6 +7108,8 @@ export default function DashboardPage() {
                   </>
                 ) : null}
 
+                {settingsSubSection === 'items' ? (
+                  <>
                 <form className="auth-form" onSubmit={createItemCatalog} style={{ marginBottom: '1.5rem' }}>
                   <h3 className="shell-title" style={{ fontSize: '1rem' }}>Crear ítem manual</h3>
                   <div className="form-field" style={{ marginBottom: '0.75rem' }}>
@@ -7649,6 +7615,8 @@ export default function DashboardPage() {
                       </tbody>
                     </table>
                   </div>
+                ) : null}
+                  </>
                 ) : null}
               </>
             )}
