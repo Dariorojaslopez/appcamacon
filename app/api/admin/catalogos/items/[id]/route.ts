@@ -38,6 +38,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       ancho?: number | null;
       altura?: number | null;
       imagenUrl?: string | null;
+      proveedorId?: string | null;
       isActive?: boolean;
       orden?: number;
     };
@@ -113,6 +114,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
     if (body.imagenUrl !== undefined) data.imagenUrl = body.imagenUrl ? String(body.imagenUrl).trim() : null;
+    if (body.proveedorId !== undefined) {
+      const proveedorId = String(body.proveedorId ?? '').trim();
+      if (proveedorId) {
+        const proveedor = await prisma.proveedorCatalog.findFirst({
+          where: { id: proveedorId, projectId: existing.projectId, isActive: true },
+          select: { id: true },
+        });
+        if (!proveedor) return NextResponse.json({ error: 'Proveedor no válido para la obra de este ítem' }, { status: 400 });
+        data.proveedorId = proveedorId;
+      } else {
+        data.proveedorId = null;
+      }
+    }
     if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
     if (body.orden !== undefined) data.orden = Number(body.orden) || 0;
 

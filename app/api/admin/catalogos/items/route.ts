@@ -91,6 +91,9 @@ export async function GET(req: NextRequest) {
         subchapter: {
           include: { chapter: { select: { id: true, codigo: true, nombre: true } } },
         },
+        proveedor: {
+          select: { id: true, nombreRazonSocial: true, nombreComercial: true, nitDocumento: true },
+        },
       },
     });
     const items = (itemsRaw as any[]).map((it) => ({
@@ -101,6 +104,8 @@ export async function GET(req: NextRequest) {
       chapterCodigo: it.subchapter?.chapter?.codigo ?? null,
       chapterNombre: it.subchapter?.chapter?.nombre ?? null,
       subchapterNombre: it.subchapter?.nombre ?? null,
+      proveedorId: it.proveedorId ?? null,
+      proveedorNombre: it.proveedor?.nombreComercial || it.proveedor?.nombreRazonSocial || null,
       codigo: it.codigo,
       descripcion: it.descripcion,
       unidad: it.unidad ?? null,
@@ -141,6 +146,7 @@ export async function POST(req: NextRequest) {
       ancho?: number | null;
       altura?: number | null;
       imagenUrl?: string | null;
+      proveedorId?: string | null;
       rawText?: string;
     };
 
@@ -248,6 +254,7 @@ export async function POST(req: NextRequest) {
     const rawAltura = body.altura as unknown;
     const altura = rawAltura == null || rawAltura === '' ? null : Number(rawAltura);
     const imagenUrl = body.imagenUrl != null ? String(body.imagenUrl).trim() : '';
+    const proveedorId = body.proveedorId != null ? String(body.proveedorId).trim() : '';
 
     if (!codigo) return NextResponse.json({ error: 'El código es requerido' }, { status: 400 });
     if (!descripcion) return NextResponse.json({ error: 'La descripción es requerida' }, { status: 400 });
@@ -260,6 +267,13 @@ export async function POST(req: NextRequest) {
     if (largo != null && !Number.isFinite(largo)) return NextResponse.json({ error: 'Largo inválido' }, { status: 400 });
     if (ancho != null && !Number.isFinite(ancho)) return NextResponse.json({ error: 'Ancho inválido' }, { status: 400 });
     if (altura != null && !Number.isFinite(altura)) return NextResponse.json({ error: 'Altura inválida' }, { status: 400 });
+    if (proveedorId) {
+      const proveedor = await prisma.proveedorCatalog.findFirst({
+        where: { id: proveedorId, projectId, isActive: true },
+        select: { id: true },
+      });
+      if (!proveedor) return NextResponse.json({ error: 'Proveedor no válido para esta obra' }, { status: 400 });
+    }
 
     let subchapterId = String(body.subchapterId ?? '').trim();
     if (!subchapterId) {
@@ -291,6 +305,7 @@ export async function POST(req: NextRequest) {
             ancho,
             altura,
             imagenUrl: imagenUrl || null,
+            proveedorId: proveedorId || null,
             orden: nextOrden,
             isActive: true,
           } as any,
@@ -305,6 +320,7 @@ export async function POST(req: NextRequest) {
             descripcion,
             unidad: unidad || null,
             precioUnitario,
+            proveedorId: proveedorId || null,
             orden: nextOrden,
             isActive: true,
           },

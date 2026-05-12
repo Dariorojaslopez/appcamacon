@@ -31,6 +31,11 @@ export async function GET(req: NextRequest) {
           include: {
             items: {
               orderBy: [{ orden: 'asc' }, { codigo: 'asc' }],
+              include: {
+                proveedor: {
+                  select: { id: true, nombreRazonSocial: true, nombreComercial: true, nitDocumento: true },
+                },
+              },
             },
           },
         },

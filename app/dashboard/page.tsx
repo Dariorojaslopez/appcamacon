@@ -266,6 +266,13 @@ type ItemCatalogNode = {
   id: string;
   projectId: string;
   subchapterId: string;
+  proveedorId?: string | null;
+  proveedor?: {
+    id: string;
+    nombreRazonSocial: string;
+    nombreComercial?: string | null;
+    nitDocumento: string;
+  } | null;
   codigo: string;
   descripcion: string;
   unidad?: string | null;
@@ -298,11 +305,47 @@ type BudgetChapterTree = {
   subchapters: BudgetSubchapterTree[];
 };
 
+type ProveedorCatalogAdmin = {
+  id: string;
+  projectId: string;
+  tipoPersona: string;
+  nombreRazonSocial: string;
+  nombreComercial?: string | null;
+  nitDocumento: string;
+  dv?: string | null;
+  email?: string | null;
+  telefono?: string | null;
+  celular?: string | null;
+  direccion?: string | null;
+  pais?: string | null;
+  departamento?: string | null;
+  ciudad?: string | null;
+  codigoPostal?: string | null;
+  isActive: boolean;
+};
+
+const emptyProveedorForm = () => ({
+  tipoPersona: 'Natural',
+  nombreRazonSocial: '',
+  nombreComercial: '',
+  nitDocumento: '',
+  dv: '',
+  email: '',
+  telefono: '',
+  celular: '',
+  direccion: '',
+  pais: 'Colombia',
+  departamento: '',
+  ciudad: '',
+  codigoPostal: '',
+  isActive: true,
+});
+
 function flattenItemCatalogTree(
   chapters: BudgetChapterTree[],
-): Array<ItemCatalogNode & { chapterCodigo: string; chapterNombre: string; subchapterNombre: string }> {
+): Array<ItemCatalogNode & { chapterCodigo: string; chapterNombre: string; subchapterNombre: string; proveedorNombre: string | null }> {
   const rows: Array<
-    ItemCatalogNode & { chapterCodigo: string; chapterNombre: string; subchapterNombre: string }
+    ItemCatalogNode & { chapterCodigo: string; chapterNombre: string; subchapterNombre: string; proveedorNombre: string | null }
   > = [];
   for (const ch of chapters) {
     for (const sub of ch.subchapters) {
@@ -312,6 +355,7 @@ function flattenItemCatalogTree(
           chapterCodigo: ch.codigo,
           chapterNombre: ch.nombre,
           subchapterNombre: sub.nombre,
+          proveedorNombre: it.proveedor?.nombreComercial || it.proveedor?.nombreRazonSocial || null,
         });
       }
     }
@@ -641,7 +685,15 @@ export default function DashboardPage() {
   const [savingRole, setSavingRole] = useState<string | null>(null);
   const [availableRoles, setAvailableRoles] = useState<{ role: string; label: string }[]>([]);
   const [settingsSubSection, setSettingsSubSection] = useState<
-    'obras' | 'jornadas' | 'frentesObra' | 'contratistas' | 'encargados' | 'cargos' | 'estructuraItems' | 'items'
+    | 'obras'
+    | 'jornadas'
+    | 'frentesObra'
+    | 'contratistas'
+    | 'encargados'
+    | 'cargos'
+    | 'proveedores'
+    | 'estructuraItems'
+    | 'items'
   >('obras');
   const [obrasList, setObrasList] = useState<
     {
@@ -745,6 +797,14 @@ export default function DashboardPage() {
   const [editingCargoId, setEditingCargoId] = useState<string | null>(null);
   const [editingCargoNombre, setEditingCargoNombre] = useState('');
   const [deletingCargoId, setDeletingCargoId] = useState<string | null>(null);
+  const [proveedoresAdmin, setProveedoresAdmin] = useState<ProveedorCatalogAdmin[]>([]);
+  const [proveedoresFilterProjectId, setProveedoresFilterProjectId] = useState('');
+  const [proveedoresNewForm, setProveedoresNewForm] = useState(emptyProveedorForm);
+  const [proveedoresSaving, setProveedoresSaving] = useState(false);
+  const [proveedoresError, setProveedoresError] = useState<string | null>(null);
+  const [editingProveedorId, setEditingProveedorId] = useState<string | null>(null);
+  const [editingProveedorForm, setEditingProveedorForm] = useState(emptyProveedorForm);
+  const [deletingProveedorId, setDeletingProveedorId] = useState<string | null>(null);
   const [itemsBudgetChapters, setItemsBudgetChapters] = useState<BudgetChapterTree[]>([]);
   const [itemsTargetSubchapterId, setItemsTargetSubchapterId] = useState('');
   const [budgetChapterCodigo, setBudgetChapterCodigo] = useState('');
@@ -752,6 +812,7 @@ export default function DashboardPage() {
   const [budgetSubchapterChapterId, setBudgetSubchapterChapterId] = useState('');
   const [budgetSubchapterNombre, setBudgetSubchapterNombre] = useState('');
   const [itemsFilterProjectId, setItemsFilterProjectId] = useState('');
+  const [itemProveedorOptions, setItemProveedorOptions] = useState<ProveedorCatalogAdmin[]>([]);
   const [itemsSaving, setItemsSaving] = useState(false);
   const [itemsError, setItemsError] = useState<string | null>(null);
   const [editingBudgetChapterId, setEditingBudgetChapterId] = useState<string | null>(null);
@@ -776,6 +837,7 @@ export default function DashboardPage() {
   const [itemNewAncho, setItemNewAncho] = useState('');
   const [itemNewAltura, setItemNewAltura] = useState('');
   const [itemNewImagenUrl, setItemNewImagenUrl] = useState('');
+  const [itemNewProveedorId, setItemNewProveedorId] = useState('');
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingItemForm, setEditingItemForm] = useState({
     codigo: '',
@@ -787,6 +849,7 @@ export default function DashboardPage() {
     ancho: '',
     altura: '',
     imagenUrl: '',
+    proveedorId: '',
     isActive: true,
     subchapterId: '',
   });
@@ -1321,12 +1384,34 @@ export default function DashboardPage() {
         }
       }
 
+      if (settingsSubSection === 'proveedores') {
+        setProveedoresError(null);
+        try {
+          if (!proveedoresFilterProjectId) {
+            setProveedoresAdmin([]);
+            return;
+          }
+          const res = await fetch(
+            `/api/admin/catalogos/proveedores?projectId=${encodeURIComponent(proveedoresFilterProjectId)}`,
+            { credentials: 'include' },
+          );
+          const data = await res.json();
+          if (!res.ok) throw new Error(data?.error ?? 'Error');
+          setProveedoresAdmin(Array.isArray(data.items) ? (data.items as ProveedorCatalogAdmin[]) : []);
+        } catch {
+          setProveedoresAdmin([]);
+          setProveedoresError('Error al cargar proveedores.');
+        }
+        return;
+      }
+
       if (settingsSubSection === 'items' || settingsSubSection === 'estructuraItems') {
         setItemsError(null);
         try {
           if (!itemsFilterProjectId) {
             setItemsBudgetChapters([]);
             setItemsTargetSubchapterId('');
+            setItemProveedorOptions([]);
             return;
           }
           const res = await fetch(
@@ -1349,9 +1434,26 @@ export default function DashboardPage() {
             if (prev && chapters.some((c) => c.id === prev)) return prev;
             return chapters[0]?.id ?? '';
           });
+          if (settingsSubSection === 'items') {
+            const proveedoresRes = await fetch(
+              `/api/admin/catalogos/proveedores?projectId=${encodeURIComponent(itemsFilterProjectId)}`,
+              { credentials: 'include' },
+            );
+            const proveedoresData = await proveedoresRes.json();
+            if (!proveedoresRes.ok) throw new Error(proveedoresData?.error ?? 'Error');
+            const proveedores = Array.isArray(proveedoresData.items)
+              ? (proveedoresData.items as ProveedorCatalogAdmin[])
+              : [];
+            setItemProveedorOptions(proveedores.filter((p) => p.isActive));
+            setItemNewProveedorId((prev) => {
+              if (prev && proveedores.some((p) => p.id === prev && p.isActive)) return prev;
+              return proveedores.find((p) => p.isActive)?.id ?? '';
+            });
+          }
         } catch (e) {
           setItemsBudgetChapters([]);
           setItemsTargetSubchapterId('');
+          setItemProveedorOptions([]);
           const fallback = 'Error al cargar estructura de presupuesto (ítems).';
           const msg = e instanceof Error ? e.message.trim() : '';
           setItemsError(msg && msg !== 'Error' ? msg : fallback);
@@ -1360,7 +1462,14 @@ export default function DashboardPage() {
     };
 
     load();
-  }, [activeSection, settingsSubSection, contratistasFilterProjectId, encargadosFilterProjectId, itemsFilterProjectId]);
+  }, [
+    activeSection,
+    settingsSubSection,
+    contratistasFilterProjectId,
+    encargadosFilterProjectId,
+    proveedoresFilterProjectId,
+    itemsFilterProjectId,
+  ]);
 
   useEffect(() => {
     if (activeSection !== 'settings' || settingsSubSection !== 'cargos') return;
@@ -1419,6 +1528,7 @@ export default function DashboardPage() {
       settingsSubSection !== 'contratistas' &&
       settingsSubSection !== 'encargados' &&
       settingsSubSection !== 'cargos' &&
+      settingsSubSection !== 'proveedores' &&
       settingsSubSection !== 'estructuraItems' &&
       settingsSubSection !== 'items'
     )
@@ -1445,6 +1555,7 @@ export default function DashboardPage() {
         if (settingsSubSection === 'contratistas') syncFilter(setContratistasFilterProjectId);
         else if (settingsSubSection === 'encargados') syncFilter(setEncargadosFilterProjectId);
         else if (settingsSubSection === 'cargos') syncFilter(setCargosFilterProjectId);
+        else if (settingsSubSection === 'proveedores') syncFilter(setProveedoresFilterProjectId);
         else syncFilter(setItemsFilterProjectId);
       } catch {
         if (!cancelled) {
@@ -1458,6 +1569,9 @@ export default function DashboardPage() {
           } else if (settingsSubSection === 'cargos') {
             setCargosFilterProjectId('');
             setCargosError('Error al cargar obras.');
+          } else if (settingsSubSection === 'proveedores') {
+            setProveedoresFilterProjectId('');
+            setProveedoresError('Error al cargar obras.');
           } else {
             setItemsFilterProjectId('');
             setItemsError('Error al cargar obras.');
@@ -2887,6 +3001,100 @@ export default function DashboardPage() {
     }
   };
 
+  const proveedorPayload = (form: ReturnType<typeof emptyProveedorForm>) => ({
+    tipoPersona: form.tipoPersona,
+    nombreRazonSocial: form.nombreRazonSocial.trim(),
+    nombreComercial: form.nombreComercial.trim() || null,
+    nitDocumento: form.nitDocumento.trim(),
+    dv: form.dv.trim() || null,
+    email: form.email.trim() || null,
+    telefono: form.telefono.trim() || null,
+    celular: form.celular.trim() || null,
+    direccion: form.direccion.trim() || null,
+    pais: form.pais.trim() || null,
+    departamento: form.departamento.trim() || null,
+    ciudad: form.ciudad.trim() || null,
+    codigoPostal: form.codigoPostal.trim() || null,
+    isActive: form.isActive,
+  });
+
+  const createProveedor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!proveedoresFilterProjectId) {
+      setProveedoresError('Seleccione una obra.');
+      return;
+    }
+    setProveedoresSaving(true);
+    setProveedoresError(null);
+    try {
+      const res = await fetch('/api/admin/catalogos/proveedores', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ projectId: proveedoresFilterProjectId, ...proveedorPayload(proveedoresNewForm) }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setProveedoresError(data.error ?? 'No se pudo crear');
+        return;
+      }
+      setProveedoresAdmin((prev) => [...prev, data.item]);
+      setProveedoresNewForm(emptyProveedorForm());
+    } catch {
+      setProveedoresError('Error de conexión.');
+    } finally {
+      setProveedoresSaving(false);
+    }
+  };
+
+  const saveEditProveedor = async (id: string) => {
+    setProveedoresSaving(true);
+    setProveedoresError(null);
+    try {
+      const res = await fetch(`/api/admin/catalogos/proveedores/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(proveedorPayload(editingProveedorForm)),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setProveedoresError(data.error ?? 'No se pudo guardar');
+        return;
+      }
+      setProveedoresAdmin((prev) => prev.map((x) => (x.id === id ? data.item : x)));
+      setEditingProveedorId(null);
+      setEditingProveedorForm(emptyProveedorForm());
+    } catch {
+      setProveedoresError('Error de conexión.');
+    } finally {
+      setProveedoresSaving(false);
+    }
+  };
+
+  const deleteProveedor = async (id: string, nombre: string) => {
+    if (!confirm(`¿Eliminar proveedor "${nombre}"? Los ítems asociados quedarán sin proveedor.`)) return;
+    setDeletingProveedorId(id);
+    setProveedoresError(null);
+    try {
+      const res = await fetch(`/api/admin/catalogos/proveedores/${id}`, { method: 'DELETE', credentials: 'include' });
+      const data = await res.json();
+      if (!res.ok) {
+        setProveedoresError(data.error ?? 'No se pudo eliminar');
+        return;
+      }
+      setProveedoresAdmin((prev) => prev.filter((x) => x.id !== id));
+      if (editingProveedorId === id) {
+        setEditingProveedorId(null);
+        setEditingProveedorForm(emptyProveedorForm());
+      }
+    } catch {
+      setProveedoresError('Error de conexión.');
+    } finally {
+      setDeletingProveedorId(null);
+    }
+  };
+
   const reloadItemsBudgetTree = useCallback(async () => {
     if (!itemsFilterProjectId) return;
     try {
@@ -3135,6 +3343,10 @@ export default function DashboardPage() {
         setItemsError('Seleccione una unidad de medida.');
         return;
       }
+      if (!itemNewProveedorId) {
+        setItemsError('Seleccione el proveedor del ítem.');
+        return;
+      }
       const kindNew = itemCatalogCaptureKind(itemNewUnidad.trim());
       if (kindNew !== 'none' && kindNew !== 'manual') {
         if (
@@ -3174,6 +3386,7 @@ export default function DashboardPage() {
           ancho: icPayload.ancho,
           altura: icPayload.altura,
           imagenUrl: itemNewImagenUrl.trim() || null,
+          proveedorId: itemNewProveedorId,
         }),
       });
       const data = await res.json();
@@ -3191,6 +3404,7 @@ export default function DashboardPage() {
       setItemNewAncho('');
       setItemNewAltura('');
       setItemNewImagenUrl('');
+      setItemNewProveedorId(itemProveedorOptions[0]?.id ?? '');
     } catch {
       setItemsError('Error de conexión.');
     } finally {
@@ -3204,6 +3418,10 @@ export default function DashboardPage() {
     try {
       if (!editingItemForm.unidad.trim()) {
         setItemsError('Seleccione una unidad de medida.');
+        return;
+      }
+      if (!editingItemForm.proveedorId.trim()) {
+        setItemsError('Seleccione el proveedor del ítem.');
         return;
       }
       const kindEd = itemCatalogCaptureKind(editingItemForm.unidad.trim());
@@ -3245,6 +3463,7 @@ export default function DashboardPage() {
           ancho: icEdit.ancho,
           altura: icEdit.altura,
           imagenUrl: editingItemForm.imagenUrl.trim() || null,
+          proveedorId: editingItemForm.proveedorId.trim(),
           isActive: editingItemForm.isActive,
         }),
       });
@@ -3265,6 +3484,7 @@ export default function DashboardPage() {
         ancho: '',
         altura: '',
         imagenUrl: '',
+        proveedorId: '',
         isActive: true,
         subchapterId: '',
       });
@@ -3299,6 +3519,7 @@ export default function DashboardPage() {
           ancho: '',
           altura: '',
           imagenUrl: '',
+          proveedorId: '',
           isActive: true,
           subchapterId: '',
         });
@@ -5657,6 +5878,14 @@ export default function DashboardPage() {
               </button>
               <button
                 type="button"
+                className={`users-tab ${settingsSubSection === 'proveedores' ? 'users-tab-active' : ''}`}
+                onClick={() => setSettingsSubSection('proveedores')}
+              >
+                <IconUsers />
+                Proveedores
+              </button>
+              <button
+                type="button"
                 className={`users-tab ${settingsSubSection === 'estructuraItems' ? 'users-tab-active' : ''}`}
                 onClick={() => setSettingsSubSection('estructuraItems')}
               >
@@ -6695,6 +6924,376 @@ export default function DashboardPage() {
               </>
             )}
 
+            {settingsSubSection === 'proveedores' && (
+              <>
+                <h2 className="shell-title" style={{ fontSize: '1.1rem', marginTop: '0.5rem' }}>
+                  Proveedores (por obra)
+                </h2>
+                {proveedoresError && <p className="feedback feedback-error">{proveedoresError}</p>}
+
+                <div className="form-field" style={{ marginBottom: '1rem' }}>
+                  <label className="form-label" htmlFor="proveedores-filter-obra">
+                    Obra
+                  </label>
+                  <select
+                    id="proveedores-filter-obra"
+                    className="form-input"
+                    value={proveedoresFilterProjectId}
+                    onChange={(e) => setProveedoresFilterProjectId(e.target.value)}
+                  >
+                    {catalogosPorObraObrasOptions.length === 0 ? (
+                      <option value="">— Sin obras —</option>
+                    ) : (
+                      catalogosPorObraObrasOptions.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.code} · {o.name}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+
+                <form className="auth-form" onSubmit={createProveedor} style={{ marginBottom: '1.5rem' }}>
+                  <div className="form-row-2">
+                    <div className="form-field">
+                      <label className="form-label">Tipo de persona</label>
+                      <select
+                        className="form-input"
+                        value={proveedoresNewForm.tipoPersona}
+                        onChange={(e) => setProveedoresNewForm((p) => ({ ...p, tipoPersona: e.target.value }))}
+                        disabled={!proveedoresFilterProjectId}
+                      >
+                        <option value="Natural">Natural</option>
+                        <option value="Jurídica">Jurídica</option>
+                      </select>
+                    </div>
+                    <div className="form-field">
+                      <label className="form-label">Nombre / razón social</label>
+                      <input
+                        className="form-input"
+                        required
+                        value={proveedoresNewForm.nombreRazonSocial}
+                        onChange={(e) => setProveedoresNewForm((p) => ({ ...p, nombreRazonSocial: e.target.value }))}
+                        disabled={!proveedoresFilterProjectId}
+                      />
+                    </div>
+                  </div>
+                  <div className="form-row-2">
+                    <div className="form-field">
+                      <label className="form-label">Nombre comercial</label>
+                      <input
+                        className="form-input"
+                        value={proveedoresNewForm.nombreComercial}
+                        onChange={(e) => setProveedoresNewForm((p) => ({ ...p, nombreComercial: e.target.value }))}
+                        disabled={!proveedoresFilterProjectId}
+                      />
+                    </div>
+                    <div className="form-row-inline" style={{ alignItems: 'flex-start' }}>
+                      <div className="form-field" style={{ flex: '1 1 12rem', marginBottom: 0 }}>
+                        <label className="form-label">NIT o documento</label>
+                        <input
+                          className="form-input"
+                          required
+                          value={proveedoresNewForm.nitDocumento}
+                          onChange={(e) => setProveedoresNewForm((p) => ({ ...p, nitDocumento: e.target.value }))}
+                          disabled={!proveedoresFilterProjectId}
+                        />
+                      </div>
+                      <div className="form-field" style={{ flex: '0 0 5rem', marginBottom: 0 }}>
+                        <label className="form-label">DV</label>
+                        <input
+                          className="form-input"
+                          value={proveedoresNewForm.dv}
+                          onChange={(e) => setProveedoresNewForm((p) => ({ ...p, dv: e.target.value }))}
+                          disabled={!proveedoresFilterProjectId}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="form-row-2">
+                    <div className="form-field">
+                      <label className="form-label">Email</label>
+                      <input
+                        className="form-input"
+                        type="email"
+                        value={proveedoresNewForm.email}
+                        onChange={(e) => setProveedoresNewForm((p) => ({ ...p, email: e.target.value }))}
+                        disabled={!proveedoresFilterProjectId}
+                      />
+                    </div>
+                    <div className="form-row-inline" style={{ alignItems: 'flex-start' }}>
+                      <div className="form-field" style={{ flex: '1 1 9rem', marginBottom: 0 }}>
+                        <label className="form-label">Teléfono</label>
+                        <input
+                          className="form-input"
+                          value={proveedoresNewForm.telefono}
+                          onChange={(e) => setProveedoresNewForm((p) => ({ ...p, telefono: e.target.value }))}
+                          disabled={!proveedoresFilterProjectId}
+                        />
+                      </div>
+                      <div className="form-field" style={{ flex: '1 1 9rem', marginBottom: 0 }}>
+                        <label className="form-label">Celular</label>
+                        <input
+                          className="form-input"
+                          value={proveedoresNewForm.celular}
+                          onChange={(e) => setProveedoresNewForm((p) => ({ ...p, celular: e.target.value }))}
+                          disabled={!proveedoresFilterProjectId}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="form-field">
+                    <label className="form-label">Dirección</label>
+                    <input
+                      className="form-input"
+                      value={proveedoresNewForm.direccion}
+                      onChange={(e) => setProveedoresNewForm((p) => ({ ...p, direccion: e.target.value }))}
+                      disabled={!proveedoresFilterProjectId}
+                    />
+                  </div>
+                  <div className="form-row-2">
+                    <div className="form-field">
+                      <label className="form-label">País</label>
+                      <input
+                        className="form-input"
+                        value={proveedoresNewForm.pais}
+                        onChange={(e) => setProveedoresNewForm((p) => ({ ...p, pais: e.target.value }))}
+                        disabled={!proveedoresFilterProjectId}
+                      />
+                    </div>
+                    <div className="form-field">
+                      <label className="form-label">Departamento</label>
+                      <input
+                        className="form-input"
+                        value={proveedoresNewForm.departamento}
+                        onChange={(e) => setProveedoresNewForm((p) => ({ ...p, departamento: e.target.value }))}
+                        disabled={!proveedoresFilterProjectId}
+                      />
+                    </div>
+                  </div>
+                  <div className="form-row-2">
+                    <div className="form-field">
+                      <label className="form-label">Ciudad</label>
+                      <input
+                        className="form-input"
+                        value={proveedoresNewForm.ciudad}
+                        onChange={(e) => setProveedoresNewForm((p) => ({ ...p, ciudad: e.target.value }))}
+                        disabled={!proveedoresFilterProjectId}
+                      />
+                    </div>
+                    <div className="form-field">
+                      <label className="form-label">Código postal</label>
+                      <input
+                        className="form-input"
+                        value={proveedoresNewForm.codigoPostal}
+                        onChange={(e) => setProveedoresNewForm((p) => ({ ...p, codigoPostal: e.target.value }))}
+                        disabled={!proveedoresFilterProjectId}
+                      />
+                    </div>
+                  </div>
+                  <button type="submit" className="btn-primary" disabled={proveedoresSaving || !proveedoresFilterProjectId}>
+                    {proveedoresSaving ? 'Creando...' : 'Crear proveedor'}
+                  </button>
+                </form>
+
+                <h2 className="shell-title" style={{ fontSize: '1.1rem' }}>Listado</h2>
+                {!proveedoresFilterProjectId ? (
+                  <p className="shell-text-muted" style={{ padding: '1rem' }}>
+                    Seleccione una obra para ver o crear proveedores.
+                  </p>
+                ) : proveedoresAdmin.length === 0 ? (
+                  <p className="shell-text-muted" style={{ padding: '1rem' }}>
+                    No hay proveedores para esta obra. Cree uno arriba.
+                  </p>
+                ) : (
+                  <div className="users-table-wrap">
+                    <table className="users-table">
+                      <thead>
+                        <tr>
+                          <th>Tipo</th>
+                          <th>Proveedor</th>
+                          <th>NIT / Doc.</th>
+                          <th>Contacto</th>
+                          <th>Ubicación</th>
+                          <th>Estado</th>
+                          <th>Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {proveedoresAdmin.map((p) => (
+                          <tr key={p.id}>
+                            <td>
+                              {editingProveedorId === p.id ? (
+                                <select
+                                  className="form-input"
+                                  value={editingProveedorForm.tipoPersona}
+                                  onChange={(e) => setEditingProveedorForm((f) => ({ ...f, tipoPersona: e.target.value }))}
+                                >
+                                  <option value="Natural">Natural</option>
+                                  <option value="Jurídica">Jurídica</option>
+                                </select>
+                              ) : (
+                                p.tipoPersona
+                              )}
+                            </td>
+                            <td style={{ minWidth: '16rem' }}>
+                              {editingProveedorId === p.id ? (
+                                <div style={{ display: 'grid', gap: '0.4rem' }}>
+                                  <input
+                                    className="form-input"
+                                    value={editingProveedorForm.nombreRazonSocial}
+                                    onChange={(e) => setEditingProveedorForm((f) => ({ ...f, nombreRazonSocial: e.target.value }))}
+                                    placeholder="Nombre / razón social"
+                                  />
+                                  <input
+                                    className="form-input"
+                                    value={editingProveedorForm.nombreComercial}
+                                    onChange={(e) => setEditingProveedorForm((f) => ({ ...f, nombreComercial: e.target.value }))}
+                                    placeholder="Nombre comercial"
+                                  />
+                                </div>
+                              ) : (
+                                <>
+                                  <div style={{ fontWeight: 600 }}>{p.nombreRazonSocial}</div>
+                                  <div className="shell-text-muted" style={{ fontSize: '0.78rem' }}>
+                                    {p.nombreComercial || '—'}
+                                  </div>
+                                </>
+                              )}
+                            </td>
+                            <td style={{ minWidth: '10rem' }}>
+                              {editingProveedorId === p.id ? (
+                                <div style={{ display: 'grid', gap: '0.4rem' }}>
+                                  <input
+                                    className="form-input"
+                                    value={editingProveedorForm.nitDocumento}
+                                    onChange={(e) => setEditingProveedorForm((f) => ({ ...f, nitDocumento: e.target.value }))}
+                                    placeholder="NIT o documento"
+                                  />
+                                  <input
+                                    className="form-input"
+                                    value={editingProveedorForm.dv}
+                                    onChange={(e) => setEditingProveedorForm((f) => ({ ...f, dv: e.target.value }))}
+                                    placeholder="DV"
+                                  />
+                                </div>
+                              ) : (
+                                `${p.nitDocumento}${p.dv ? `-${p.dv}` : ''}`
+                              )}
+                            </td>
+                            <td style={{ minWidth: '14rem' }}>
+                              {editingProveedorId === p.id ? (
+                                <div style={{ display: 'grid', gap: '0.4rem' }}>
+                                  <input className="form-input" value={editingProveedorForm.email} onChange={(e) => setEditingProveedorForm((f) => ({ ...f, email: e.target.value }))} placeholder="Email" />
+                                  <input className="form-input" value={editingProveedorForm.telefono} onChange={(e) => setEditingProveedorForm((f) => ({ ...f, telefono: e.target.value }))} placeholder="Teléfono" />
+                                  <input className="form-input" value={editingProveedorForm.celular} onChange={(e) => setEditingProveedorForm((f) => ({ ...f, celular: e.target.value }))} placeholder="Celular" />
+                                </div>
+                              ) : (
+                                <>
+                                  <div>{p.email || '—'}</div>
+                                  <div className="shell-text-muted" style={{ fontSize: '0.78rem' }}>
+                                    {[p.telefono, p.celular].filter(Boolean).join(' / ') || '—'}
+                                  </div>
+                                </>
+                              )}
+                            </td>
+                            <td style={{ minWidth: '15rem' }}>
+                              {editingProveedorId === p.id ? (
+                                <div style={{ display: 'grid', gap: '0.4rem' }}>
+                                  <input className="form-input" value={editingProveedorForm.direccion} onChange={(e) => setEditingProveedorForm((f) => ({ ...f, direccion: e.target.value }))} placeholder="Dirección" />
+                                  <input className="form-input" value={editingProveedorForm.pais} onChange={(e) => setEditingProveedorForm((f) => ({ ...f, pais: e.target.value }))} placeholder="País" />
+                                  <input className="form-input" value={editingProveedorForm.departamento} onChange={(e) => setEditingProveedorForm((f) => ({ ...f, departamento: e.target.value }))} placeholder="Departamento" />
+                                  <input className="form-input" value={editingProveedorForm.ciudad} onChange={(e) => setEditingProveedorForm((f) => ({ ...f, ciudad: e.target.value }))} placeholder="Ciudad" />
+                                  <input className="form-input" value={editingProveedorForm.codigoPostal} onChange={(e) => setEditingProveedorForm((f) => ({ ...f, codigoPostal: e.target.value }))} placeholder="Código postal" />
+                                </div>
+                              ) : (
+                                <>
+                                  <div>{p.direccion || '—'}</div>
+                                  <div className="shell-text-muted" style={{ fontSize: '0.78rem' }}>
+                                    {[p.ciudad, p.departamento, p.pais].filter(Boolean).join(', ') || '—'}
+                                  </div>
+                                  <div className="shell-text-muted" style={{ fontSize: '0.78rem' }}>
+                                    {p.codigoPostal || '—'}
+                                  </div>
+                                </>
+                              )}
+                            </td>
+                            <td>
+                              {editingProveedorId === p.id ? (
+                                <input
+                                  type="checkbox"
+                                  checked={editingProveedorForm.isActive}
+                                  onChange={(e) => setEditingProveedorForm((f) => ({ ...f, isActive: e.target.checked }))}
+                                />
+                              ) : p.isActive ? (
+                                'Activo'
+                              ) : (
+                                'Inactivo'
+                              )}
+                            </td>
+                            <td>
+                              {editingProveedorId === p.id ? (
+                                <div className="users-table-actions">
+                                  <button type="button" disabled={proveedoresSaving} onClick={() => saveEditProveedor(p.id)}>
+                                    {proveedoresSaving ? 'Guardando...' : 'Guardar'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn-cancel"
+                                    onClick={() => {
+                                      setEditingProveedorId(null);
+                                      setEditingProveedorForm(emptyProveedorForm());
+                                    }}
+                                  >
+                                    Cancelar
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="users-table-actions">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingProveedorId(p.id);
+                                      setEditingProveedorForm({
+                                        tipoPersona: p.tipoPersona,
+                                        nombreRazonSocial: p.nombreRazonSocial,
+                                        nombreComercial: p.nombreComercial ?? '',
+                                        nitDocumento: p.nitDocumento,
+                                        dv: p.dv ?? '',
+                                        email: p.email ?? '',
+                                        telefono: p.telefono ?? '',
+                                        celular: p.celular ?? '',
+                                        direccion: p.direccion ?? '',
+                                        pais: p.pais ?? '',
+                                        departamento: p.departamento ?? '',
+                                        ciudad: p.ciudad ?? '',
+                                        codigoPostal: p.codigoPostal ?? '',
+                                        isActive: p.isActive,
+                                      });
+                                    }}
+                                  >
+                                    <IconEdit /> Editar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="danger"
+                                    disabled={deletingProveedorId === p.id}
+                                    onClick={() => deleteProveedor(p.id, p.nombreComercial || p.nombreRazonSocial)}
+                                  >
+                                    <IconTrash /> Eliminar
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
+
             {(settingsSubSection === 'items' || settingsSubSection === 'estructuraItems') && (
               <>
                 <h2 className="shell-title" style={{ fontSize: '1.1rem', marginTop: '0.5rem' }}>
@@ -7138,6 +7737,29 @@ export default function DashboardPage() {
                       El ítem quedará asociado al subcapítulo seleccionado aquí.
                     </p>
                   </div>
+                  <div className="form-field" style={{ marginBottom: '0.75rem' }}>
+                    <label className="form-label" htmlFor="item-new-proveedor">
+                      Proveedor
+                    </label>
+                    <select
+                      id="item-new-proveedor"
+                      className="form-input"
+                      required
+                      value={itemNewProveedorId}
+                      onChange={(e) => setItemNewProveedorId(e.target.value)}
+                      disabled={itemsSaving || itemProveedorOptions.length === 0}
+                    >
+                      {itemProveedorOptions.length === 0 ? (
+                        <option value="">— Primero cree un proveedor activo —</option>
+                      ) : (
+                        itemProveedorOptions.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {(p.nombreComercial || p.nombreRazonSocial)} · {p.nitDocumento}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
                   <div className="form-row-inline">
                     <div className="form-field" style={{ marginBottom: 0 }}>
                       <label className="form-label" htmlFor="item-new-codigo">Código</label>
@@ -7310,7 +7932,7 @@ export default function DashboardPage() {
                   <button
                     type="submit"
                     className="btn-primary"
-                    disabled={itemsSaving || !itemsFilterProjectId || !itemsTargetSubchapterId}
+                    disabled={itemsSaving || !itemsFilterProjectId || !itemsTargetSubchapterId || !itemNewProveedorId}
                   >
                     {itemsSaving ? 'Guardando...' : 'Crear ítem'}
                   </button>
@@ -7337,6 +7959,7 @@ export default function DashboardPage() {
                         <tr>
                           <th>Capítulo</th>
                           <th>Subcapítulo</th>
+                          <th>Proveedor</th>
                           <th>Código</th>
                           <th>Descripción</th>
                           <th>Unidad</th>
@@ -7384,6 +8007,24 @@ export default function DashboardPage() {
                                 </select>
                               ) : (
                                 it.subchapterNombre
+                              )}
+                            </td>
+                            <td style={{ minWidth: '12rem', verticalAlign: 'top' }}>
+                              {editingItemId === it.id ? (
+                                <select
+                                  className="form-input"
+                                  value={editingItemForm.proveedorId}
+                                  onChange={(e) => setEditingItemForm((p) => ({ ...p, proveedorId: e.target.value }))}
+                                >
+                                  <option value="">— Proveedor —</option>
+                                  {itemProveedorOptions.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                      {(p.nombreComercial || p.nombreRazonSocial)} · {p.nitDocumento}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                it.proveedorNombre ?? '—'
                               )}
                             </td>
                             <td>
@@ -7597,6 +8238,7 @@ export default function DashboardPage() {
                                         ancho: it.ancho != null ? String(it.ancho) : '',
                                         altura: it.altura != null ? String(it.altura) : '',
                                         imagenUrl: it.imagenUrl ?? '',
+                                        proveedorId: it.proveedorId ?? '',
                                         isActive: it.isActive,
                                         subchapterId: it.subchapterId,
                                       });

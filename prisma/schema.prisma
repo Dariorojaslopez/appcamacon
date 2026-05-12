@@ -42,6 +42,7 @@ model Project {
   contratistasCatalog ContratistaCatalog[]
   encargadosCatalog EncargadoReporteCatalog[]
   cargosCatalog     CargoCatalog[]
+  proveedoresCatalog ProveedorCatalog[]
   itemsCatalog      ItemCatalog[]
   budgetChapters    BudgetChapter[]
 }
@@ -414,6 +415,35 @@ model CargoCatalog {
   @@index([projectId, isActive, nombre])
 }
 
+model ProveedorCatalog {
+  id                String   @id @default(cuid())
+  projectId         String
+  project           Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  tipoPersona       String
+  nombreRazonSocial String
+  nombreComercial   String?
+  nitDocumento      String
+  dv                String?
+  email             String?
+  telefono          String?
+  celular           String?
+  direccion         String?
+  pais              String?
+  departamento      String?
+  ciudad            String?
+  codigoPostal      String?
+  isActive          Boolean  @default(true)
+
+  items             ItemCatalog[]
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([projectId, nitDocumento])
+  @@index([projectId, isActive, nombreRazonSocial])
+}
+
 model ItemCatalog {
   id            String   @id @default(cuid())
   projectId     String
@@ -421,6 +451,9 @@ model ItemCatalog {
 
   subchapterId  String
   subchapter    BudgetSubchapter @relation(fields: [subchapterId], references: [id], onDelete: Cascade)
+
+  proveedorId   String?
+  proveedor     ProveedorCatalog? @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
 
   codigo        String
   descripcion   String
@@ -439,6 +472,7 @@ model ItemCatalog {
 
   @@unique([projectId, codigo])
   @@index([projectId, isActive, orden, codigo])
+  @@index([proveedorId])
   @@index([subchapterId, orden])
 }
 
