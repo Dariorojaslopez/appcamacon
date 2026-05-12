@@ -118,6 +118,7 @@ export async function GET(req: NextRequest) {
         horaReinicio: s.horaReinicio,
         tipoClima: s.tipoClima ?? '',
         horasClima: s.horasClima ?? 0,
+        imagenUrl: s.imagenUrl ?? null,
         orden: s.orden,
       })),
       informeCerrado: informe.informeCerrado,
@@ -147,6 +148,7 @@ export async function POST(req: NextRequest) {
       horaReinicio?: string;
       tipoClima?: string;
       horasClima?: number;
+      imagenUrl?: string | null;
     };
 
     const { projectId, date: dateStr, jornadaId } = body;
@@ -208,6 +210,7 @@ export async function POST(req: NextRequest) {
         horaReinicio: hR,
         tipoClima: body.tipoClima?.trim() || null,
         horasClima: typeof body.horasClima === 'number' ? body.horasClima : null,
+        imagenUrl: typeof body.imagenUrl === 'string' && body.imagenUrl.trim() ? body.imagenUrl.trim() : null,
         orden,
       },
     });
@@ -220,6 +223,7 @@ export async function POST(req: NextRequest) {
         horaReinicio: created.horaReinicio,
         tipoClima: created.tipoClima ?? '',
         horasClima: created.horasClima ?? 0,
+        imagenUrl: created.imagenUrl ?? null,
         orden: created.orden,
       },
     });

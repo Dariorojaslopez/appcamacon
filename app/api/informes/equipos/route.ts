@@ -38,7 +38,12 @@ export async function GET(req: NextRequest) {
 
     const informe = await prisma.informeDiario.findFirst({
       where: { projectId, date, jornadaCatalogoId: jr.id },
-      include: { equipos: { orderBy: { createdAt: 'asc' } } },
+      include: {
+        equipos: {
+          orderBy: { createdAt: 'asc' },
+          include: { horarios: { orderBy: [{ orden: 'asc' }, { createdAt: 'asc' }] } },
+        },
+      },
     });
 
     return NextResponse.json({
@@ -54,6 +59,13 @@ export async function GET(req: NextRequest) {
         horasTrabajadas: e.horasTrabajadas,
         horaIngreso: e.horaIngreso,
         horaSalida: e.horaSalida,
+        horarios: e.horarios.map((h) => ({
+          id: h.id,
+          horaIngreso: h.horaIngreso,
+          horaSalida: h.horaSalida,
+          horasTrabajadas: h.horasTrabajadas,
+          orden: h.orden,
+        })),
       })),
     });
   } catch (error: unknown) {
@@ -86,6 +98,11 @@ export async function POST(req: NextRequest) {
         horasTrabajadas?: number;
         horaIngreso?: string;
         horaSalida?: string;
+        horarios?: Array<{
+          horaIngreso?: string;
+          horaSalida?: string;
+          horasTrabajadas?: number;
+        }>;
       }>;
     };
 
@@ -109,18 +126,43 @@ export async function POST(req: NextRequest) {
 
     const items = Array.isArray(body.equipos) ? body.equipos : [];
     const cleaned = items
-      .map((e) => ({
-        descripcion: String(e.descripcion ?? '').trim(),
-        placaRef: e.placaRef ? String(e.placaRef).trim() : null,
-        propiedad: e.propiedad ? String(e.propiedad).trim() : null,
-        estado: e.estado ? String(e.estado).trim() : null,
-        horasTrabajadas:
+      .map((e) => {
+        const horarios = Array.isArray(e.horarios)
+          ? e.horarios
+              .map((h) => ({
+                horaIngreso: h.horaIngreso ? String(h.horaIngreso).trim() : '',
+                horaSalida: h.horaSalida ? String(h.horaSalida).trim() : '',
+                horasTrabajadas:
+                  typeof h.horasTrabajadas === 'number' && Number.isFinite(h.horasTrabajadas)
+                    ? h.horasTrabajadas
+                    : 0,
+              }))
+              .filter((h) => h.horaIngreso && h.horaSalida)
+          : [];
+        const legacyHoraIngreso = e.horaIngreso ? String(e.horaIngreso).trim() : '';
+        const legacyHoraSalida = e.horaSalida ? String(e.horaSalida).trim() : '';
+        const legacyHoras =
           typeof e.horasTrabajadas === 'number' && Number.isFinite(e.horasTrabajadas)
             ? e.horasTrabajadas
-            : null,
-        horaIngreso: e.horaIngreso ? String(e.horaIngreso).trim() : null,
-        horaSalida: e.horaSalida ? String(e.horaSalida).trim() : null,
-      }))
+            : 0;
+        const effectiveHorarios =
+          horarios.length > 0
+            ? horarios
+            : legacyHoraIngreso || legacyHoraSalida
+              ? [{ horaIngreso: legacyHoraIngreso, horaSalida: legacyHoraSalida, horasTrabajadas: legacyHoras }]
+              : [];
+        const totalHoras = effectiveHorarios.reduce((sum, h) => sum + (Number(h.horasTrabajadas) || 0), 0);
+        return {
+          descripcion: String(e.descripcion ?? '').trim(),
+          placaRef: e.placaRef ? String(e.placaRef).trim() : null,
+          propiedad: e.propiedad ? String(e.propiedad).trim() : null,
+          estado: e.estado ? String(e.estado).trim() : null,
+          horasTrabajadas: totalHoras,
+          horaIngreso: effectiveHorarios[0]?.horaIngreso || null,
+          horaSalida: effectiveHorarios[effectiveHorarios.length - 1]?.horaSalida || null,
+          horarios: effectiveHorarios,
+        };
+      })
       .filter((e) => e.descripcion);
 
     const existing = await prisma.informeDiario.findFirst({
@@ -163,15 +205,33 @@ export async function POST(req: NextRequest) {
     }
 
     await prisma.equipoObra.deleteMany({ where: { informeId } });
-    if (cleaned.length > 0) {
-      await prisma.equipoObra.createMany({
-        data: cleaned.map((e) => ({ ...e, informeId: informeId as string })),
+    for (const e of cleaned) {
+      await prisma.equipoObra.create({
+        data: {
+          informeId: informeId as string,
+          descripcion: e.descripcion,
+          placaRef: e.placaRef,
+          propiedad: e.propiedad,
+          estado: e.estado,
+          horasTrabajadas: e.horasTrabajadas,
+          horaIngreso: e.horaIngreso,
+          horaSalida: e.horaSalida,
+          horarios: {
+            create: e.horarios.map((h, idx) => ({
+              horaIngreso: h.horaIngreso,
+              horaSalida: h.horaSalida,
+              horasTrabajadas: h.horasTrabajadas,
+              orden: idx,
+            })),
+          },
+        },
       });
     }
 
     const saved = await prisma.equipoObra.findMany({
       where: { informeId: informeId as string },
       orderBy: { createdAt: 'asc' },
+      include: { horarios: { orderBy: [{ orden: 'asc' }, { createdAt: 'asc' }] } },
     });
 
     return NextResponse.json({
@@ -185,6 +245,13 @@ export async function POST(req: NextRequest) {
         horasTrabajadas: e.horasTrabajadas,
         horaIngreso: e.horaIngreso,
         horaSalida: e.horaSalida,
+        horarios: e.horarios.map((h) => ({
+          id: h.id,
+          horaIngreso: h.horaIngreso,
+          horaSalida: h.horaSalida,
+          horasTrabajadas: h.horasTrabajadas,
+          orden: h.orden,
+        })),
       })),
     });
   } catch (error: unknown) {

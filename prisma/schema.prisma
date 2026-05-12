@@ -196,6 +196,7 @@ model InformeSuspension {
   horaReinicio       String
   tipoClima          String?
   horasClima         Float?
+  imagenUrl          String?
   orden              Int           @default(0)
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
@@ -246,12 +247,28 @@ model EquipoObra {
   horasTrabajadas Float?
   horaIngreso   String?  // "HH:mm"
   horaSalida    String?  // "HH:mm"
+  horarios      EquipoObraHorario[]
 
   informeId     String
   informe       InformeDiario @relation(fields: [informeId], references: [id], onDelete: Cascade)
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+model EquipoObraHorario {
+  id              String   @id @default(cuid())
+  equipoId        String
+  equipo          EquipoObra @relation(fields: [equipoId], references: [id], onDelete: Cascade)
+  horaIngreso     String
+  horaSalida      String
+  horasTrabajadas Float
+  orden           Int      @default(0)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([equipoId, orden])
 }
 
 model MaterialIngreso {

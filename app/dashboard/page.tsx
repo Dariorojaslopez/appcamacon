@@ -395,7 +395,36 @@ const emptyEquipoDraft = () => ({
   horaIngreso: '',
   horaSalida: '',
   horasTrabajadas: 0,
+  horarios: [] as EquipoHorarioDraft[],
 });
+
+type EquipoHorarioDraft = {
+  horaIngreso: string;
+  horaSalida: string;
+  horasTrabajadas: number;
+};
+
+function computeEquipoHorasDecimal(entrada: string, salida: string): number {
+  if (!entrada || !salida) return 0;
+  const [eh, em] = entrada.split(':').map(Number);
+  const [sh, sm] = salida.split(':').map(Number);
+  if (![eh, em, sh, sm].every(Number.isFinite)) return 0;
+  let min = sh * 60 + sm - (eh * 60 + em);
+  if (min < 0) min += 24 * 60;
+  return Math.round((min / 60) * 100) / 100;
+}
+
+function formatEquipoHoras(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '0h 0m';
+  const totalMin = Math.round(value * 60);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return `${h}h ${m}m`;
+}
+
+function sumEquipoHorarios(horarios: EquipoHorarioDraft[]): number {
+  return Math.round(horarios.reduce((sum, h) => sum + (Number(h.horasTrabajadas) || 0), 0) * 100) / 100;
+}
 
 const emptyIngresoDraft = () => ({
   proveedor: '',
@@ -523,6 +552,7 @@ const CLIMA_INFORME_OPTIONS = [
   { value: 'LLUVIA', label: 'Lluvia' },
   { value: 'TORMENTA', label: 'Tormenta' },
   { value: 'VIENTO', label: 'Viento' },
+  { value: 'OTRO', label: 'Otro' },
 ] as const;
 
 function climaInformeLabel(value: string): string {
@@ -539,6 +569,7 @@ type SuspensionRow = {
   horaReinicio: string;
   tipoClima: string;
   horasClima: number;
+  imagenUrl?: string | null;
 };
 
 type FirmaEvidenciaKey = (typeof FIRMAS_EVIDENCIAS_CONFIG)[number]['key'];
@@ -982,6 +1013,7 @@ export default function DashboardPage() {
     horaSuspension: '',
     horaReinicio: '',
     tipoClima: '',
+    imagenUrl: '',
   });
   const [editingSuspensionId, setEditingSuspensionId] = useState<string | null>(null);
   const [editSuspensionDraft, setEditSuspensionDraft] = useState({
@@ -989,6 +1021,7 @@ export default function DashboardPage() {
     horaSuspension: '',
     horaReinicio: '',
     tipoClima: '',
+    imagenUrl: '',
   });
   const horasDraftCalculadas = useMemo(
     () => horasEntreTiemposHHmm(suspensionDraft.horaSuspension, suspensionDraft.horaReinicio),
@@ -1038,6 +1071,7 @@ export default function DashboardPage() {
       horaIngreso: string;
       horaSalida: string;
       horasTrabajadas: number;
+      horarios: EquipoHorarioDraft[];
     }>
   >([]);
   const [loadingEquipos, setLoadingEquipos] = useState(false);
@@ -2142,16 +2176,38 @@ export default function DashboardPage() {
         .then((data: { equipos?: any[] }) => {
           const list = Array.isArray(data.equipos) ? data.equipos : [];
           setEquiposRows(
-            list.map((e) => ({
-              id: e.id,
-              descripcion: e.descripcion ?? '',
-              placaRef: e.placaRef ?? '',
-              propiedad: e.propiedad ?? '',
-              estado: e.estado ?? '',
-              horaIngreso: e.horaIngreso ?? '',
-              horaSalida: e.horaSalida ?? '',
-              horasTrabajadas: Number(e.horasTrabajadas ?? 0),
-            })),
+            list.map((e) => {
+              const horarios = Array.isArray(e.horarios)
+                ? e.horarios.map((h: any) => ({
+                    horaIngreso: h.horaIngreso ?? '',
+                    horaSalida: h.horaSalida ?? '',
+                    horasTrabajadas: Number(h.horasTrabajadas ?? 0),
+                  }))
+                : [];
+              const fallbackHorarios =
+                horarios.length > 0
+                  ? horarios
+                  : e.horaIngreso || e.horaSalida
+                    ? [
+                        {
+                          horaIngreso: e.horaIngreso ?? '',
+                          horaSalida: e.horaSalida ?? '',
+                          horasTrabajadas: Number(e.horasTrabajadas ?? 0),
+                        },
+                      ]
+                    : [];
+              return {
+                id: e.id,
+                descripcion: e.descripcion ?? '',
+                placaRef: e.placaRef ?? '',
+                propiedad: e.propiedad ?? '',
+                estado: e.estado ?? '',
+                horaIngreso: fallbackHorarios[0]?.horaIngreso ?? '',
+                horaSalida: fallbackHorarios[fallbackHorarios.length - 1]?.horaSalida ?? '',
+                horasTrabajadas: sumEquipoHorarios(fallbackHorarios),
+                horarios: fallbackHorarios,
+              };
+            }),
           );
           setEquipoDraft(emptyEquipoDraft());
           setEquipoEditingIndex(null);
@@ -4161,7 +4217,7 @@ export default function DashboardPage() {
     const hR = suspensionDraft.horaReinicio.trim();
     const tc = suspensionDraft.tipoClima.trim();
     if (!motivo || !hS || !hR || !tc) {
-      setJornadaError('Complete motivo, horas de suspensión y reinicio, y tipo de clima.');
+      setJornadaError('Complete motivo, horas de suspensión y reinicio, y tipo.');
       return;
     }
     if (!validarHorasSuspensionEnJornada(hS, hR)) return;
@@ -4186,6 +4242,7 @@ export default function DashboardPage() {
           horaReinicio: hR,
           tipoClima: tc,
           horasClima: horas,
+          imagenUrl: suspensionDraft.imagenUrl.trim() || null,
         }),
       });
       const data = (await res.json()) as { error?: string; item?: SuspensionRow };
@@ -4196,7 +4253,7 @@ export default function DashboardPage() {
       if (data.item) {
         setSuspensionesRows((prev) => [...prev, data.item!]);
       }
-      setSuspensionDraft({ motivoSuspension: '', horaSuspension: '', horaReinicio: '', tipoClima: '' });
+      setSuspensionDraft({ motivoSuspension: '', horaSuspension: '', horaReinicio: '', tipoClima: '', imagenUrl: '' });
       setJornadaMessage('Suspensión registrada.');
       setTimeout(() => setJornadaMessage(null), 3000);
     } catch {
@@ -4213,6 +4270,7 @@ export default function DashboardPage() {
       horaSuspension: row.horaSuspension,
       horaReinicio: row.horaReinicio,
       tipoClima: row.tipoClima,
+      imagenUrl: row.imagenUrl ?? '',
     });
     setJornadaError(null);
   };
@@ -4224,6 +4282,7 @@ export default function DashboardPage() {
       horaSuspension: '',
       horaReinicio: '',
       tipoClima: '',
+      imagenUrl: '',
     });
   };
 
@@ -4256,6 +4315,7 @@ export default function DashboardPage() {
           horaReinicio: hR,
           tipoClima: tc,
           horasClima: horas,
+          imagenUrl: editSuspensionDraft.imagenUrl.trim() || null,
         }),
       });
       const data = (await res.json()) as { error?: string; item?: SuspensionRow };
@@ -4431,6 +4491,35 @@ export default function DashboardPage() {
     setEquiposError(null);
   };
 
+  const addEquipoHorarioDraft = () => {
+    const horaIngreso = equipoDraft.horaIngreso.trim();
+    const horaSalida = equipoDraft.horaSalida.trim();
+    if (!horaIngreso || !horaSalida) {
+      setEquiposError('Indique hora de ingreso y hora de salida para agregar el horario.');
+      return;
+    }
+    const horasTrabajadas = computeEquipoHorasDecimal(horaIngreso, horaSalida);
+    if (horasTrabajadas <= 0) {
+      setEquiposError('Las horas trabajadas del horario deben ser mayores a 0.');
+      return;
+    }
+    setEquipoDraft((prev) => ({
+      ...prev,
+      horaIngreso: '',
+      horaSalida: '',
+      horasTrabajadas: 0,
+      horarios: [...prev.horarios, { horaIngreso, horaSalida, horasTrabajadas }],
+    }));
+    setEquiposError(null);
+  };
+
+  const removeEquipoHorarioDraft = (idx: number) => {
+    setEquipoDraft((prev) => ({
+      ...prev,
+      horarios: prev.horarios.filter((_, i) => i !== idx),
+    }));
+  };
+
   const startEditEquipo = (idx: number) => {
     const r = equiposRows[idx];
     if (!r) return;
@@ -4439,9 +4528,10 @@ export default function DashboardPage() {
       placaRef: r.placaRef,
       propiedad: r.propiedad,
       estado: r.estado,
-      horaIngreso: r.horaIngreso,
-      horaSalida: r.horaSalida,
-      horasTrabajadas: r.horasTrabajadas,
+      horaIngreso: '',
+      horaSalida: '',
+      horasTrabajadas: 0,
+      horarios: [...r.horarios],
     });
     setEquipoEditingIndex(idx);
     setEquiposError(null);
@@ -4451,6 +4541,25 @@ export default function DashboardPage() {
     if (!equipoDraft.descripcion.trim()) {
       setEquiposError('Indique la descripción del equipo.');
       return;
+    }
+    const pendingHoraIngreso = equipoDraft.horaIngreso.trim();
+    const pendingHoraSalida = equipoDraft.horaSalida.trim();
+    const nextHorarios = [...equipoDraft.horarios];
+    if (pendingHoraIngreso || pendingHoraSalida) {
+      if (!pendingHoraIngreso || !pendingHoraSalida) {
+        setEquiposError('Complete hora de ingreso y hora de salida, o agregue un horario ya completo.');
+        return;
+      }
+      const pendingHoras = computeEquipoHorasDecimal(pendingHoraIngreso, pendingHoraSalida);
+      if (pendingHoras <= 0) {
+        setEquiposError('Las horas trabajadas del horario deben ser mayores a 0.');
+        return;
+      }
+      nextHorarios.push({
+        horaIngreso: pendingHoraIngreso,
+        horaSalida: pendingHoraSalida,
+        horasTrabajadas: pendingHoras,
+      });
     }
     setEquiposError(null);
     if (equipoEditingIndex !== null) {
@@ -4464,9 +4573,10 @@ export default function DashboardPage() {
                 placaRef: equipoDraft.placaRef.trim(),
                 propiedad: equipoDraft.propiedad,
                 estado: equipoDraft.estado,
-                horaIngreso: equipoDraft.horaIngreso,
-                horaSalida: equipoDraft.horaSalida,
-                horasTrabajadas: Number(equipoDraft.horasTrabajadas) || 0,
+                horaIngreso: nextHorarios[0]?.horaIngreso ?? '',
+                horaSalida: nextHorarios[nextHorarios.length - 1]?.horaSalida ?? '',
+                horasTrabajadas: sumEquipoHorarios(nextHorarios),
+                horarios: nextHorarios,
               }
             : row,
         ),
@@ -4480,9 +4590,10 @@ export default function DashboardPage() {
           placaRef: equipoDraft.placaRef.trim(),
           propiedad: equipoDraft.propiedad,
           estado: equipoDraft.estado,
-          horaIngreso: equipoDraft.horaIngreso,
-          horaSalida: equipoDraft.horaSalida,
-          horasTrabajadas: Number(equipoDraft.horasTrabajadas) || 0,
+          horaIngreso: nextHorarios[0]?.horaIngreso ?? '',
+          horaSalida: nextHorarios[nextHorarios.length - 1]?.horaSalida ?? '',
+          horasTrabajadas: sumEquipoHorarios(nextHorarios),
+          horarios: nextHorarios,
         },
       ]);
     }
@@ -4528,6 +4639,11 @@ export default function DashboardPage() {
             horaIngreso: e.horaIngreso,
             horaSalida: e.horaSalida,
             horasTrabajadas: Number(e.horasTrabajadas),
+            horarios: e.horarios.map((h) => ({
+              horaIngreso: h.horaIngreso,
+              horaSalida: h.horaSalida,
+              horasTrabajadas: Number(h.horasTrabajadas),
+            })),
           })),
         }),
       });
@@ -4538,16 +4654,38 @@ export default function DashboardPage() {
       }
       const list = Array.isArray(data.equipos) ? data.equipos : [];
       setEquiposRows(
-        list.map((e: any) => ({
-          id: e.id,
-          descripcion: e.descripcion ?? '',
-          placaRef: e.placaRef ?? '',
-          propiedad: e.propiedad ?? '',
-          estado: e.estado ?? '',
-          horaIngreso: e.horaIngreso ?? '',
-          horaSalida: e.horaSalida ?? '',
-          horasTrabajadas: Number(e.horasTrabajadas ?? 0),
-        })),
+        list.map((e: any) => {
+          const horarios = Array.isArray(e.horarios)
+            ? e.horarios.map((h: any) => ({
+                horaIngreso: h.horaIngreso ?? '',
+                horaSalida: h.horaSalida ?? '',
+                horasTrabajadas: Number(h.horasTrabajadas ?? 0),
+              }))
+            : [];
+          const fallbackHorarios =
+            horarios.length > 0
+              ? horarios
+              : e.horaIngreso || e.horaSalida
+                ? [
+                    {
+                      horaIngreso: e.horaIngreso ?? '',
+                      horaSalida: e.horaSalida ?? '',
+                      horasTrabajadas: Number(e.horasTrabajadas ?? 0),
+                    },
+                  ]
+                : [];
+          return {
+            id: e.id,
+            descripcion: e.descripcion ?? '',
+            placaRef: e.placaRef ?? '',
+            propiedad: e.propiedad ?? '',
+            estado: e.estado ?? '',
+            horaIngreso: fallbackHorarios[0]?.horaIngreso ?? '',
+            horaSalida: fallbackHorarios[fallbackHorarios.length - 1]?.horaSalida ?? '',
+            horasTrabajadas: sumEquipoHorarios(fallbackHorarios),
+            horarios: fallbackHorarios,
+          };
+        }),
       );
       setEquiposMessage('Equipos guardados.');
       setEquipoDraft(emptyEquipoDraft());
@@ -5040,6 +5178,25 @@ export default function DashboardPage() {
       throw new Error(data?.error ?? 'Error al subir imagen.');
     }
     return String(data.url);
+  };
+
+  const uploadSuspensionImagen = async (file: File | null): Promise<string | null> => {
+    if (!file) return null;
+    if (!selectedObraId) throw new Error('Seleccione una obra antes de subir la imagen.');
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('projectId', selectedObraId);
+    const res = await fetch('/api/uploads/evidencia-foto', {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+    });
+    const data = await res.json();
+    const url = data?.previewUrl || data?.url;
+    if (!res.ok || !url) {
+      throw new Error(data?.error ?? 'Error al subir imagen.');
+    }
+    return String(url);
   };
 
   const addEnsayoRow = () => {
@@ -9091,13 +9248,13 @@ export default function DashboardPage() {
                     </div>
                     <div className="form-row-2 form-row-2--align-inputs-end">
                       <div className="informe-field">
-                        <label className="informe-label" htmlFor="edit-tipo-clima">TIPO DE CLIMA *</label>
+                        <label className="informe-label" htmlFor="edit-tipo-clima">TIPO *</label>
                         <InformeSearchableSelect
                           id="edit-tipo-clima"
                           value={editSuspensionDraft.tipoClima}
                           disabled={informeBloqueado}
                           emptyOptionLabel="Seleccione…"
-                          searchPlaceholder="Buscar tipo de clima…"
+                          searchPlaceholder="Buscar tipo…"
                           options={[...CLIMA_INFORME_OPTIONS]}
                           onChange={(v) => setEditSuspensionDraft((p) => ({ ...p, tipoClima: v }))}
                         />
@@ -9113,6 +9270,45 @@ export default function DashboardPage() {
                           value={horasEditCalculadas}
                         />
                       </div>
+                    </div>
+                    <div className="informe-field">
+                      <label className="informe-label" htmlFor="edit-suspension-imagen">IMAGEN (OPCIONAL)</label>
+                      <input
+                        id="edit-suspension-imagen"
+                        className="form-input calidad-file-input"
+                        type="file"
+                        accept="image/*"
+                        disabled={informeBloqueado || savingSuspension || !selectedObraId}
+                        onChange={async (e) => {
+                          const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+                          try {
+                            setJornadaError(null);
+                            const url = await uploadSuspensionImagen(file);
+                            if (url) setEditSuspensionDraft((p) => ({ ...p, imagenUrl: url }));
+                          } catch (err) {
+                            setJornadaError(err instanceof Error ? err.message : 'Error al subir imagen.');
+                          } finally {
+                            e.target.value = '';
+                          }
+                        }}
+                      />
+                      {editSuspensionDraft.imagenUrl ? (
+                        <div style={{ display: 'grid', gap: '0.5rem', marginTop: '0.5rem' }}>
+                          <img
+                            src={editSuspensionDraft.imagenUrl}
+                            alt="Imagen de suspensión"
+                            className="calidad-mobile-thumb"
+                          />
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            disabled={informeBloqueado || savingSuspension}
+                            onClick={() => setEditSuspensionDraft((p) => ({ ...p, imagenUrl: '' }))}
+                          >
+                            Quitar imagen
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
                     <div className="suspensiones-edit-actions">
                       <button type="button" className="btn-secondary" onClick={cancelarEdicionSuspension}>
@@ -9192,13 +9388,13 @@ export default function DashboardPage() {
                     </div>
                     <div className="form-row-2 form-row-2--align-inputs-end">
                       <div className="informe-field">
-                        <label className="informe-label" htmlFor="tipo-clima">TIPO DE CLIMA *</label>
+                        <label className="informe-label" htmlFor="tipo-clima">TIPO *</label>
                         <InformeSearchableSelect
                           id="tipo-clima"
                           value={suspensionDraft.tipoClima}
                           disabled={informeBloqueado}
                           emptyOptionLabel="Seleccione…"
-                          searchPlaceholder="Buscar tipo de clima…"
+                          searchPlaceholder="Buscar tipo…"
                           options={[...CLIMA_INFORME_OPTIONS]}
                           onChange={(v) => setSuspensionDraft((p) => ({ ...p, tipoClima: v }))}
                         />
@@ -9215,6 +9411,45 @@ export default function DashboardPage() {
                           value={horasDraftCalculadas}
                         />
                       </div>
+                    </div>
+                    <div className="informe-field">
+                      <label className="informe-label" htmlFor="suspension-imagen">IMAGEN (OPCIONAL)</label>
+                      <input
+                        id="suspension-imagen"
+                        className="form-input calidad-file-input"
+                        type="file"
+                        accept="image/*"
+                        disabled={informeBloqueado || savingSuspension || !selectedObraId}
+                        onChange={async (e) => {
+                          const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+                          try {
+                            setJornadaError(null);
+                            const url = await uploadSuspensionImagen(file);
+                            if (url) setSuspensionDraft((p) => ({ ...p, imagenUrl: url }));
+                          } catch (err) {
+                            setJornadaError(err instanceof Error ? err.message : 'Error al subir imagen.');
+                          } finally {
+                            e.target.value = '';
+                          }
+                        }}
+                      />
+                      {suspensionDraft.imagenUrl ? (
+                        <div style={{ display: 'grid', gap: '0.5rem', marginTop: '0.5rem' }}>
+                          <img
+                            src={suspensionDraft.imagenUrl}
+                            alt="Imagen de suspensión"
+                            className="calidad-mobile-thumb"
+                          />
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            disabled={informeBloqueado || savingSuspension}
+                            onClick={() => setSuspensionDraft((p) => ({ ...p, imagenUrl: '' }))}
+                          >
+                            Quitar imagen
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
                     <button
                       type="button"
@@ -9248,8 +9483,9 @@ export default function DashboardPage() {
                           <th>Motivo</th>
                           <th>Desde</th>
                           <th>Hasta</th>
-                          <th>Clima</th>
+                          <th>Tipo</th>
                           <th>Horas</th>
+                          <th>Imagen</th>
                           <th aria-label="Acciones" />
                         </tr>
                       </thead>
@@ -9261,6 +9497,17 @@ export default function DashboardPage() {
                             <td>{row.horaReinicio}</td>
                             <td>{climaInformeLabel(row.tipoClima)}</td>
                             <td>{row.horasClima}</td>
+                            <td>
+                              {row.imagenUrl ? (
+                                <img
+                                  src={row.imagenUrl}
+                                  alt="Imagen de suspensión"
+                                  className="calidad-table-thumb"
+                                />
+                              ) : (
+                                '—'
+                              )}
+                            </td>
                             <td className="suspensiones-td-actions">
                               <button
                                 type="button"
@@ -9643,7 +9890,7 @@ export default function DashboardPage() {
                           <option value="FUERA_DE_SERVICIO">Fuera de servicio</option>
                         </select>
                       </div>
-                      <div className="personal-form-times">
+                      <div className="form-row-inline" style={{ alignItems: 'flex-end' }}>
                         <div className="informe-field">
                           <label className="informe-label" htmlFor="equipo-draft-h-in">
                             Hora ingreso
@@ -9682,26 +9929,64 @@ export default function DashboardPage() {
                             </span>
                           </div>
                         </div>
+                        <div className="informe-field" style={{ minWidth: '9rem' }}>
+                          <label className="informe-label" htmlFor="equipo-draft-horas">
+                            Horas trabajadas
+                          </label>
+                          <input
+                            id="equipo-draft-horas"
+                            className="personal-input personal-input-readonly"
+                            type="text"
+                            readOnly
+                            value={formatEquipoHoras(
+                              computeEquipoHorasDecimal(equipoDraft.horaIngreso, equipoDraft.horaSalida),
+                            )}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          style={{ width: 'auto', minWidth: '8rem' }}
+                          onClick={addEquipoHorarioDraft}
+                        >
+                          Agregar horario
+                        </button>
                       </div>
-                      <div className="informe-field">
-                        <label className="informe-label" htmlFor="equipo-draft-horas">
-                          Horas trabajadas
-                        </label>
-                        <input
-                          id="equipo-draft-horas"
-                          className="personal-input"
-                          type="number"
-                          min={0}
-                          step={0.5}
-                          value={equipoDraft.horasTrabajadas}
-                          onChange={(e) =>
-                            setEquipoDraft((d) => ({
-                              ...d,
-                              horasTrabajadas: Number(e.target.value),
-                            }))
-                          }
-                        />
-                      </div>
+                      {equipoDraft.horarios.length > 0 ? (
+                        <div className="users-table-wrap" style={{ marginTop: 0 }}>
+                          <table className="users-table">
+                            <thead>
+                              <tr>
+                                <th>Ingreso</th>
+                                <th>Salida</th>
+                                <th>Horas</th>
+                                <th>Acciones</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {equipoDraft.horarios.map((h, idx) => (
+                                <tr key={`${h.horaIngreso}-${h.horaSalida}-${idx}`}>
+                                  <td>{h.horaIngreso}</td>
+                                  <td>{h.horaSalida}</td>
+                                  <td>{formatEquipoHoras(h.horasTrabajadas)}</td>
+                                  <td>
+                                    <button
+                                      type="button"
+                                      className="danger"
+                                      onClick={() => removeEquipoHorarioDraft(idx)}
+                                    >
+                                      <IconTrash /> Quitar
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : null}
+                      <p className="shell-text-muted" style={{ margin: 0 }}>
+                        Total horas trabajadas: {formatEquipoHoras(sumEquipoHorarios(equipoDraft.horarios))}
+                      </p>
                       <div className="personal-form-actions">
                         <button type="button" className="btn-primary" onClick={commitEquipoDraft}>
                           {equipoEditingIndex !== null ? 'Guardar cambios' : 'Agregar a la lista'}
@@ -9766,16 +10051,36 @@ export default function DashboardPage() {
                                 <strong>Estado:</strong> {equipoEstadoLabel(r.estado)}
                               </div>
                               <div>
-                                <strong>Horario:</strong>{' '}
-                                {r.horaIngreso || r.horaSalida
-                                  ? `${r.horaIngreso || '—'} → ${r.horaSalida || '—'}`
-                                  : '—'}
+                                <strong>Horarios:</strong>{' '}
+                                {r.horarios.length > 0 ? `${r.horarios.length} registro(s)` : '—'}
                               </div>
                               <div>
                                 <strong>Horas trabajadas:</strong>{' '}
-                                {Number.isFinite(r.horasTrabajadas) ? r.horasTrabajadas : '—'}
+                                {formatEquipoHoras(r.horasTrabajadas)}
                               </div>
                             </div>
+                            {r.horarios.length > 0 ? (
+                              <div className="users-table-wrap" style={{ marginTop: '0.75rem' }}>
+                                <table className="users-table">
+                                  <thead>
+                                    <tr>
+                                      <th>Ingreso</th>
+                                      <th>Salida</th>
+                                      <th>Horas</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {r.horarios.map((h, horarioIdx) => (
+                                      <tr key={`${h.horaIngreso}-${h.horaSalida}-${horarioIdx}`}>
+                                        <td>{h.horaIngreso}</td>
+                                        <td>{h.horaSalida}</td>
+                                        <td>{formatEquipoHoras(h.horasTrabajadas)}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            ) : null}
                           </div>
                         ))}
                       </div>

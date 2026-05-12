@@ -20,6 +20,7 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx) {
       horaReinicio?: string;
       tipoClima?: string;
       horasClima?: number;
+      imagenUrl?: string | null;
     };
 
     const row = await prisma.informeSuspension.findFirst({
@@ -49,6 +50,12 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx) {
               ? body.horasClima
               : null
             : row.horasClima,
+        imagenUrl:
+          body.imagenUrl !== undefined
+            ? typeof body.imagenUrl === 'string' && body.imagenUrl.trim()
+              ? body.imagenUrl.trim()
+              : null
+            : row.imagenUrl,
       },
     });
 
@@ -60,6 +67,7 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx) {
         horaReinicio: updated.horaReinicio,
         tipoClima: updated.tipoClima ?? '',
         horasClima: updated.horasClima ?? 0,
+        imagenUrl: updated.imagenUrl ?? null,
         orden: updated.orden,
       },
     });
