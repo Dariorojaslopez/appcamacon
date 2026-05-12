@@ -37,6 +37,9 @@ export function resolveGoogleDriveFolderId(
 export function googleDriveErrorMessage(error: unknown): string {
   const message = String((error as { message?: unknown })?.message ?? '');
   if (!message) return 'Error desconocido de Google Drive.';
+  if (message.includes('unauthorized_client')) {
+    return 'Google rechazó el cliente OAuth. Verifica que GOOGLE_DRIVE_CLIENT_ID, GOOGLE_DRIVE_CLIENT_SECRET y GOOGLE_DRIVE_REFRESH_TOKEN pertenezcan al mismo OAuth Client, y reinicia el contenedor para cargar el .env actualizado.';
+  }
   if (message.includes('invalid_grant')) {
     return 'Google Drive rechazó el refresh token. Regenera GOOGLE_DRIVE_REFRESH_TOKEN.';
   }
