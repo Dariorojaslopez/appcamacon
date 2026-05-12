@@ -730,6 +730,44 @@ const FIRMAS_EVIDENCIAS_CONFIG = [
   { key: 'vistoBuenoDirectorObra', label: 'Visto bueno director de obra' },
 ] as const;
 
+const BITACORA_TABS = [
+  { id: 'dashboard' as const, label: 'Dashboard diario' },
+  { id: 'timeline' as const, label: 'Timeline de obra' },
+  { id: 'historial' as const, label: 'Historial de eventos' },
+  { id: 'evidencias' as const, label: 'Evidencias fotográficas' },
+  { id: 'auditoria' as const, label: 'Auditoría y trazabilidad' },
+  { id: 'pdf' as const, label: 'Generar PDF oficial' },
+] as const;
+
+type BitacoraTab = (typeof BITACORA_TABS)[number]['id'];
+
+type BitacoraEventoUi = {
+  id: string;
+  tipoEvento: string;
+  moduloOrigen: string;
+  descripcion: string;
+  usuario?: string | null;
+  rolUsuario?: string | null;
+  fecha: string;
+  hora: string;
+  timestampUtc: string;
+  latitud?: number | null;
+  longitud?: number | null;
+  precisionGps?: number | null;
+  dispositivo?: string | null;
+  navegador?: string | null;
+  ip?: string | null;
+  evidenciaFotografica?: string | null;
+  firmaAsociada?: string | null;
+  observaciones?: string | null;
+  estado: string;
+  hashIntegridad: string;
+  inconsistencias?: unknown;
+  evidencias?: Array<{ id: string; url: string; fase?: string | null }>;
+  firmas?: Array<{ id: string; slot: string; firmante?: string | null; firmadoEn?: string | null }>;
+  auditorias?: Array<{ id: string; accion: string; tabla: string; timestampUtc: string }>;
+};
+
 /** Campos de datos generales al cambiar a un informe que aún no existe (otra jornada / día). */
 const DATOS_GENERALES_CAMPOS_VACIOS = {
   frenteObra: '',
@@ -865,6 +903,7 @@ export default function DashboardPage() {
     | 'calidad'
     | 'evidencias'
     | 'tabulacion'
+    | 'bitacora'
   >('home');
   const isInformeSection = useMemo(
     () =>
@@ -879,6 +918,19 @@ export default function DashboardPage() {
     [activeSection],
   );
   const [usersSubSection, setUsersSubSection] = useState<'crear' | 'administrar' | 'roles'>('crear');
+  const [bitacoraTab, setBitacoraTab] = useState<BitacoraTab>('dashboard');
+  const [bitacoraEventos, setBitacoraEventos] = useState<BitacoraEventoUi[]>([]);
+  const [bitacoraMetrics, setBitacoraMetrics] = useState<any>(null);
+  const [bitacoraClima, setBitacoraClima] = useState({
+    tipo: '',
+    temperatura: '',
+    humedad: '',
+    observaciones: '',
+  });
+  const [loadingBitacora, setLoadingBitacora] = useState(false);
+  const [savingBitacoraClima, setSavingBitacoraClima] = useState(false);
+  const [bitacoraMessage, setBitacoraMessage] = useState<string | null>(null);
+  const [bitacoraError, setBitacoraError] = useState<string | null>(null);
   const [creatingUser, setCreatingUser] = useState(false);
   const [userForm, setUserForm] = useState({
     identification: '',
@@ -1549,6 +1601,97 @@ export default function DashboardPage() {
   }, [isAppInstalled]);
 
   const canSee = (menuKey: string) => allowedMenus.length === 0 || allowedMenus.includes(menuKey);
+
+  const loadBitacoraDigital = useCallback(async () => {
+    if (!selectedObraId || !selectedJornadaId) {
+      setBitacoraEventos([]);
+      setBitacoraMetrics(null);
+      return;
+    }
+    const date = datosGeneralesForm.fechaReporte || new Date().toISOString().slice(0, 10);
+    const qs = `projectId=${encodeURIComponent(selectedObraId)}&date=${encodeURIComponent(date)}&jornadaId=${encodeURIComponent(selectedJornadaId)}`;
+    setLoadingBitacora(true);
+    setBitacoraError(null);
+    try {
+      const [dashboardRes, eventosRes, climaRes] = await Promise.all([
+        fetch(`/api/bitacora/dashboard?${qs}`, { credentials: 'include' }),
+        fetch(`/api/bitacora/eventos?${qs}`, { credentials: 'include' }),
+        fetch(`/api/bitacora/clima?${qs}`, { credentials: 'include' }),
+      ]);
+      const dashboardData = await dashboardRes.json();
+      const eventosData = await eventosRes.json();
+      const climaData = await climaRes.json();
+      if (!dashboardRes.ok) throw new Error(dashboardData?.error ?? 'No se pudo cargar dashboard de bitácora');
+      if (!eventosRes.ok) throw new Error(eventosData?.error ?? 'No se pudo cargar eventos de bitácora');
+      setBitacoraMetrics(dashboardData.metrics ?? null);
+      setBitacoraEventos(Array.isArray(eventosData.eventos) ? eventosData.eventos : []);
+      const clima = climaData?.clima;
+      if (clima) {
+        setBitacoraClima({
+          tipo: clima.tipo ?? '',
+          temperatura: clima.temperatura != null ? String(clima.temperatura) : '',
+          humedad: clima.humedad != null ? String(clima.humedad) : '',
+          observaciones: clima.observaciones ?? '',
+        });
+      }
+    } catch (err) {
+      setBitacoraError(err instanceof Error ? err.message : 'Error al cargar bitácora digital.');
+    } finally {
+      setLoadingBitacora(false);
+    }
+  }, [datosGeneralesForm.fechaReporte, selectedJornadaId, selectedObraId]);
+
+  useEffect(() => {
+    if (activeSection === 'bitacora') {
+      void loadBitacoraDigital();
+    }
+  }, [activeSection, loadBitacoraDigital]);
+
+  const saveBitacoraClima = async () => {
+    if (!selectedObraId || !selectedJornadaId) {
+      setBitacoraError('Seleccione obra y jornada.');
+      return;
+    }
+    const date = datosGeneralesForm.fechaReporte || new Date().toISOString().slice(0, 10);
+    setSavingBitacoraClima(true);
+    setBitacoraError(null);
+    setBitacoraMessage(null);
+    try {
+      const res = await fetch('/api/bitacora/clima', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          projectId: selectedObraId,
+          date,
+          jornadaId: selectedJornadaId,
+          tipo: bitacoraClima.tipo,
+          temperatura: bitacoraClima.temperatura ? Number(bitacoraClima.temperatura) : null,
+          humedad: bitacoraClima.humedad ? Number(bitacoraClima.humedad) : null,
+          observaciones: bitacoraClima.observaciones,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? 'No se pudo guardar clima.');
+      setBitacoraMessage('Clima de bitácora guardado.');
+      setTimeout(() => setBitacoraMessage(null), 2500);
+      await loadBitacoraDigital();
+    } catch (err) {
+      setBitacoraError(err instanceof Error ? err.message : 'Error al guardar clima.');
+    } finally {
+      setSavingBitacoraClima(false);
+    }
+  };
+
+  const openBitacoraPdf = () => {
+    if (!selectedObraId || !selectedJornadaId) {
+      setBitacoraError('Seleccione obra y jornada.');
+      return;
+    }
+    const date = datosGeneralesForm.fechaReporte || new Date().toISOString().slice(0, 10);
+    const qs = `projectId=${encodeURIComponent(selectedObraId)}&date=${encodeURIComponent(date)}&jornadaId=${encodeURIComponent(selectedJornadaId)}`;
+    window.open(`/api/bitacora/pdf?${qs}`, '_blank', 'noopener,noreferrer');
+  };
 
   useEffect(() => {
     if (activeSection === 'users' && usersSubSection === 'roles') {
@@ -6325,6 +6468,24 @@ export default function DashboardPage() {
     </div>
   );
 
+  const bitacoraMetricCards = bitacoraMetrics
+    ? [
+        ['Personal total', bitacoraMetrics.personalTotal ?? 0],
+        ['Horas hombre', Number(bitacoraMetrics.horasHombre ?? 0).toFixed(1)],
+        ['Materiales ingresados', bitacoraMetrics.materialesIngresados ?? 0],
+        ['Actividades ejecutadas', bitacoraMetrics.actividadesEjecutadas ?? 0],
+        ['Suspensiones', bitacoraMetrics.suspensiones ?? 0],
+        ['Maquinaria activa', bitacoraMetrics.maquinariaActiva ?? 0],
+        ['Incidentes', bitacoraMetrics.incidentes ?? 0],
+        ['No conformidades', bitacoraMetrics.noConformidades ?? 0],
+        ['Avance diario', Number(bitacoraMetrics.avanceDiario ?? 0).toFixed(2)],
+      ]
+    : [];
+
+  const bitacoraEventosConFotos = bitacoraEventos.filter(
+    (e) => (e.evidencias?.length ?? 0) > 0 || e.evidenciaFotografica,
+  );
+
   return (
     <div className="shell">
       <header className="topbar">
@@ -6424,6 +6585,16 @@ export default function DashboardPage() {
               )}
             </div>
           )}
+          {canSee('bitacora') && (
+            <button
+              type="button"
+              className={`topbar-link ${activeSection === 'bitacora' ? 'topbar-link-active' : ''}`}
+              onClick={() => setActiveSection('bitacora')}
+            >
+              <IconShield />
+              <span>Bitácora Digital</span>
+            </button>
+          )}
           {canSee('settings') && (
             <button
               type="button"
@@ -6521,6 +6692,21 @@ export default function DashboardPage() {
               </div>
             )}
 
+            {canSee('bitacora') && (
+              <button
+                type="button"
+                className={`nav-item ${activeSection === 'bitacora' ? 'nav-item-active' : ''}`}
+                onClick={() => {
+                  setActiveSection('bitacora');
+                  setMenuOpen(false);
+                }}
+              >
+                <IconShield />
+                <span>Bitácora Digital</span>
+                <IconChevronRight />
+              </button>
+            )}
+
             {canSee('settings') && (
               <button
                 type="button"
@@ -6590,6 +6776,209 @@ export default function DashboardPage() {
               Esta pantalla está optimizada para móviles: la barra superior se convierte en menú
               tipo hamburguesa para que puedas usarla cómodamente en campo.
             </p>
+          </section>
+        )}
+
+        {activeSection === 'bitacora' && (
+          <section className="shell-card shell-card-wide bitacora-shell">
+            <div className="bitacora-header">
+              <div>
+                <p className="legal-kicker">Trazabilidad contractual</p>
+                <h1 className="shell-title">Bitácora Digital de Obra</h1>
+                <p className="shell-text-muted">
+                  Capa oficial de consolidación, auditoría y control de obra pública. No duplica formularios:
+                  organiza cronológicamente lo capturado en el informe diario.
+                </p>
+              </div>
+              <button type="button" className="btn-secondary" onClick={() => void loadBitacoraDigital()}>
+                Actualizar bitácora
+              </button>
+            </div>
+
+            {bitacoraMessage && <p className="feedback feedback-success">{bitacoraMessage}</p>}
+            {bitacoraError && <p className="feedback feedback-error">{bitacoraError}</p>}
+
+            <div className="users-tabs bitacora-tabs">
+              {BITACORA_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={`users-tab ${bitacoraTab === tab.id ? 'users-tab-active' : ''}`}
+                  onClick={() => setBitacoraTab(tab.id)}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {loadingBitacora ? (
+              <p className="shell-text-muted">Consolidando bitácora digital...</p>
+            ) : (
+              <>
+                {bitacoraTab === 'dashboard' && (
+                  <div className="bitacora-panel">
+                    <div className="bitacora-metrics-grid">
+                      {bitacoraMetricCards.map(([label, value]) => (
+                        <div key={label} className="bitacora-metric-card">
+                          <span>{label}</span>
+                          <strong>{value}</strong>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="bitacora-clima-card">
+                      <h2>Clima de la bitácora diaria</h2>
+                      <div className="form-grid">
+                        <label className="informe-field">
+                          <span>Tipo</span>
+                          <select
+                            className="personal-input"
+                            value={bitacoraClima.tipo}
+                            onChange={(e) => setBitacoraClima((prev) => ({ ...prev, tipo: e.target.value }))}
+                          >
+                            <option value="">Seleccione...</option>
+                            <option value="SOLEADO">Soleado</option>
+                            <option value="LLUVIA">Lluvia</option>
+                            <option value="NUBLADO">Nublado</option>
+                            <option value="TORMENTA">Tormenta</option>
+                          </select>
+                        </label>
+                        <label className="informe-field">
+                          <span>Temperatura °C</span>
+                          <input
+                            className="personal-input"
+                            type="number"
+                            value={bitacoraClima.temperatura}
+                            onChange={(e) => setBitacoraClima((prev) => ({ ...prev, temperatura: e.target.value }))}
+                          />
+                        </label>
+                        <label className="informe-field">
+                          <span>Humedad %</span>
+                          <input
+                            className="personal-input"
+                            type="number"
+                            value={bitacoraClima.humedad}
+                            onChange={(e) => setBitacoraClima((prev) => ({ ...prev, humedad: e.target.value }))}
+                          />
+                        </label>
+                      </div>
+                      <label className="informe-field">
+                        <span>Observaciones clima</span>
+                        <textarea
+                          className="personal-input"
+                          rows={3}
+                          value={bitacoraClima.observaciones}
+                          onChange={(e) => setBitacoraClima((prev) => ({ ...prev, observaciones: e.target.value }))}
+                        />
+                      </label>
+                      <button type="button" className="btn-primary" onClick={saveBitacoraClima} disabled={savingBitacoraClima}>
+                        {savingBitacoraClima ? 'Guardando...' : 'Guardar clima'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {(bitacoraTab === 'timeline' || bitacoraTab === 'historial') && (
+                  <div className="bitacora-timeline">
+                    {bitacoraEventos.length === 0 ? (
+                      <p className="shell-text-muted">No hay eventos para la obra, fecha y jornada seleccionadas.</p>
+                    ) : (
+                      bitacoraEventos.map((evento) => (
+                        <article key={evento.id} className={`bitacora-event-card bitacora-event-${evento.moduloOrigen.toLowerCase()}`}>
+                          <div className="bitacora-event-time">{evento.hora}</div>
+                          <div className="bitacora-event-body">
+                            <div className="bitacora-event-head">
+                              <strong>{evento.moduloOrigen}</strong>
+                              <span>{evento.estado}</span>
+                            </div>
+                            <p>{evento.descripcion}</p>
+                            <div className="bitacora-event-meta">
+                              <span>{evento.usuario || 'Usuario no disponible'}</span>
+                              <span>{evento.rolUsuario || 'Rol no disponible'}</span>
+                              <span>{evento.dispositivo} · {evento.navegador}</span>
+                            </div>
+                            <div className="bitacora-event-location">
+                              GPS: {evento.latitud ?? 'N/A'}, {evento.longitud ?? 'N/A'}
+                              {evento.latitud != null && evento.longitud != null ? (
+                                <a
+                                  href={`https://www.google.com/maps?q=${evento.latitud},${evento.longitud}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  Ver mapa
+                                </a>
+                              ) : null}
+                            </div>
+                            {evento.observaciones ? <p className="bitacora-event-observacion">{evento.observaciones}</p> : null}
+                            {(evento.evidencias ?? []).length > 0 ? (
+                              <div className="bitacora-event-photos">
+                                {(evento.evidencias ?? []).slice(0, 4).map((foto) => (
+                                  <a key={foto.id} href={foto.url} target="_blank" rel="noopener noreferrer">
+                                    Evidencia
+                                  </a>
+                                ))}
+                              </div>
+                            ) : null}
+                            {bitacoraTab === 'historial' ? (
+                              <code className="bitacora-hash">Hash: {evento.hashIntegridad}</code>
+                            ) : null}
+                          </div>
+                        </article>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {bitacoraTab === 'evidencias' && (
+                  <div className="bitacora-evidencias-grid">
+                    {bitacoraEventosConFotos.length === 0 ? (
+                      <p className="shell-text-muted">No hay evidencias fotográficas consolidadas.</p>
+                    ) : (
+                      bitacoraEventosConFotos.map((evento) => (
+                        <div key={evento.id} className="bitacora-evidencia-card">
+                          <strong>{evento.moduloOrigen}</strong>
+                          <p>{evento.descripcion}</p>
+                          {(evento.evidencias?.length ? evento.evidencias : [{ id: evento.id, url: evento.evidenciaFotografica ?? '' }]).map((foto) =>
+                            foto.url ? (
+                              <a key={foto.id} href={foto.url} target="_blank" rel="noopener noreferrer">
+                                Abrir evidencia
+                              </a>
+                            ) : null,
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {bitacoraTab === 'auditoria' && (
+                  <div className="bitacora-audit-list">
+                    {bitacoraEventos.map((evento) => (
+                      <div key={evento.id} className="bitacora-audit-row">
+                        <strong>{evento.moduloOrigen}</strong>
+                        <span>{evento.tipoEvento}</span>
+                        <span>{evento.timestampUtc ? new Date(evento.timestampUtc).toLocaleString('es-CO') : ''}</span>
+                        <span>{evento.ip || 'IP no disponible'}</span>
+                        <code>{evento.hashIntegridad}</code>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {bitacoraTab === 'pdf' && (
+                  <div className="bitacora-pdf-card">
+                    <h2>Generar PDF oficial</h2>
+                    <p className="shell-text-muted">
+                      Se abre una versión oficial imprimible con encabezado, timeline, fotos, firmas, QR de validación
+                      y hash de integridad.
+                    </p>
+                    <button type="button" className="btn-primary" onClick={openBitacoraPdf}>
+                      Abrir PDF oficial
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
           </section>
         )}
 

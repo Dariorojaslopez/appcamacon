@@ -8,6 +8,7 @@ export const MENU_KEYS = [
   'calidad',
   'evidencias',
   'tabulacion',
+  'bitacora',
   'settings',
   'users',
 ] as const;
@@ -24,6 +25,7 @@ export const MENU_LABELS: Record<MenuKey, string> = {
   calidad: 'Calidad e incidentes',
   evidencias: 'Evidencias y cierre',
   tabulacion: 'Formato de tabulación',
+  bitacora: 'Bitácora Digital',
   settings: 'Configuración',
   users: 'Usuarios',
 };

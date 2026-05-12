@@ -1283,6 +1283,200 @@ body {
   background: #fff;
 }
 
+.bitacora-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.bitacora-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+@media (min-width: 760px) {
+  .bitacora-header {
+    align-items: flex-start;
+    flex-direction: row;
+    justify-content: space-between;
+  }
+}
+
+.bitacora-tabs {
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.bitacora-tabs .users-tab {
+  white-space: nowrap;
+}
+
+.bitacora-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.bitacora-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.bitacora-metric-card,
+.bitacora-clima-card,
+.bitacora-pdf-card,
+.bitacora-evidencia-card {
+  border: 1px solid rgba(209, 213, 219, 0.95);
+  border-radius: 14px;
+  background: #fff;
+  padding: 0.9rem;
+}
+
+.bitacora-metric-card span {
+  color: #6b7280;
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.bitacora-metric-card strong {
+  color: #111827;
+  display: block;
+  font-size: 1.45rem;
+  margin-top: 0.25rem;
+}
+
+.bitacora-clima-card h2,
+.bitacora-pdf-card h2 {
+  font-size: 1rem;
+  margin: 0 0 0.75rem;
+}
+
+.bitacora-timeline {
+  border-left: 3px solid var(--color-primary, #f59e0b);
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-left: 0.55rem;
+  padding-left: 0.9rem;
+}
+
+.bitacora-event-card {
+  display: grid;
+  gap: 0.55rem;
+  position: relative;
+}
+
+.bitacora-event-card::before {
+  background: var(--color-primary, #f59e0b);
+  border: 3px solid #fff;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.35);
+  content: '';
+  height: 12px;
+  left: -1.42rem;
+  position: absolute;
+  top: 0.35rem;
+  width: 12px;
+}
+
+.bitacora-event-time {
+  color: #92400e;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.bitacora-event-body {
+  background: #fff;
+  border: 1px solid rgba(209, 213, 219, 0.95);
+  border-radius: 14px;
+  padding: 0.85rem;
+}
+
+.bitacora-event-head,
+.bitacora-event-meta,
+.bitacora-event-location,
+.bitacora-event-photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.bitacora-event-head {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.bitacora-event-head span,
+.bitacora-event-meta span {
+  background: #f3f4f6;
+  border-radius: 999px;
+  color: #374151;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.5rem;
+}
+
+.bitacora-event-location,
+.bitacora-event-observacion {
+  color: #4b5563;
+  font-size: 0.82rem;
+}
+
+.bitacora-event-location a,
+.bitacora-event-photos a,
+.bitacora-evidencia-card a {
+  color: #2563eb;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.bitacora-hash {
+  background: #f3f4f6;
+  border-radius: 8px;
+  display: block;
+  font-size: 0.72rem;
+  margin-top: 0.5rem;
+  overflow-wrap: anywhere;
+  padding: 0.5rem;
+}
+
+.bitacora-evidencias-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.bitacora-audit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.bitacora-audit-row {
+  align-items: center;
+  background: #fff;
+  border: 1px solid rgba(209, 213, 219, 0.95);
+  border-radius: 12px;
+  display: grid;
+  gap: 0.4rem;
+  grid-template-columns: 1fr;
+  padding: 0.75rem;
+}
+
+@media (min-width: 860px) {
+  .bitacora-audit-row {
+    grid-template-columns: 1fr 0.7fr 1fr 0.7fr 2fr;
+  }
+}
+
+.bitacora-audit-row code {
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
+}
+
 .form-actions-row {
   display: flex;
   flex-wrap: wrap;

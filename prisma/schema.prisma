@@ -38,6 +38,8 @@ model Project {
   updatedAt   DateTime        @updatedAt
 
   informes           InformeDiario[]
+  bitacoraEventos    BitacoraEvento[]
+  bitacoraClimas     BitacoraClima[]
   frentesObraCatalog FrenteObraCatalog[]
   contratistasCatalog ContratistaCatalog[]
   encargadosCatalog EncargadoReporteCatalog[]
@@ -177,6 +179,8 @@ model InformeDiario {
   noConformidadesObra NoConformidadObra[]
   firmas              FirmaInforme[]
   suspensiones        InformeSuspension[]
+  bitacoraEventos     BitacoraEvento[]
+  bitacoraClimas      BitacoraClima[]
 
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
@@ -422,6 +426,135 @@ model NoConformidadObra {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model BitacoraEvento {
+  id                  String    @id @default(cuid())
+  tipoEvento          String    @map("tipo_evento")
+  moduloOrigen        String    @map("modulo_origen")
+  descripcion         String
+  usuarioId           String?   @map("usuario_id")
+  usuario             String?
+  rolUsuario          String?   @map("rol_usuario")
+  fecha               DateTime
+  hora                String
+  timestampUtc        DateTime  @default(now()) @map("timestamp_utc")
+  latitud             Float?
+  longitud            Float?
+  precisionGps        Float?    @map("precision_gps")
+  direccionAproximada String?   @map("direccion_aproximada")
+  dispositivo         String?
+  navegador           String?
+  ip                  String?
+  projectId           String    @map("proyecto_id")
+  project             Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  informeId           String?   @map("informe_id")
+  informe             InformeDiario? @relation(fields: [informeId], references: [id], onDelete: SetNull)
+  frenteObraId        String?   @map("frente_obra_id")
+  contratistaId       String?   @map("contratista_id")
+  evidenciaFotografica String?  @map("evidencia_fotografica")
+  firmaAsociada       String?   @map("firma_asociada")
+  observaciones       String?
+  estado              String    @default("ACTIVO")
+  hashIntegridad      String    @map("hash_integridad")
+  sourceModel         String?   @map("source_model")
+  sourceId            String?   @map("source_id")
+  payload             Json?
+  inconsistencias     Json?
+  deletedAt           DateTime? @map("deleted_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  evidencias          BitacoraEvidencia[]
+  firmas              BitacoraFirma[]
+  auditorias          BitacoraAuditoria[]
+
+  @@index([projectId, fecha, timestampUtc])
+  @@index([informeId, moduloOrigen])
+  @@index([sourceModel, sourceId])
+  @@map("bitacora_eventos")
+}
+
+model BitacoraEvidencia {
+  id          String   @id @default(cuid())
+  eventoId    String   @map("evento_id")
+  evento      BitacoraEvento @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  url         String
+  previewUrl  String?  @map("preview_url")
+  fase        String?
+  latitud     Float?
+  longitud    Float?
+  precisionGps Float?  @map("precision_gps")
+  geoEstado   String?  @map("geo_estado")
+  tomadaEn    DateTime? @map("tomada_en")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([eventoId])
+  @@map("bitacora_evidencias")
+}
+
+model BitacoraFirma {
+  id          String   @id @default(cuid())
+  eventoId    String   @map("evento_id")
+  evento      BitacoraEvento @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  slot        String
+  firmante    String?
+  rolFirmante String?  @map("rol_firmante")
+  firmadoEn   DateTime? @map("firmado_en")
+  hashFirma   String?  @map("hash_firma")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([eventoId])
+  @@map("bitacora_firmas")
+}
+
+model BitacoraAuditoria {
+  id          String   @id @default(cuid())
+  eventoId    String?  @map("evento_id")
+  evento      BitacoraEvento? @relation(fields: [eventoId], references: [id], onDelete: SetNull)
+  accion      String
+  tabla       String
+  registroId  String?  @map("registro_id")
+  valorAnterior Json?  @map("valor_anterior")
+  valorNuevo    Json?  @map("valor_nuevo")
+  usuarioId   String?  @map("usuario_id")
+  usuario     String?
+  rolUsuario  String?  @map("rol_usuario")
+  ip          String?
+  latitud     Float?
+  longitud    Float?
+  timestampUtc DateTime @default(now()) @map("timestamp_utc")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([tabla, registroId])
+  @@index([timestampUtc])
+  @@map("bitacora_auditoria")
+}
+
+model BitacoraClima {
+  id          String   @id @default(cuid())
+  projectId   String   @map("proyecto_id")
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  informeId   String?  @map("informe_id")
+  informe     InformeDiario? @relation(fields: [informeId], references: [id], onDelete: SetNull)
+  fecha       DateTime
+  tipo        String
+  temperatura Float?
+  humedad     Float?
+  observaciones String?
+  latitud     Float?
+  longitud    Float?
+  precisionGps Float? @map("precision_gps")
+  capturadoEn DateTime @default(now()) @map("capturado_en")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([informeId])
+  @@index([projectId, fecha])
+  @@map("bitacora_clima")
 }
 
 model ContratistaCatalog {
