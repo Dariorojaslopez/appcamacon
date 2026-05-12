@@ -57,6 +57,7 @@ export async function GET(req: NextRequest) {
         propiedad: e.propiedad,
         estado: e.estado,
         observacion: e.observacion,
+        imagenUrl: e.imagenUrl,
         horasTrabajadas: e.horasTrabajadas,
         horaIngreso: e.horaIngreso,
         horaSalida: e.horaSalida,
@@ -97,6 +98,7 @@ export async function POST(req: NextRequest) {
         propiedad?: string;
         estado?: string;
         observacion?: string;
+        imagenUrl?: string;
         horasTrabajadas?: number;
         horaIngreso?: string;
         horaSalida?: string;
@@ -160,6 +162,7 @@ export async function POST(req: NextRequest) {
           propiedad: e.propiedad ? String(e.propiedad).trim() : null,
           estado: e.estado ? String(e.estado).trim() : null,
           observacion: e.observacion ? String(e.observacion).trim() : null,
+          imagenUrl: e.imagenUrl ? String(e.imagenUrl).trim() : null,
           horasTrabajadas: totalHoras,
           horaIngreso: effectiveHorarios[0]?.horaIngreso || null,
           horaSalida: effectiveHorarios[effectiveHorarios.length - 1]?.horaSalida || null,
@@ -217,6 +220,7 @@ export async function POST(req: NextRequest) {
           propiedad: e.propiedad,
           estado: e.estado,
           observacion: e.observacion,
+          imagenUrl: e.imagenUrl,
           horasTrabajadas: e.horasTrabajadas,
           horaIngreso: e.horaIngreso,
           horaSalida: e.horaSalida,
@@ -247,6 +251,7 @@ export async function POST(req: NextRequest) {
         propiedad: e.propiedad,
         estado: e.estado,
         observacion: e.observacion,
+        imagenUrl: e.imagenUrl,
         horasTrabajadas: e.horasTrabajadas,
         horaIngreso: e.horaIngreso,
         horaSalida: e.horaSalida,

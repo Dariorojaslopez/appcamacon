@@ -1957,6 +1957,42 @@ ul.informe-searchable-list {
   resize: vertical;
 }
 
+.equipo-imagen-input.calidad-file-input {
+  min-height: 2.45rem;
+}
+
+.equipo-imagen-preview {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 0.65rem;
+  align-items: start;
+}
+
+.equipo-imagen-remove-btn {
+  width: fit-content;
+  min-height: 2rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  border: 1px dashed rgba(156, 163, 175, 0.65);
+  background: #fff;
+  color: #4b5563;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.equipo-imagen-remove-btn:hover:not(:disabled) {
+  border-color: #f59e0b;
+  background: rgba(250, 204, 21, 0.06);
+  color: #111827;
+}
+
+.equipo-imagen-remove-btn:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
 .equipo-horarios-actions {
   justify-content: flex-start;
 }

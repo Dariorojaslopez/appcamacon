@@ -393,6 +393,7 @@ const emptyEquipoDraft = () => ({
   propiedad: '',
   estado: '',
   observacion: '',
+  imagenUrl: '',
   horaIngreso: '',
   horaSalida: '',
   horasTrabajadas: 0,
@@ -1070,6 +1071,7 @@ export default function DashboardPage() {
       propiedad: string;
       estado: string;
       observacion: string;
+      imagenUrl: string;
       horaIngreso: string;
       horaSalida: string;
       horasTrabajadas: number;
@@ -2205,6 +2207,7 @@ export default function DashboardPage() {
                 propiedad: e.propiedad ?? '',
                 estado: e.estado ?? '',
                 observacion: e.observacion ?? '',
+                imagenUrl: e.imagenUrl ?? '',
                 horaIngreso: fallbackHorarios[0]?.horaIngreso ?? '',
                 horaSalida: fallbackHorarios[fallbackHorarios.length - 1]?.horaSalida ?? '',
                 horasTrabajadas: sumEquipoHorarios(fallbackHorarios),
@@ -4537,6 +4540,7 @@ export default function DashboardPage() {
       propiedad: r.propiedad,
       estado: r.estado,
       observacion: r.observacion,
+      imagenUrl: r.imagenUrl,
       horaIngreso: '',
       horaSalida: '',
       horasTrabajadas: 0,
@@ -4583,6 +4587,7 @@ export default function DashboardPage() {
                 propiedad: equipoDraft.propiedad,
                 estado: equipoDraft.estado,
                 observacion: equipoDraft.observacion.trim(),
+                imagenUrl: equipoDraft.imagenUrl.trim(),
                 horaIngreso: nextHorarios[0]?.horaIngreso ?? '',
                 horaSalida: nextHorarios[nextHorarios.length - 1]?.horaSalida ?? '',
                 horasTrabajadas: sumEquipoHorarios(nextHorarios),
@@ -4601,6 +4606,7 @@ export default function DashboardPage() {
           propiedad: equipoDraft.propiedad,
           estado: equipoDraft.estado,
           observacion: equipoDraft.observacion.trim(),
+          imagenUrl: equipoDraft.imagenUrl.trim(),
           horaIngreso: nextHorarios[0]?.horaIngreso ?? '',
           horaSalida: nextHorarios[nextHorarios.length - 1]?.horaSalida ?? '',
           horasTrabajadas: sumEquipoHorarios(nextHorarios),
@@ -4648,6 +4654,7 @@ export default function DashboardPage() {
             propiedad: e.propiedad,
             estado: e.estado,
             observacion: e.observacion,
+            imagenUrl: e.imagenUrl,
             horaIngreso: e.horaIngreso,
             horaSalida: e.horaSalida,
             horasTrabajadas: Number(e.horasTrabajadas),
@@ -4693,6 +4700,7 @@ export default function DashboardPage() {
             propiedad: e.propiedad ?? '',
             estado: e.estado ?? '',
             observacion: e.observacion ?? '',
+            imagenUrl: e.imagenUrl ?? '',
             horaIngreso: fallbackHorarios[0]?.horaIngreso ?? '',
             horaSalida: fallbackHorarios[fallbackHorarios.length - 1]?.horaSalida ?? '',
             horasTrabajadas: sumEquipoHorarios(fallbackHorarios),
@@ -5194,6 +5202,25 @@ export default function DashboardPage() {
   };
 
   const uploadSuspensionImagen = async (file: File | null): Promise<string | null> => {
+    if (!file) return null;
+    if (!selectedObraId) throw new Error('Seleccione una obra antes de subir la imagen.');
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('projectId', selectedObraId);
+    const res = await fetch('/api/uploads/evidencia-foto', {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+    });
+    const data = await res.json();
+    const url = data?.previewUrl || data?.url;
+    if (!res.ok || !url) {
+      throw new Error(data?.error ?? 'Error al subir imagen.');
+    }
+    return String(url);
+  };
+
+  const uploadEquipoImagen = async (file: File | null): Promise<string | null> => {
     if (!file) return null;
     if (!selectedObraId) throw new Error('Seleccione una obra antes de subir la imagen.');
     const formData = new FormData();
@@ -9928,6 +9955,47 @@ export default function DashboardPage() {
                           </button>
                         </div>
                       </div>
+                      <div className="informe-field">
+                        <label className="informe-label" htmlFor="equipo-draft-imagen">
+                          Registro fotográfico
+                        </label>
+                        <input
+                          id="equipo-draft-imagen"
+                          className="personal-input calidad-file-input equipo-imagen-input"
+                          type="file"
+                          accept="image/*"
+                          disabled={informeBloqueado || !selectedObraId}
+                          onChange={async (e) => {
+                            const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+                            try {
+                              setEquiposError(null);
+                              const url = await uploadEquipoImagen(file);
+                              if (url) setEquipoDraft((d) => ({ ...d, imagenUrl: url }));
+                            } catch (err) {
+                              setEquiposError(err instanceof Error ? err.message : 'Error al subir imagen.');
+                            } finally {
+                              e.target.value = '';
+                            }
+                          }}
+                        />
+                        {equipoDraft.imagenUrl ? (
+                          <div className="equipo-imagen-preview">
+                            <img
+                              src={equipoDraft.imagenUrl}
+                              alt="Registro fotográfico del equipo"
+                              className="calidad-mobile-thumb"
+                            />
+                            <button
+                              type="button"
+                              className="equipo-imagen-remove-btn"
+                              disabled={informeBloqueado}
+                              onClick={() => setEquipoDraft((d) => ({ ...d, imagenUrl: '' }))}
+                            >
+                              Quitar imagen
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
                       <div className="form-row-inline equipo-horarios-row">
                         <div className="informe-field equipo-horarios-field">
                           <label className="informe-label" htmlFor="equipo-draft-h-in">
@@ -10089,6 +10157,18 @@ export default function DashboardPage() {
                               </div>
                               <div>
                                 <strong>Observación:</strong> {r.observacion.trim() || '—'}
+                              </div>
+                              <div>
+                                <strong>Registro fotográfico:</strong>{' '}
+                                {r.imagenUrl ? (
+                                  <img
+                                    src={r.imagenUrl}
+                                    alt="Registro fotográfico del equipo"
+                                    className="calidad-table-thumb"
+                                  />
+                                ) : (
+                                  '—'
+                                )}
                               </div>
                               <div>
                                 <strong>Horarios:</strong>{' '}
