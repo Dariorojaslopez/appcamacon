@@ -9983,7 +9983,7 @@ export default function DashboardPage() {
                         </div>
                         <button
                           type="button"
-                          className="btn-secondary equipo-horarios-add-btn"
+                          className="btn-primary equipo-horarios-add-btn"
                           onClick={addEquipoHorarioDraft}
                         >
                           Agregar horario
@@ -10009,7 +10009,7 @@ export default function DashboardPage() {
                                   <td className="users-table-actions equipo-horarios-actions">
                                     <button
                                       type="button"
-                                      className="danger"
+                                      className="equipo-horarios-remove-btn"
                                       onClick={() => removeEquipoHorarioDraft(idx)}
                                     >
                                       <IconTrash /> Quitar
