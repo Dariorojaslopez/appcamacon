@@ -5353,8 +5353,8 @@ export default function DashboardPage() {
         selectedItem?.cantidad != null && Number.isFinite(Number(selectedItem.cantidad))
           ? Number(selectedItem.cantidad)
           : Number(actividadDraft.cantidadTotal ?? 0),
-      imagenUrl: selectedItem?.imagenUrl ? String(selectedItem.imagenUrl) : actividadDraft.imagenUrl ?? null,
-      ...fotoGeoPayload(selectedItem?.imagenUrl ? fotoGeoFromSource(selectedItem) : actividadDraft),
+      imagenUrl: actividadDraft.imagenUrl ?? null,
+      ...fotoGeoPayload(actividadDraft),
     };
     const cantidadCalculada = Number.isFinite(normalizedDraft.largo * normalizedDraft.ancho * normalizedDraft.altura)
       ? normalizedDraft.largo * normalizedDraft.ancho * normalizedDraft.altura
@@ -11101,94 +11101,146 @@ export default function DashboardPage() {
               <>
                 <div className="personal-form-panel">
                   <div className="calidad-mobile-grid" style={{ marginBottom: 0 }}>
-                    <input
-                      className="personal-input"
-                      type="text"
-                      placeholder="PK (Ej. K0)"
-                      value={actividadDraft.pk}
-                      onChange={(e) => updateActividadDraft({ pk: e.target.value })}
-                    />
-                    <input
-                      className="personal-input"
-                      type="text"
-                      placeholder="Abscisado (Ej. +000)"
-                      value={actividadDraft.abscisado}
-                      onChange={(e) => updateActividadDraft({ abscisado: e.target.value })}
-                    />
-                    <InformeSearchableSelect
-                      id="actividad-draft-item"
-                      value={actividadDraft.itemContractual}
-                      options={itemsCatalogOptions.map((it) => ({
-                        value: it.codigo,
-                        label: `${it.codigo} - ${it.descripcion}${it.unidad ? ` (${it.unidad})` : ''}${it.rubro ? ` — ${it.rubro}` : ''}`,
-                      }))}
-                      onChange={(codigo) => {
-                        if (!codigo) {
-                          updateActividadDraft({
-                            itemContractual: '',
-                            descripcion: '',
-                            unidadMedida: '',
-                            largo: 0,
-                            ancho: 0,
-                            altura: 0,
-                            imagenUrl: null,
-                          });
-                          return;
-                        }
-                        const selected = itemsCatalogOptions.find((it) => it.codigo === codigo);
-                        updateActividadDraft({
-                          itemContractual: codigo,
-                          descripcion: selected?.descripcion ?? actividadDraft.descripcion,
-                          unidadMedida: selected?.unidad ?? actividadDraft.unidadMedida,
-                          largo: selected?.largo != null ? Number(selected.largo) : 0,
-                          ancho: selected?.ancho != null ? Number(selected.ancho) : 0,
-                          altura: selected?.altura != null ? Number(selected.altura) : 0,
-                          cantidadTotal:
-                            selected?.cantidad != null && Number.isFinite(Number(selected.cantidad))
-                              ? Number(selected.cantidad)
-                              : Number(actividadDraft.cantidadTotal ?? 0),
-                          imagenUrl: selected?.imagenUrl ?? null,
-                        });
-                      }}
-                      disabled={!selectedObraId}
-                      emptyOptionLabel={selectedObraId ? 'Seleccione ítem...' : 'Seleccione una obra arriba'}
-                      searchPlaceholder="Buscar ítem por código o descripción…"
-                      className="actividad-item-select"
-                    />
-                    <input
-                      className="personal-input personal-input-readonly"
-                      type="text"
-                      placeholder="Descripción heredada del ítem"
-                      value={actividadDraft.descripcion}
-                      readOnly
-                    />
-                    <input
-                      className="personal-input"
-                      type="number"
-                      step="0.001"
-                      min="0"
-                      placeholder="Cantidad"
-                      value={Number.isFinite(Number(actividadDraft.cantidadTotal)) ? String(actividadDraft.cantidadTotal) : ''}
-                      onChange={(e) => updateActividadDraft({ cantidadTotal: Number(e.target.value || 0) })}
-                    />
-                    <div className="actividad-observacion-wrap">
-                      <textarea
-                        className="personal-input actividad-observacion-textarea"
-                        placeholder="Observación de la actividad"
-                        value={actividadDraft.observacion}
-                        onChange={(e) => updateActividadDraft({ observacion: e.target.value })}
-                        rows={3}
+                    <div className="informe-field">
+                      <label className="informe-label" htmlFor="actividad-draft-pk">
+                        PK *
+                      </label>
+                      <input
+                        id="actividad-draft-pk"
+                        className="personal-input"
+                        type="text"
+                        placeholder="Ej. K0"
+                        value={actividadDraft.pk}
+                        onChange={(e) => updateActividadDraft({ pk: e.target.value })}
                       />
-                      <button
-                        type="button"
-                        className="btn-voice-inline"
-                        onClick={() => startVoiceCapture('actividadDraftObservacion')}
-                        title="Dictar observación"
-                        aria-label="Dictar observación"
-                      >
-                        <IconMic />
-                      </button>
                     </div>
+                    <div className="informe-field">
+                      <label className="informe-label" htmlFor="actividad-draft-abscisado">
+                        Abscisado *
+                      </label>
+                      <input
+                        id="actividad-draft-abscisado"
+                        className="personal-input"
+                        type="text"
+                        placeholder="Ej. +000"
+                        value={actividadDraft.abscisado}
+                        onChange={(e) => updateActividadDraft({ abscisado: e.target.value })}
+                      />
+                    </div>
+                    <div className="informe-field">
+                      <label className="informe-label" htmlFor="actividad-draft-item">
+                        Ítem contractual *
+                      </label>
+                      <InformeSearchableSelect
+                        id="actividad-draft-item"
+                        value={actividadDraft.itemContractual}
+                        options={itemsCatalogOptions.map((it) => ({
+                          value: it.codigo,
+                          label: `${it.codigo} - ${it.descripcion}${it.unidad ? ` (${it.unidad})` : ''}${it.rubro ? ` — ${it.rubro}` : ''}`,
+                        }))}
+                        onChange={(codigo) => {
+                          if (!codigo) {
+                            updateActividadDraft({
+                              itemContractual: '',
+                              descripcion: '',
+                              unidadMedida: '',
+                              largo: 0,
+                              ancho: 0,
+                              altura: 0,
+                            });
+                            return;
+                          }
+                          const selected = itemsCatalogOptions.find((it) => it.codigo === codigo);
+                          updateActividadDraft({
+                            itemContractual: codigo,
+                            descripcion: selected?.descripcion ?? actividadDraft.descripcion,
+                            unidadMedida: selected?.unidad ?? actividadDraft.unidadMedida,
+                            largo: selected?.largo != null ? Number(selected.largo) : 0,
+                            ancho: selected?.ancho != null ? Number(selected.ancho) : 0,
+                            altura: selected?.altura != null ? Number(selected.altura) : 0,
+                            cantidadTotal:
+                              selected?.cantidad != null && Number.isFinite(Number(selected.cantidad))
+                                ? Number(selected.cantidad)
+                                : Number(actividadDraft.cantidadTotal ?? 0),
+                          });
+                        }}
+                        disabled={!selectedObraId}
+                        emptyOptionLabel={selectedObraId ? 'Seleccione ítem...' : 'Seleccione una obra arriba'}
+                        searchPlaceholder="Buscar ítem por código o descripción…"
+                        className="actividad-item-select"
+                      />
+                    </div>
+                    <div className="informe-field">
+                      <label className="informe-label" htmlFor="actividad-draft-descripcion">
+                        Descripción
+                      </label>
+                      <input
+                        id="actividad-draft-descripcion"
+                        className="personal-input personal-input-readonly"
+                        type="text"
+                        placeholder="Descripción heredada del ítem"
+                        value={actividadDraft.descripcion}
+                        readOnly
+                      />
+                    </div>
+                    <div className="informe-field">
+                      <label className="informe-label" htmlFor="actividad-draft-cantidad">
+                        Cantidad *
+                      </label>
+                      <input
+                        id="actividad-draft-cantidad"
+                        className="personal-input"
+                        type="number"
+                        step="0.001"
+                        min="0"
+                        placeholder="Cantidad"
+                        value={Number.isFinite(Number(actividadDraft.cantidadTotal)) ? String(actividadDraft.cantidadTotal) : ''}
+                        onChange={(e) => updateActividadDraft({ cantidadTotal: Number(e.target.value || 0) })}
+                      />
+                    </div>
+                    <div className="informe-field">
+                      <label className="informe-label" htmlFor="actividad-draft-observacion">
+                        Observación
+                      </label>
+                      <div className="actividad-observacion-wrap">
+                        <textarea
+                          id="actividad-draft-observacion"
+                          className="personal-input actividad-observacion-textarea"
+                          placeholder="Observación de la actividad"
+                          value={actividadDraft.observacion}
+                          onChange={(e) => updateActividadDraft({ observacion: e.target.value })}
+                          rows={3}
+                        />
+                        <button
+                          type="button"
+                          className="btn-voice-inline"
+                          onClick={() => startVoiceCapture('actividadDraftObservacion')}
+                          title="Dictar observación"
+                          aria-label="Dictar observación"
+                        >
+                          <IconMic />
+                        </button>
+                      </div>
+                    </div>
+                    <RegistroFotograficoInput
+                      idBase="actividad-draft-imagen"
+                      imageUrl={actividadDraft.imagenUrl}
+                      disabled={informeBloqueado || !selectedObraId}
+                      onFileSelected={async (file) => {
+                        setActividadError(null);
+                        try {
+                          return await uploadRegistroFotografico(file);
+                        } catch (err) {
+                          setActividadError(err instanceof Error ? err.message : 'Error al subir imagen.');
+                          return null;
+                        }
+                      }}
+                      onUploaded={(foto) =>
+                        updateActividadDraft({ imagenUrl: foto.url, ...fotoGeoPayload(foto) })
+                      }
+                      onClear={() => updateActividadDraft({ imagenUrl: null, ...clearFotoGeoPayload() })}
+                      onPreview={setRegistroFotoPreviewUrl}
+                    />
                   </div>
                   <div className="personal-form-actions">
                     <button type="button" className="btn-add-personal" onClick={commitActividadDraft}>
