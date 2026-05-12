@@ -4,6 +4,7 @@ import fs from 'fs/promises';
 import { verifyAccessToken } from '../../../../src/infrastructure/auth/tokens';
 import prisma from '../../../../src/lib/prisma';
 import {
+  googleDriveErrorMessage,
   resolveGoogleDriveFolderId,
   uploadEvidenciaToGoogleDrive,
 } from '../../../../src/lib/googleDriveUpload';
@@ -117,12 +118,23 @@ export async function POST(req: NextRequest) {
       }
 
       const contentType = mime || 'application/octet-stream';
-      const { webUrl, thumbnailUrl } = await uploadEvidenciaToGoogleDrive(
-        folderId,
-        fileName,
-        buffer,
-        contentType,
-      );
+      let uploaded: Awaited<ReturnType<typeof uploadEvidenciaToGoogleDrive>>;
+      try {
+        uploaded = await uploadEvidenciaToGoogleDrive(
+          folderId,
+          fileName,
+          buffer,
+          contentType,
+        );
+      } catch (error) {
+        const detail = googleDriveErrorMessage(error);
+        console.error('Google Drive upload failed:', detail);
+        return NextResponse.json(
+          { error: `No se pudo subir a Google Drive. ${detail}` },
+          { status: 502 },
+        );
+      }
+      const { webUrl, thumbnailUrl } = uploaded;
       return NextResponse.json(
         {
           url: webUrl,

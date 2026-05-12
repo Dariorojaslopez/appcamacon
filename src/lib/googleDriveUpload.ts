@@ -34,6 +34,24 @@ export function resolveGoogleDriveFolderId(
   return null;
 }
 
+export function googleDriveErrorMessage(error: unknown): string {
+  const message = String((error as { message?: unknown })?.message ?? '');
+  if (!message) return 'Error desconocido de Google Drive.';
+  if (message.includes('invalid_grant')) {
+    return 'Google Drive rechazó el refresh token. Regenera GOOGLE_DRIVE_REFRESH_TOKEN.';
+  }
+  if (message.includes('insufficient') || message.includes('insufficientPermissions')) {
+    return 'La cuenta autorizada de Google Drive no tiene permisos suficientes para subir archivos.';
+  }
+  if (message.includes('File not found') || message.includes('notFound')) {
+    return 'Google Drive no encontró la carpeta o la cuenta autorizada no tiene acceso a ella. Verifica el ID y comparte la carpeta con esa cuenta.';
+  }
+  if (message.includes('cannotDownloadFile') || message.includes('forbidden') || message.includes('"code": 403')) {
+    return 'Google Drive denegó el acceso a la carpeta. Comparte la carpeta con permiso de editor para la cuenta autorizada.';
+  }
+  return message.slice(0, 700);
+}
+
 /** Token OAuth para llamadas a la API de Drive (subida, lectura de archivos). */
 export async function getGoogleDriveAccessToken(): Promise<string> {
   const clientId = process.env.GOOGLE_DRIVE_CLIENT_ID?.trim();
@@ -99,7 +117,7 @@ export async function uploadEvidenciaToGoogleDrive(
   ]);
 
   const uploadRes = await fetch(
-    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink,thumbnailLink',
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,webViewLink,thumbnailLink',
     {
       method: 'POST',
       headers: {

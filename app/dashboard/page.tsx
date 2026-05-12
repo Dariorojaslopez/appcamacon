@@ -87,6 +87,18 @@ function voiceInsecureDevOriginMatch(): boolean {
   }
 }
 
+function browserPermissionPolicyAllows(feature: 'camera' | 'geolocation'): boolean {
+  if (typeof document === 'undefined') return true;
+  const doc = document as any;
+  const policy = doc.permissionsPolicy ?? doc.featurePolicy;
+  if (!policy?.allowsFeature) return true;
+  try {
+    return Boolean(policy.allowsFeature(feature));
+  } catch {
+    return true;
+  }
+}
+
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
@@ -5506,23 +5518,30 @@ export default function DashboardPage() {
     if (!window.isSecureContext && !voiceInsecureDevOriginMatch()) {
       return { ...base, imagenGeoEstado: 'insecure' };
     }
+    if (!browserPermissionPolicyAllows('geolocation')) {
+      return { ...base, imagenGeoEstado: 'blocked_by_policy' };
+    }
     return new Promise((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          resolve({
-            imagenLatitud: pos.coords.latitude,
-            imagenLongitud: pos.coords.longitude,
-            imagenPrecision: pos.coords.accuracy,
-            imagenGeoEstado: 'granted',
-            imagenTomadaEn: new Date(pos.timestamp || Date.now()).toISOString(),
-          });
-        },
-        (err) => {
-          const status = err.code === err.PERMISSION_DENIED ? 'denied' : 'unavailable';
-          resolve({ ...base, imagenGeoEstado: status });
-        },
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
-      );
+      try {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            resolve({
+              imagenLatitud: pos.coords.latitude,
+              imagenLongitud: pos.coords.longitude,
+              imagenPrecision: pos.coords.accuracy,
+              imagenGeoEstado: 'granted',
+              imagenTomadaEn: new Date(pos.timestamp || Date.now()).toISOString(),
+            });
+          },
+          (err) => {
+            const status = err.code === err.PERMISSION_DENIED ? 'denied' : 'unavailable';
+            resolve({ ...base, imagenGeoEstado: status });
+          },
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
+        );
+      } catch {
+        resolve({ ...base, imagenGeoEstado: 'blocked_by_policy' });
+      }
     });
   }, []);
 
@@ -5555,7 +5574,9 @@ export default function DashboardPage() {
     }
 
     let cancelled = false;
-    if (navigator.geolocation) {
+    if (!browserPermissionPolicyAllows('geolocation')) {
+      setMediaPermissionState((s) => ({ ...s, geolocation: 'blocked_by_policy' }));
+    } else if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         () => {
           if (!cancelled) setMediaPermissionState((s) => ({ ...s, geolocation: 'granted' }));
@@ -5574,7 +5595,9 @@ export default function DashboardPage() {
       setMediaPermissionState((s) => ({ ...s, geolocation: 'unavailable' }));
     }
 
-    if (navigator.mediaDevices?.getUserMedia) {
+    if (!browserPermissionPolicyAllows('camera')) {
+      setMediaPermissionState((s) => ({ ...s, camera: 'blocked_by_policy' }));
+    } else if (navigator.mediaDevices?.getUserMedia) {
       navigator.mediaDevices
         .getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
         .then((stream) => {
