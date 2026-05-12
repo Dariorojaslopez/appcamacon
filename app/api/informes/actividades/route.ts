@@ -55,6 +55,11 @@ export async function GET(req: NextRequest) {
         observacion: a.observacion,
         observacionTexto: (a as { observacionTexto?: string | null }).observacionTexto ?? '',
         imagenUrl: a.imagenUrl,
+        imagenLatitud: a.imagenLatitud,
+        imagenLongitud: a.imagenLongitud,
+        imagenPrecision: a.imagenPrecision,
+        imagenGeoEstado: a.imagenGeoEstado,
+        imagenTomadaEn: a.imagenTomadaEn ? a.imagenTomadaEn.toISOString() : null,
         largo: a.largo,
         ancho: a.ancho,
         altura: a.altura,
@@ -92,6 +97,11 @@ export async function POST(req: NextRequest) {
         observacion?: boolean;
         observacionTexto?: string;
         imagenUrl?: string | null;
+        imagenLatitud?: number | null;
+        imagenLongitud?: number | null;
+        imagenPrecision?: number | null;
+        imagenGeoEstado?: string | null;
+        imagenTomadaEn?: string | null;
         largo?: number;
         ancho?: number;
         altura?: number;
@@ -124,6 +134,14 @@ export async function POST(req: NextRequest) {
         const observacionTexto = String(a.observacionTexto ?? '').trim();
         const observacion = observacionTexto.length > 0 || Boolean(a.observacion);
         const imagenUrl = typeof a.imagenUrl === 'string' ? a.imagenUrl.trim() : null;
+        const imagenLatitud =
+          typeof a.imagenLatitud === 'number' && Number.isFinite(a.imagenLatitud) ? a.imagenLatitud : null;
+        const imagenLongitud =
+          typeof a.imagenLongitud === 'number' && Number.isFinite(a.imagenLongitud) ? a.imagenLongitud : null;
+        const imagenPrecision =
+          typeof a.imagenPrecision === 'number' && Number.isFinite(a.imagenPrecision) ? a.imagenPrecision : null;
+        const imagenGeoEstado = a.imagenGeoEstado ? String(a.imagenGeoEstado).trim() : null;
+        const imagenTomadaEn = a.imagenTomadaEn ? new Date(a.imagenTomadaEn) : null;
         const largo = typeof a.largo === 'number' ? a.largo : null;
         const ancho = typeof a.ancho === 'number' ? a.ancho : null;
         const altura = typeof a.altura === 'number' ? a.altura : null;
@@ -144,6 +162,11 @@ export async function POST(req: NextRequest) {
           observacion,
           observacionTexto,
           imagenUrl,
+          imagenLatitud,
+          imagenLongitud,
+          imagenPrecision,
+          imagenGeoEstado,
+          imagenTomadaEn,
           largo,
           ancho,
           altura,
@@ -202,6 +225,11 @@ export async function POST(req: NextRequest) {
             unidadMedida: a.unidadMedida,
             observacion: a.observacion,
             imagenUrl: a.imagenUrl,
+            imagenLatitud: a.imagenLatitud,
+            imagenLongitud: a.imagenLongitud,
+            imagenPrecision: a.imagenPrecision,
+            imagenGeoEstado: a.imagenGeoEstado,
+            imagenTomadaEn: a.imagenTomadaEn,
             largo: a.largo,
             ancho: a.ancho,
             altura: a.altura,
@@ -228,6 +256,11 @@ export async function POST(req: NextRequest) {
         observacion: a.observacion,
         observacionTexto: (a as { observacionTexto?: string | null }).observacionTexto ?? '',
         imagenUrl: a.imagenUrl,
+        imagenLatitud: a.imagenLatitud,
+        imagenLongitud: a.imagenLongitud,
+        imagenPrecision: a.imagenPrecision,
+        imagenGeoEstado: a.imagenGeoEstado,
+        imagenTomadaEn: a.imagenTomadaEn ? a.imagenTomadaEn.toISOString() : null,
         largo: a.largo,
         ancho: a.ancho,
         altura: a.altura,

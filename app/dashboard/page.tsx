@@ -282,6 +282,11 @@ type ItemCatalogNode = {
   ancho?: number | null;
   altura?: number | null;
   imagenUrl?: string | null;
+  imagenLatitud?: number | null;
+  imagenLongitud?: number | null;
+  imagenPrecision?: number | null;
+  imagenGeoEstado?: string | null;
+  imagenTomadaEn?: string | null;
   orden: number;
   isActive: boolean;
 };
@@ -379,6 +384,173 @@ function flattenBudgetSubchapters(
   return rows;
 }
 
+type FotoGeoFields = {
+  imagenLatitud?: number | null;
+  imagenLongitud?: number | null;
+  imagenPrecision?: number | null;
+  imagenGeoEstado?: string | null;
+  imagenTomadaEn?: string | null;
+};
+
+type UploadedRegistroFotografico = FotoGeoFields & {
+  url: string;
+};
+
+function emptyFotoGeoFields(): FotoGeoFields {
+  return {
+    imagenLatitud: null,
+    imagenLongitud: null,
+    imagenPrecision: null,
+    imagenGeoEstado: null,
+    imagenTomadaEn: null,
+  };
+}
+
+function fotoGeoFromSource(source: any): FotoGeoFields {
+  return {
+    imagenLatitud:
+      typeof source?.imagenLatitud === 'number' && Number.isFinite(source.imagenLatitud)
+        ? source.imagenLatitud
+        : null,
+    imagenLongitud:
+      typeof source?.imagenLongitud === 'number' && Number.isFinite(source.imagenLongitud)
+        ? source.imagenLongitud
+        : null,
+    imagenPrecision:
+      typeof source?.imagenPrecision === 'number' && Number.isFinite(source.imagenPrecision)
+        ? source.imagenPrecision
+        : null,
+    imagenGeoEstado: source?.imagenGeoEstado ? String(source.imagenGeoEstado) : null,
+    imagenTomadaEn: source?.imagenTomadaEn ? String(source.imagenTomadaEn) : null,
+  };
+}
+
+function fotoGeoPayload(source: FotoGeoFields) {
+  return {
+    imagenLatitud:
+      typeof source.imagenLatitud === 'number' && Number.isFinite(source.imagenLatitud)
+        ? source.imagenLatitud
+        : null,
+    imagenLongitud:
+      typeof source.imagenLongitud === 'number' && Number.isFinite(source.imagenLongitud)
+        ? source.imagenLongitud
+        : null,
+    imagenPrecision:
+      typeof source.imagenPrecision === 'number' && Number.isFinite(source.imagenPrecision)
+        ? source.imagenPrecision
+        : null,
+    imagenGeoEstado: source.imagenGeoEstado ?? null,
+    imagenTomadaEn: source.imagenTomadaEn ?? null,
+  };
+}
+
+function clearFotoGeoPayload() {
+  return {
+    imagenLatitud: null,
+    imagenLongitud: null,
+    imagenPrecision: null,
+    imagenGeoEstado: null,
+    imagenTomadaEn: null,
+  };
+}
+
+function RegistroFotograficoInput({
+  idBase,
+  label = 'Registro fotográfico',
+  imageUrl,
+  disabled,
+  onUploaded,
+  onClear,
+  onPreview,
+  onFileSelected,
+}: {
+  idBase: string;
+  label?: string;
+  imageUrl?: string | null;
+  disabled?: boolean;
+  onUploaded: (foto: UploadedRegistroFotografico) => void;
+  onClear: () => void;
+  onPreview: (url: string) => void;
+  onFileSelected: (file: File | null) => Promise<UploadedRegistroFotografico | null>;
+}) {
+  const selectRef = useRef<HTMLInputElement | null>(null);
+  const cameraRef = useRef<HTMLInputElement | null>(null);
+
+  const handleFile = async (file: File | null, input: HTMLInputElement | null) => {
+    try {
+      const uploaded = await onFileSelected(file);
+      if (uploaded) onUploaded(uploaded);
+    } finally {
+      if (input) input.value = '';
+    }
+  };
+
+  return (
+    <div className="registro-foto-field">
+      <label className="informe-label" htmlFor={`${idBase}-select`}>
+        {label}
+      </label>
+      <div className="registro-foto-actions">
+        <button
+          type="button"
+          className="registro-foto-btn registro-foto-btn-primary"
+          disabled={disabled}
+          onClick={() => selectRef.current?.click()}
+        >
+          Seleccionar archivo
+        </button>
+        <button
+          type="button"
+          className="registro-foto-btn"
+          disabled={disabled}
+          onClick={() => cameraRef.current?.click()}
+        >
+          Tomar registro fotográfico
+        </button>
+        {imageUrl ? (
+          <button
+            type="button"
+            className="registro-foto-btn"
+            disabled={disabled}
+            onClick={() => onPreview(imageUrl)}
+          >
+            Ver imagen
+          </button>
+        ) : null}
+      </div>
+      <input
+        ref={selectRef}
+        id={`${idBase}-select`}
+        className="sr-only"
+        type="file"
+        accept="image/*"
+        disabled={disabled}
+        onChange={(e) => void handleFile(e.target.files?.[0] ?? null, e.currentTarget)}
+      />
+      <input
+        ref={cameraRef}
+        id={`${idBase}-camera`}
+        className="sr-only"
+        type="file"
+        accept="image/*"
+        capture="environment"
+        disabled={disabled}
+        onChange={(e) => void handleFile(e.target.files?.[0] ?? null, e.currentTarget)}
+      />
+      {imageUrl ? (
+        <div className="equipo-imagen-preview">
+          <button type="button" className="registro-foto-preview-btn" onClick={() => onPreview(imageUrl)}>
+            <img src={imageUrl} alt={label} className="calidad-mobile-thumb" />
+          </button>
+          <button type="button" className="equipo-imagen-remove-btn" disabled={disabled} onClick={onClear}>
+            Quitar imagen
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 const emptyPersonalDraft = () => ({
   nombre: '',
   cargo: '',
@@ -394,6 +566,7 @@ const emptyEquipoDraft = () => ({
   estado: '',
   observacion: '',
   imagenUrl: '',
+  ...emptyFotoGeoFields(),
   horaIngreso: '',
   horaSalida: '',
   horasTrabajadas: 0,
@@ -436,6 +609,7 @@ const emptyIngresoDraft = () => ({
   cantidad: 0,
   observacion: '',
   imagenUrl: '',
+  ...emptyFotoGeoFields(),
 });
 
 const emptyEntregaDraft = () => ({
@@ -446,6 +620,7 @@ const emptyEntregaDraft = () => ({
   firmaRecibido: false,
   observacion: '',
   imagenUrl: '',
+  ...emptyFotoGeoFields(),
 });
 
 const emptyActividadDraft = () => ({
@@ -456,6 +631,7 @@ const emptyActividadDraft = () => ({
   unidadMedida: '',
   observacion: '',
   imagenUrl: null as string | null,
+  ...emptyFotoGeoFields(),
   largo: 0,
   ancho: 0,
   altura: 0,
@@ -471,6 +647,7 @@ const emptyEnsayoDraft = () => ({
   resultado: '',
   observacion: '',
   imagenUrl: '',
+  ...emptyFotoGeoFields(),
 });
 
 const emptyDanoDraft = () => ({
@@ -481,6 +658,7 @@ const emptyDanoDraft = () => ({
   noReporte: '',
   observacion: '',
   imagenUrl: '',
+  ...emptyFotoGeoFields(),
 });
 
 const emptyNoConformidadDraft = () => ({
@@ -488,6 +666,7 @@ const emptyNoConformidadDraft = () => ({
   detalle: '',
   estado: '',
   imagenUrl: '',
+  ...emptyFotoGeoFields(),
 });
 
 function equipoPropiedadLabel(v: string) {
@@ -576,6 +755,11 @@ type SuspensionRow = {
   tipoClima: string;
   horasClima: number;
   imagenUrl?: string | null;
+  imagenLatitud?: number | null;
+  imagenLongitud?: number | null;
+  imagenPrecision?: number | null;
+  imagenGeoEstado?: string | null;
+  imagenTomadaEn?: string | null;
 };
 
 type FirmaEvidenciaKey = (typeof FIRMAS_EVIDENCIAS_CONFIG)[number]['key'];
@@ -874,6 +1058,7 @@ export default function DashboardPage() {
   const [itemNewAncho, setItemNewAncho] = useState('');
   const [itemNewAltura, setItemNewAltura] = useState('');
   const [itemNewImagenUrl, setItemNewImagenUrl] = useState('');
+  const [itemNewFotoGeo, setItemNewFotoGeo] = useState<FotoGeoFields>(emptyFotoGeoFields);
   const [itemNewProveedorId, setItemNewProveedorId] = useState('');
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingItemForm, setEditingItemForm] = useState({
@@ -886,6 +1071,7 @@ export default function DashboardPage() {
     ancho: '',
     altura: '',
     imagenUrl: '',
+    ...emptyFotoGeoFields(),
     proveedorId: '',
     isActive: true,
     subchapterId: '',
@@ -1020,6 +1206,7 @@ export default function DashboardPage() {
     horaReinicio: '',
     tipoClima: '',
     imagenUrl: '',
+    ...emptyFotoGeoFields(),
   });
   const [editingSuspensionId, setEditingSuspensionId] = useState<string | null>(null);
   const [editSuspensionDraft, setEditSuspensionDraft] = useState({
@@ -1028,6 +1215,7 @@ export default function DashboardPage() {
     horaReinicio: '',
     tipoClima: '',
     imagenUrl: '',
+    ...emptyFotoGeoFields(),
   });
   const horasDraftCalculadas = useMemo(
     () => horasEntreTiemposHHmm(suspensionDraft.horaSuspension, suspensionDraft.horaReinicio),
@@ -1076,6 +1264,11 @@ export default function DashboardPage() {
       estado: string;
       observacion: string;
       imagenUrl: string;
+      imagenLatitud?: number | null;
+      imagenLongitud?: number | null;
+      imagenPrecision?: number | null;
+      imagenGeoEstado?: string | null;
+      imagenTomadaEn?: string | null;
       horaIngreso: string;
       horaSalida: string;
       horasTrabajadas: number;
@@ -1114,6 +1307,11 @@ export default function DashboardPage() {
       cantidad: number;
       observacion: string;
       imagenUrl: string;
+      imagenLatitud?: number | null;
+      imagenLongitud?: number | null;
+      imagenPrecision?: number | null;
+      imagenGeoEstado?: string | null;
+      imagenTomadaEn?: string | null;
     }>
   >([]);
   const [loadingIngreso, setLoadingIngreso] = useState(false);
@@ -1131,6 +1329,11 @@ export default function DashboardPage() {
       firmaRecibido: boolean;
       observacion: string;
       imagenUrl: string;
+      imagenLatitud?: number | null;
+      imagenLongitud?: number | null;
+      imagenPrecision?: number | null;
+      imagenGeoEstado?: string | null;
+      imagenTomadaEn?: string | null;
     }>
   >([]);
   const [loadingEntrega, setLoadingEntrega] = useState(false);
@@ -1148,6 +1351,11 @@ export default function DashboardPage() {
       unidadMedida: string;
       observacion: string;
       imagenUrl?: string | null;
+      imagenLatitud?: number | null;
+      imagenLongitud?: number | null;
+      imagenPrecision?: number | null;
+      imagenGeoEstado?: string | null;
+      imagenTomadaEn?: string | null;
       largo: number;
       ancho: number;
       altura: number;
@@ -1174,6 +1382,11 @@ export default function DashboardPage() {
       resultado: string;
       observacion: string;
       imagenUrl?: string | null;
+      imagenLatitud?: number | null;
+      imagenLongitud?: number | null;
+      imagenPrecision?: number | null;
+      imagenGeoEstado?: string | null;
+      imagenTomadaEn?: string | null;
     }>
   >([]);
   const [loadingEnsayos, setLoadingEnsayos] = useState(false);
@@ -1192,6 +1405,11 @@ export default function DashboardPage() {
       noReporte: string;
       observacion: string;
       imagenUrl?: string | null;
+      imagenLatitud?: number | null;
+      imagenLongitud?: number | null;
+      imagenPrecision?: number | null;
+      imagenGeoEstado?: string | null;
+      imagenTomadaEn?: string | null;
     }>
   >([]);
   const [loadingDanos, setLoadingDanos] = useState(false);
@@ -1207,6 +1425,11 @@ export default function DashboardPage() {
       detalle: string;
       estado: string;
       imagenUrl?: string | null;
+      imagenLatitud?: number | null;
+      imagenLongitud?: number | null;
+      imagenPrecision?: number | null;
+      imagenGeoEstado?: string | null;
+      imagenTomadaEn?: string | null;
     }>
   >([]);
   const [loadingNoConformidades, setLoadingNoConformidades] = useState(false);
@@ -1238,6 +1461,11 @@ export default function DashboardPage() {
   const [tabulacionExportError, setTabulacionExportError] = useState<string | null>(null);
   const [tabulacionExporting, setTabulacionExporting] = useState(false);
   const [uploadingEvidencia, setUploadingEvidencia] = useState(false);
+  const [registroFotoPreviewUrl, setRegistroFotoPreviewUrl] = useState<string | null>(null);
+  const [mediaPermissionState, setMediaPermissionState] = useState<{
+    camera: string;
+    geolocation: string;
+  }>({ camera: 'pending', geolocation: 'pending' });
   const [firmaToken, setFirmaToken] = useState<string | null>(null);
   const [firmaTokenCopiado, setFirmaTokenCopiado] = useState(false);
   const [informeCerrado, setInformeCerrado] = useState(false);
@@ -2012,6 +2240,7 @@ export default function DashboardPage() {
                 resultado: '',
                 observacion: '',
                 imagenUrl: '',
+                ...emptyFotoGeoFields(),
               },
             ]);
             return;
@@ -2027,6 +2256,7 @@ export default function DashboardPage() {
               resultado: e.resultado ?? '',
               observacion: e.observacion ?? '',
               imagenUrl: e.imagenUrl ?? '',
+              ...fotoGeoFromSource(e),
             })),
           );
         })
@@ -2053,6 +2283,7 @@ export default function DashboardPage() {
                 noReporte: '',
                 observacion: '',
                 imagenUrl: '',
+                ...emptyFotoGeoFields(),
               },
             ]);
             return;
@@ -2067,6 +2298,7 @@ export default function DashboardPage() {
               noReporte: d.noReporte ?? '',
               observacion: d.observacion ?? '',
               imagenUrl: d.imagenUrl ?? '',
+              ...fotoGeoFromSource(d),
             })),
           );
         })
@@ -2090,6 +2322,7 @@ export default function DashboardPage() {
                 detalle: '',
                 estado: '',
                 imagenUrl: '',
+                ...emptyFotoGeoFields(),
               },
             ]);
             return;
@@ -2101,6 +2334,7 @@ export default function DashboardPage() {
               detalle: n.detalle ?? '',
               estado: n.estado ?? '',
               imagenUrl: n.imagenUrl ?? '',
+              ...fotoGeoFromSource(n),
             })),
           );
         })
@@ -2216,6 +2450,7 @@ export default function DashboardPage() {
                 estado: e.estado ?? '',
                 observacion: e.observacion ?? '',
                 imagenUrl: e.imagenUrl ?? '',
+                ...fotoGeoFromSource(e),
                 horaIngreso: fallbackHorarios[0]?.horaIngreso ?? '',
                 horaSalida: fallbackHorarios[fallbackHorarios.length - 1]?.horaSalida ?? '',
                 horasTrabajadas: sumEquipoHorarios(fallbackHorarios),
@@ -2261,6 +2496,7 @@ export default function DashboardPage() {
               cantidad: Number(m.cantidad ?? 0),
               observacion: m.observacion ?? '',
               imagenUrl: m.imagenUrl ?? '',
+              ...fotoGeoFromSource(m),
             })),
           );
           setIngresoDraft(emptyIngresoDraft());
@@ -2292,6 +2528,7 @@ export default function DashboardPage() {
               firmaRecibido: Boolean(m.firmaRecibido),
               observacion: m.observacion ?? '',
               imagenUrl: m.imagenUrl ?? '',
+              ...fotoGeoFromSource(m),
             })),
           );
           setEntregaDraft(emptyEntregaDraft());
@@ -2323,6 +2560,7 @@ export default function DashboardPage() {
               unidadMedida: a.unidadMedida ?? '',
               observacion: String(a.observacionTexto ?? ''),
               imagenUrl: a.imagenUrl ?? null,
+              ...fotoGeoFromSource(a),
               largo: Number(a.largo ?? 0),
               ancho: Number(a.ancho ?? 0),
               altura: Number(a.altura ?? 0),
@@ -3460,6 +3698,7 @@ export default function DashboardPage() {
           ancho: icPayload.ancho,
           altura: icPayload.altura,
           imagenUrl: itemNewImagenUrl.trim() || null,
+          ...fotoGeoPayload(itemNewFotoGeo),
           proveedorId: itemNewProveedorId,
         }),
       });
@@ -3478,6 +3717,7 @@ export default function DashboardPage() {
       setItemNewAncho('');
       setItemNewAltura('');
       setItemNewImagenUrl('');
+      setItemNewFotoGeo(emptyFotoGeoFields());
       setItemNewProveedorId(itemProveedorOptions[0]?.id ?? '');
     } catch {
       setItemsError('Error de conexión.');
@@ -3537,6 +3777,7 @@ export default function DashboardPage() {
           ancho: icEdit.ancho,
           altura: icEdit.altura,
           imagenUrl: editingItemForm.imagenUrl.trim() || null,
+          ...fotoGeoPayload(editingItemForm),
           proveedorId: editingItemForm.proveedorId.trim(),
           isActive: editingItemForm.isActive,
         }),
@@ -3558,6 +3799,7 @@ export default function DashboardPage() {
         ancho: '',
         altura: '',
         imagenUrl: '',
+        ...emptyFotoGeoFields(),
         proveedorId: '',
         isActive: true,
         subchapterId: '',
@@ -3593,6 +3835,7 @@ export default function DashboardPage() {
           ancho: '',
           altura: '',
           imagenUrl: '',
+          ...emptyFotoGeoFields(),
           proveedorId: '',
           isActive: true,
           subchapterId: '',
@@ -4278,6 +4521,7 @@ export default function DashboardPage() {
           tipoClima: tc,
           horasClima: horas,
           imagenUrl: suspensionDraft.imagenUrl.trim() || null,
+          ...fotoGeoPayload(suspensionDraft),
         }),
       });
       const data = (await res.json()) as { error?: string; item?: SuspensionRow };
@@ -4288,7 +4532,7 @@ export default function DashboardPage() {
       if (data.item) {
         setSuspensionesRows((prev) => [...prev, data.item!]);
       }
-      setSuspensionDraft({ motivoSuspension: '', horaSuspension: '', horaReinicio: '', tipoClima: '', imagenUrl: '' });
+      setSuspensionDraft({ motivoSuspension: '', horaSuspension: '', horaReinicio: '', tipoClima: '', imagenUrl: '', ...emptyFotoGeoFields() });
       setJornadaMessage('Suspensión registrada.');
       setTimeout(() => setJornadaMessage(null), 3000);
     } catch {
@@ -4306,6 +4550,7 @@ export default function DashboardPage() {
       horaReinicio: row.horaReinicio,
       tipoClima: row.tipoClima,
       imagenUrl: row.imagenUrl ?? '',
+      ...fotoGeoFromSource(row),
     });
     setJornadaError(null);
   };
@@ -4318,6 +4563,7 @@ export default function DashboardPage() {
       horaReinicio: '',
       tipoClima: '',
       imagenUrl: '',
+      ...emptyFotoGeoFields(),
     });
   };
 
@@ -4351,6 +4597,7 @@ export default function DashboardPage() {
           tipoClima: tc,
           horasClima: horas,
           imagenUrl: editSuspensionDraft.imagenUrl.trim() || null,
+          ...fotoGeoPayload(editSuspensionDraft),
         }),
       });
       const data = (await res.json()) as { error?: string; item?: SuspensionRow };
@@ -4565,6 +4812,7 @@ export default function DashboardPage() {
       estado: r.estado,
       observacion: r.observacion,
       imagenUrl: r.imagenUrl,
+      ...fotoGeoFromSource(r),
       horaIngreso: '',
       horaSalida: '',
       horasTrabajadas: 0,
@@ -4612,6 +4860,7 @@ export default function DashboardPage() {
                 estado: equipoDraft.estado,
                 observacion: equipoDraft.observacion.trim(),
                 imagenUrl: equipoDraft.imagenUrl.trim(),
+                ...fotoGeoPayload(equipoDraft),
                 horaIngreso: nextHorarios[0]?.horaIngreso ?? '',
                 horaSalida: nextHorarios[nextHorarios.length - 1]?.horaSalida ?? '',
                 horasTrabajadas: sumEquipoHorarios(nextHorarios),
@@ -4631,6 +4880,7 @@ export default function DashboardPage() {
           estado: equipoDraft.estado,
           observacion: equipoDraft.observacion.trim(),
           imagenUrl: equipoDraft.imagenUrl.trim(),
+          ...fotoGeoPayload(equipoDraft),
           horaIngreso: nextHorarios[0]?.horaIngreso ?? '',
           horaSalida: nextHorarios[nextHorarios.length - 1]?.horaSalida ?? '',
           horasTrabajadas: sumEquipoHorarios(nextHorarios),
@@ -4679,6 +4929,7 @@ export default function DashboardPage() {
             estado: e.estado,
             observacion: e.observacion,
             imagenUrl: e.imagenUrl,
+            ...fotoGeoPayload(e),
             horaIngreso: e.horaIngreso,
             horaSalida: e.horaSalida,
             horasTrabajadas: Number(e.horasTrabajadas),
@@ -4725,6 +4976,7 @@ export default function DashboardPage() {
             estado: e.estado ?? '',
             observacion: e.observacion ?? '',
             imagenUrl: e.imagenUrl ?? '',
+            ...fotoGeoFromSource(e),
             horaIngreso: fallbackHorarios[0]?.horaIngreso ?? '',
             horaSalida: fallbackHorarios[fallbackHorarios.length - 1]?.horaSalida ?? '',
             horasTrabajadas: sumEquipoHorarios(fallbackHorarios),
@@ -4760,6 +5012,7 @@ export default function DashboardPage() {
       cantidad: r.cantidad,
       observacion: r.observacion,
       imagenUrl: r.imagenUrl,
+      ...fotoGeoFromSource(r),
     });
     setIngresoEditingIndex(idx);
     setIngresoError(null);
@@ -4785,6 +5038,7 @@ export default function DashboardPage() {
                 cantidad: Number(ingresoDraft.cantidad) || 0,
                 observacion: ingresoDraft.observacion.trim(),
                 imagenUrl: ingresoDraft.imagenUrl.trim(),
+                ...fotoGeoPayload(ingresoDraft),
               }
             : row,
         ),
@@ -4801,6 +5055,7 @@ export default function DashboardPage() {
           cantidad: Number(ingresoDraft.cantidad) || 0,
           observacion: ingresoDraft.observacion.trim(),
           imagenUrl: ingresoDraft.imagenUrl.trim(),
+          ...fotoGeoPayload(ingresoDraft),
         },
       ]);
     }
@@ -4846,6 +5101,7 @@ export default function DashboardPage() {
             cantidad: Number(m.cantidad),
             observacion: m.observacion,
             imagenUrl: m.imagenUrl,
+            ...fotoGeoPayload(m),
           })),
         }),
       });
@@ -4865,6 +5121,7 @@ export default function DashboardPage() {
           cantidad: Number(m.cantidad ?? 0),
           observacion: m.observacion ?? '',
           imagenUrl: m.imagenUrl ?? '',
+          ...fotoGeoFromSource(m),
         })),
       );
       setIngresoMessage('Ingreso de material guardado.');
@@ -4895,6 +5152,7 @@ export default function DashboardPage() {
       firmaRecibido: r.firmaRecibido,
       observacion: r.observacion,
       imagenUrl: r.imagenUrl,
+      ...fotoGeoFromSource(r),
     });
     setEntregaEditingIndex(idx);
     setEntregaError(null);
@@ -4920,6 +5178,7 @@ export default function DashboardPage() {
                 firmaRecibido: entregaDraft.firmaRecibido,
                 observacion: entregaDraft.observacion.trim(),
                 imagenUrl: entregaDraft.imagenUrl.trim(),
+                ...fotoGeoPayload(entregaDraft),
               }
             : row,
         ),
@@ -4936,6 +5195,7 @@ export default function DashboardPage() {
           firmaRecibido: entregaDraft.firmaRecibido,
           observacion: entregaDraft.observacion.trim(),
           imagenUrl: entregaDraft.imagenUrl.trim(),
+          ...fotoGeoPayload(entregaDraft),
         },
       ]);
     }
@@ -4981,6 +5241,7 @@ export default function DashboardPage() {
             firmaRecibido: m.firmaRecibido,
             observacion: m.observacion,
             imagenUrl: m.imagenUrl,
+            ...fotoGeoPayload(m),
           })),
         }),
       });
@@ -5000,6 +5261,7 @@ export default function DashboardPage() {
           firmaRecibido: Boolean(m.firmaRecibido),
           observacion: m.observacion ?? '',
           imagenUrl: m.imagenUrl ?? '',
+          ...fotoGeoFromSource(m),
         })),
       );
       setEntregaMessage('Material entregado guardado.');
@@ -5047,6 +5309,7 @@ export default function DashboardPage() {
       unidadMedida: r.unidadMedida,
       observacion: r.observacion,
       imagenUrl: r.imagenUrl ?? null,
+      ...fotoGeoFromSource(r),
       largo: Number(r.largo ?? 0),
       ancho: Number(r.ancho ?? 0),
       altura: Number(r.altura ?? 0),
@@ -5079,6 +5342,7 @@ export default function DashboardPage() {
           ? Number(selectedItem.cantidad)
           : Number(actividadDraft.cantidadTotal ?? 0),
       imagenUrl: selectedItem?.imagenUrl ? String(selectedItem.imagenUrl) : actividadDraft.imagenUrl ?? null,
+      ...fotoGeoPayload(selectedItem?.imagenUrl ? fotoGeoFromSource(selectedItem) : actividadDraft),
     };
     const cantidadCalculada = Number.isFinite(normalizedDraft.largo * normalizedDraft.ancho * normalizedDraft.altura)
       ? normalizedDraft.largo * normalizedDraft.ancho * normalizedDraft.altura
@@ -5191,6 +5455,7 @@ export default function DashboardPage() {
             observacion: Boolean(a.observacion.trim()),
             observacionTexto: a.observacion,
             imagenUrl: a.imagenUrl ?? null,
+            ...fotoGeoPayload(a),
             largo: Number(a.largo),
             ancho: Number(a.ancho),
             altura: Number(a.altura),
@@ -5214,6 +5479,7 @@ export default function DashboardPage() {
           unidadMedida: a.unidadMedida ?? '',
           observacion: String(a.observacionTexto ?? ''),
           imagenUrl: a.imagenUrl ?? null,
+          ...fotoGeoFromSource(a),
           largo: Number(a.largo ?? 0),
           ancho: Number(a.ancho ?? 0),
           altura: Number(a.altura ?? 0),
@@ -5229,25 +5495,41 @@ export default function DashboardPage() {
     }
   };
 
-  const uploadCalidadImagen = async (file: File | null): Promise<string | null> => {
-    if (!file) return null;
-    const formData = new FormData();
-    formData.append('file', file);
-    const res = await fetch('/api/uploads/actividad-imagen', {
-      method: 'POST',
-      body: formData,
-      credentials: 'include',
-    });
-    const data = await res.json();
-    if (!res.ok || !data?.url) {
-      throw new Error(data?.error ?? 'Error al subir imagen.');
+  const captureRegistroFotoGeo = useCallback(async (): Promise<FotoGeoFields> => {
+    const base: FotoGeoFields = {
+      ...emptyFotoGeoFields(),
+      imagenTomadaEn: new Date().toISOString(),
+    };
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      return { ...base, imagenGeoEstado: 'unavailable' };
     }
-    return String(data.url);
-  };
+    if (!window.isSecureContext && !voiceInsecureDevOriginMatch()) {
+      return { ...base, imagenGeoEstado: 'insecure' };
+    }
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          resolve({
+            imagenLatitud: pos.coords.latitude,
+            imagenLongitud: pos.coords.longitude,
+            imagenPrecision: pos.coords.accuracy,
+            imagenGeoEstado: 'granted',
+            imagenTomadaEn: new Date(pos.timestamp || Date.now()).toISOString(),
+          });
+        },
+        (err) => {
+          const status = err.code === err.PERMISSION_DENIED ? 'denied' : 'unavailable';
+          resolve({ ...base, imagenGeoEstado: status });
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
+      );
+    });
+  }, []);
 
-  const uploadSuspensionImagen = async (file: File | null): Promise<string | null> => {
+  const uploadRegistroFotografico = async (file: File | null): Promise<UploadedRegistroFotografico | null> => {
     if (!file) return null;
     if (!selectedObraId) throw new Error('Seleccione una obra antes de subir la imagen.');
+    const geoPromise = captureRegistroFotoGeo();
     const formData = new FormData();
     formData.append('file', file);
     formData.append('projectId', selectedObraId);
@@ -5261,27 +5543,60 @@ export default function DashboardPage() {
     if (!res.ok || !url) {
       throw new Error(data?.error ?? 'Error al subir imagen.');
     }
-    return String(url);
+    const geo = await geoPromise;
+    return { url: String(url), ...geo };
   };
 
-  const uploadEquipoImagen = async (file: File | null): Promise<string | null> => {
-    if (!file) return null;
-    if (!selectedObraId) throw new Error('Seleccione una obra antes de subir la imagen.');
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('projectId', selectedObraId);
-    const res = await fetch('/api/uploads/evidencia-foto', {
-      method: 'POST',
-      body: formData,
-      credentials: 'include',
-    });
-    const data = await res.json();
-    const url = data?.previewUrl || data?.url;
-    if (!res.ok || !url) {
-      throw new Error(data?.error ?? 'Error al subir imagen.');
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!window.isSecureContext && !voiceInsecureDevOriginMatch()) {
+      setMediaPermissionState({ camera: 'insecure', geolocation: 'insecure' });
+      return;
     }
-    return String(url);
-  };
+
+    let cancelled = false;
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        () => {
+          if (!cancelled) setMediaPermissionState((s) => ({ ...s, geolocation: 'granted' }));
+        },
+        (err) => {
+          if (!cancelled) {
+            setMediaPermissionState((s) => ({
+              ...s,
+              geolocation: err.code === err.PERMISSION_DENIED ? 'denied' : 'unavailable',
+            }));
+          }
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+      );
+    } else {
+      setMediaPermissionState((s) => ({ ...s, geolocation: 'unavailable' }));
+    }
+
+    if (navigator.mediaDevices?.getUserMedia) {
+      navigator.mediaDevices
+        .getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
+        .then((stream) => {
+          stream.getTracks().forEach((track) => track.stop());
+          if (!cancelled) setMediaPermissionState((s) => ({ ...s, camera: 'granted' }));
+        })
+        .catch((err: any) => {
+          if (!cancelled) {
+            setMediaPermissionState((s) => ({
+              ...s,
+              camera: String(err?.name ?? '') === 'NotAllowedError' ? 'denied' : 'unavailable',
+            }));
+          }
+        });
+    } else {
+      setMediaPermissionState((s) => ({ ...s, camera: 'unavailable' }));
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const addEnsayoRow = () => {
     setEnsayosRows((prev) => [
@@ -5295,6 +5610,7 @@ export default function DashboardPage() {
         resultado: '',
         observacion: '',
         imagenUrl: '',
+        ...emptyFotoGeoFields(),
       },
     ]);
   };
@@ -5379,6 +5695,7 @@ export default function DashboardPage() {
             resultado: e.resultado,
             observacion: e.observacion || null,
             imagenUrl: e.imagenUrl || null,
+          ...fotoGeoPayload(e),
           })),
         }),
       });
@@ -5401,6 +5718,7 @@ export default function DashboardPage() {
           resultado: e.resultado ?? '',
           observacion: e.observacion ?? '',
           imagenUrl: e.imagenUrl ?? '',
+          ...fotoGeoFromSource(e),
         })),
       );
       setEnsayosMessage('Ensayos guardados.');
@@ -5423,6 +5741,7 @@ export default function DashboardPage() {
         noReporte: '',
         observacion: '',
         imagenUrl: '',
+        ...emptyFotoGeoFields(),
       },
     ]);
   };
@@ -5502,6 +5821,7 @@ export default function DashboardPage() {
             noReporte: d.noReporte,
             observacion: d.observacion || null,
             imagenUrl: d.imagenUrl || null,
+            ...fotoGeoPayload(d),
           })),
         }),
       });
@@ -5523,6 +5843,7 @@ export default function DashboardPage() {
           noReporte: d.noReporte ?? '',
           observacion: d.observacion ?? '',
           imagenUrl: d.imagenUrl ?? '',
+          ...fotoGeoFromSource(d),
         })),
       );
       setDanosMessage('Daños guardados.');
@@ -5542,6 +5863,7 @@ export default function DashboardPage() {
         detalle: '',
         estado: '',
         imagenUrl: '',
+        ...emptyFotoGeoFields(),
       },
     ]);
   };
@@ -5613,6 +5935,7 @@ export default function DashboardPage() {
             detalle: n.detalle,
             estado: n.estado,
             imagenUrl: n.imagenUrl || null,
+            ...fotoGeoPayload(n),
           })),
         }),
       });
@@ -5630,6 +5953,7 @@ export default function DashboardPage() {
           detalle: n.detalle ?? '',
           estado: n.estado ?? '',
           imagenUrl: n.imagenUrl ?? '',
+          ...fotoGeoFromSource(n),
         })),
       );
       setNoConformidadesMessage('No conformidades guardadas.');
@@ -5734,30 +6058,11 @@ export default function DashboardPage() {
     try {
       const appended: EvidenciaItem[] = [];
       for (const f of valid) {
-        const formData = new FormData();
-        formData.append('file', f);
-        if (selectedObraId) formData.append('projectId', selectedObraId);
-        const res = await fetch('/api/uploads/evidencia-foto', {
-          method: 'POST',
-          credentials: 'include',
-          body: formData,
-        });
-        const data = (await res.json()) as {
-          url?: string;
-          previewUrl?: string;
-          error?: string;
-        };
-        if (!res.ok || !data?.url) {
-          setEvidenciasError(data?.error ?? 'Error al subir imagen.');
+        const uploaded = await uploadRegistroFotografico(f);
+        if (!uploaded) {
           continue;
         }
-        const url = String(data.url);
-        const previewUrl =
-          typeof data.previewUrl === 'string' && data.previewUrl.trim()
-            ? data.previewUrl.trim()
-            : undefined;
-        const item: EvidenciaItem = previewUrl ? { url, previewUrl } : url;
-        appended.push(item);
+        appended.push({ url: uploaded.url, ...fotoGeoPayload(uploaded) });
       }
 
       if (appended.length > 0) {
@@ -8142,30 +8447,30 @@ export default function DashboardPage() {
                       />
                     </div>
                   </div>
-                  <div className="form-field">
-                    <label className="form-label">Imagen (archivo)</label>
-                    <input
-                      className="form-input calidad-file-input"
-                      type="file"
-                      accept="image/*"
-                      onChange={async (e) => {
-                        const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
-                        try {
-                          setItemsError(null);
-                          const url = await uploadCalidadImagen(file);
-                          if (url) setItemNewImagenUrl(url);
-                        } catch (err) {
-                          setItemsError(err instanceof Error ? err.message : 'Error al subir imagen.');
-                        } finally {
-                          e.target.value = '';
-                        }
-                      }}
-                    />
-                    <p className="shell-text-muted" style={{ marginTop: '0.35rem' }}>
-                      La URL se genera automáticamente al subir la imagen.
-                    </p>
-                    {itemNewImagenUrl ? <img src={itemNewImagenUrl} alt="Imagen ítem" className="calidad-mobile-thumb" /> : null}
-                  </div>
+                  <RegistroFotograficoInput
+                    idBase="item-new-imagen"
+                    label="Imagen (archivo)"
+                    imageUrl={itemNewImagenUrl}
+                    disabled={!itemsFilterProjectId}
+                    onFileSelected={async (file) => {
+                      setItemsError(null);
+                      try {
+                        return await uploadRegistroFotografico(file);
+                      } catch (err) {
+                        setItemsError(err instanceof Error ? err.message : 'Error al subir imagen.');
+                        return null;
+                      }
+                    }}
+                    onUploaded={(foto) => {
+                      setItemNewImagenUrl(foto.url);
+                      setItemNewFotoGeo(fotoGeoPayload(foto));
+                    }}
+                    onClear={() => {
+                      setItemNewImagenUrl('');
+                      setItemNewFotoGeo(emptyFotoGeoFields());
+                    }}
+                    onPreview={setRegistroFotoPreviewUrl}
+                  />
                   <div className="form-field">
                     <label className="form-label">Descripción</label>
                     <input className="form-input" type="text" required value={itemNewDescripcion} onChange={(e) => setItemNewDescripcion(e.target.value)} />
@@ -8361,33 +8666,34 @@ export default function DashboardPage() {
                             </td>
                             <td>
                               {editingItemId === it.id ? (
-                                <div style={{ display: 'grid', gap: '0.4rem' }}>
-                                  <input
-                                    className="form-input calidad-file-input"
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={async (e) => {
-                                      const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
-                                      try {
-                                        setItemsError(null);
-                                        const url = await uploadCalidadImagen(file);
-                                        if (url) setEditingItemForm((p) => ({ ...p, imagenUrl: url }));
-                                      } catch (err) {
-                                        setItemsError(err instanceof Error ? err.message : 'Error al subir imagen.');
-                                      } finally {
-                                        e.target.value = '';
-                                      }
-                                    }}
-                                  />
-                                  <p className="shell-text-muted" style={{ margin: 0 }}>
-                                    URL automática
-                                  </p>
-                                  {editingItemForm.imagenUrl ? (
-                                    <img src={editingItemForm.imagenUrl} alt="Imagen ítem edición" className="calidad-table-thumb" />
-                                  ) : null}
-                                </div>
+                                <RegistroFotograficoInput
+                                  idBase={`item-edit-imagen-${it.id}`}
+                                  label="Imagen"
+                                  imageUrl={editingItemForm.imagenUrl}
+                                  disabled={!itemsFilterProjectId}
+                                  onFileSelected={async (file) => {
+                                    setItemsError(null);
+                                    try {
+                                      return await uploadRegistroFotografico(file);
+                                    } catch (err) {
+                                      setItemsError(err instanceof Error ? err.message : 'Error al subir imagen.');
+                                      return null;
+                                    }
+                                  }}
+                                  onUploaded={(foto) =>
+                                    setEditingItemForm((p) => ({ ...p, imagenUrl: foto.url, ...fotoGeoPayload(foto) }))
+                                  }
+                                  onClear={() =>
+                                    setEditingItemForm((p) => ({ ...p, imagenUrl: '', ...clearFotoGeoPayload() }))
+                                  }
+                                  onPreview={setRegistroFotoPreviewUrl}
+                                />
                               ) : (
-                                it.imagenUrl ? <img src={it.imagenUrl} alt="Imagen ítem" className="calidad-table-thumb" /> : '—'
+                                it.imagenUrl ? (
+                                  <button type="button" className="registro-foto-preview-btn" onClick={() => setRegistroFotoPreviewUrl(it.imagenUrl ?? '')}>
+                                    <img src={it.imagenUrl} alt="Imagen ítem" className="calidad-table-thumb" />
+                                  </button>
+                                ) : '—'
                               )}
                             </td>
                             <td>
@@ -8479,6 +8785,7 @@ export default function DashboardPage() {
                                         ancho: it.ancho != null ? String(it.ancho) : '',
                                         altura: it.altura != null ? String(it.altura) : '',
                                         imagenUrl: it.imagenUrl ?? '',
+                                        ...fotoGeoFromSource(it),
                                         proveedorId: it.proveedorId ?? '',
                                         isActive: it.isActive,
                                         subchapterId: it.subchapterId,
@@ -9355,45 +9662,26 @@ export default function DashboardPage() {
                         />
                       </div>
                     </div>
-                    <div className="informe-field">
-                      <label className="informe-label" htmlFor="edit-suspension-imagen">IMAGEN (OPCIONAL)</label>
-                      <input
-                        id="edit-suspension-imagen"
-                        className="form-input calidad-file-input"
-                        type="file"
-                        accept="image/*"
-                        disabled={informeBloqueado || savingSuspension || !selectedObraId}
-                        onChange={async (e) => {
-                          const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
-                          try {
-                            setJornadaError(null);
-                            const url = await uploadSuspensionImagen(file);
-                            if (url) setEditSuspensionDraft((p) => ({ ...p, imagenUrl: url }));
-                          } catch (err) {
-                            setJornadaError(err instanceof Error ? err.message : 'Error al subir imagen.');
-                          } finally {
-                            e.target.value = '';
-                          }
-                        }}
-                      />
-                      {editSuspensionDraft.imagenUrl ? (
-                        <div style={{ display: 'grid', gap: '0.5rem', marginTop: '0.5rem' }}>
-                          <img
-                            src={editSuspensionDraft.imagenUrl}
-                            alt="Imagen de suspensión"
-                            className="calidad-mobile-thumb"
-                          />
-                          <button
-                            type="button"
-                            className="btn-secondary"
-                            disabled={informeBloqueado || savingSuspension}
-                            onClick={() => setEditSuspensionDraft((p) => ({ ...p, imagenUrl: '' }))}
-                          >
-                            Quitar imagen
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
+                    <RegistroFotograficoInput
+                      idBase="edit-suspension-imagen"
+                      label="Imagen (opcional)"
+                      imageUrl={editSuspensionDraft.imagenUrl}
+                      disabled={informeBloqueado || savingSuspension || !selectedObraId}
+                      onFileSelected={async (file) => {
+                        setJornadaError(null);
+                        try {
+                          return await uploadRegistroFotografico(file);
+                        } catch (err) {
+                          setJornadaError(err instanceof Error ? err.message : 'Error al subir imagen.');
+                          return null;
+                        }
+                      }}
+                      onUploaded={(foto) =>
+                        setEditSuspensionDraft((p) => ({ ...p, imagenUrl: foto.url, ...fotoGeoPayload(foto) }))
+                      }
+                      onClear={() => setEditSuspensionDraft((p) => ({ ...p, imagenUrl: '', ...clearFotoGeoPayload() }))}
+                      onPreview={setRegistroFotoPreviewUrl}
+                    />
                     <div className="suspensiones-edit-actions">
                       <button type="button" className="btn-secondary" onClick={cancelarEdicionSuspension}>
                         Cancelar
@@ -9496,45 +9784,26 @@ export default function DashboardPage() {
                         />
                       </div>
                     </div>
-                    <div className="informe-field">
-                      <label className="informe-label" htmlFor="suspension-imagen">IMAGEN (OPCIONAL)</label>
-                      <input
-                        id="suspension-imagen"
-                        className="form-input calidad-file-input"
-                        type="file"
-                        accept="image/*"
-                        disabled={informeBloqueado || savingSuspension || !selectedObraId}
-                        onChange={async (e) => {
-                          const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
-                          try {
-                            setJornadaError(null);
-                            const url = await uploadSuspensionImagen(file);
-                            if (url) setSuspensionDraft((p) => ({ ...p, imagenUrl: url }));
-                          } catch (err) {
-                            setJornadaError(err instanceof Error ? err.message : 'Error al subir imagen.');
-                          } finally {
-                            e.target.value = '';
-                          }
-                        }}
-                      />
-                      {suspensionDraft.imagenUrl ? (
-                        <div style={{ display: 'grid', gap: '0.5rem', marginTop: '0.5rem' }}>
-                          <img
-                            src={suspensionDraft.imagenUrl}
-                            alt="Imagen de suspensión"
-                            className="calidad-mobile-thumb"
-                          />
-                          <button
-                            type="button"
-                            className="btn-secondary"
-                            disabled={informeBloqueado || savingSuspension}
-                            onClick={() => setSuspensionDraft((p) => ({ ...p, imagenUrl: '' }))}
-                          >
-                            Quitar imagen
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
+                    <RegistroFotograficoInput
+                      idBase="suspension-imagen"
+                      label="Imagen (opcional)"
+                      imageUrl={suspensionDraft.imagenUrl}
+                      disabled={informeBloqueado || savingSuspension || !selectedObraId}
+                      onFileSelected={async (file) => {
+                        setJornadaError(null);
+                        try {
+                          return await uploadRegistroFotografico(file);
+                        } catch (err) {
+                          setJornadaError(err instanceof Error ? err.message : 'Error al subir imagen.');
+                          return null;
+                        }
+                      }}
+                      onUploaded={(foto) =>
+                        setSuspensionDraft((p) => ({ ...p, imagenUrl: foto.url, ...fotoGeoPayload(foto) }))
+                      }
+                      onClear={() => setSuspensionDraft((p) => ({ ...p, imagenUrl: '', ...clearFotoGeoPayload() }))}
+                      onPreview={setRegistroFotoPreviewUrl}
+                    />
                     <button
                       type="button"
                       className="btn-primary"
@@ -9999,47 +10268,25 @@ export default function DashboardPage() {
                           </button>
                         </div>
                       </div>
-                      <div className="informe-field">
-                        <label className="informe-label" htmlFor="equipo-draft-imagen">
-                          Registro fotográfico
-                        </label>
-                        <input
-                          id="equipo-draft-imagen"
-                          className="personal-input calidad-file-input equipo-imagen-input"
-                          type="file"
-                          accept="image/*"
-                          disabled={informeBloqueado || !selectedObraId}
-                          onChange={async (e) => {
-                            const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
-                            try {
-                              setEquiposError(null);
-                              const url = await uploadEquipoImagen(file);
-                              if (url) setEquipoDraft((d) => ({ ...d, imagenUrl: url }));
-                            } catch (err) {
-                              setEquiposError(err instanceof Error ? err.message : 'Error al subir imagen.');
-                            } finally {
-                              e.target.value = '';
-                            }
-                          }}
-                        />
-                        {equipoDraft.imagenUrl ? (
-                          <div className="equipo-imagen-preview">
-                            <img
-                              src={equipoDraft.imagenUrl}
-                              alt="Registro fotográfico del equipo"
-                              className="calidad-mobile-thumb"
-                            />
-                            <button
-                              type="button"
-                              className="equipo-imagen-remove-btn"
-                              disabled={informeBloqueado}
-                              onClick={() => setEquipoDraft((d) => ({ ...d, imagenUrl: '' }))}
-                            >
-                              Quitar imagen
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
+                      <RegistroFotograficoInput
+                        idBase="equipo-draft-imagen"
+                        imageUrl={equipoDraft.imagenUrl}
+                        disabled={informeBloqueado || !selectedObraId}
+                        onFileSelected={async (file) => {
+                          setEquiposError(null);
+                          try {
+                            return await uploadRegistroFotografico(file);
+                          } catch (err) {
+                            setEquiposError(err instanceof Error ? err.message : 'Error al subir imagen.');
+                            return null;
+                          }
+                        }}
+                        onUploaded={(foto) =>
+                          setEquipoDraft((d) => ({ ...d, imagenUrl: foto.url, ...fotoGeoPayload(foto) }))
+                        }
+                        onClear={() => setEquipoDraft((d) => ({ ...d, imagenUrl: '', ...clearFotoGeoPayload() }))}
+                        onPreview={setRegistroFotoPreviewUrl}
+                      />
                       <div className="form-row-inline equipo-horarios-row">
                         <div className="informe-field equipo-horarios-field">
                           <label className="informe-label" htmlFor="equipo-draft-h-in">
@@ -10425,47 +10672,25 @@ export default function DashboardPage() {
                           </button>
                         </div>
                       </div>
-                      <div className="informe-field">
-                        <label className="informe-label" htmlFor="ingreso-draft-imagen">
-                          Registro fotográfico
-                        </label>
-                        <input
-                          id="ingreso-draft-imagen"
-                          className="personal-input calidad-file-input equipo-imagen-input"
-                          type="file"
-                          accept="image/*"
-                          disabled={informeBloqueado || !selectedObraId}
-                          onChange={async (e) => {
-                            const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
-                            try {
-                              setIngresoError(null);
-                              const url = await uploadEquipoImagen(file);
-                              if (url) setIngresoDraft((d) => ({ ...d, imagenUrl: url }));
-                            } catch (err) {
-                              setIngresoError(err instanceof Error ? err.message : 'Error al subir imagen.');
-                            } finally {
-                              e.target.value = '';
-                            }
-                          }}
-                        />
-                        {ingresoDraft.imagenUrl ? (
-                          <div className="equipo-imagen-preview">
-                            <img
-                              src={ingresoDraft.imagenUrl}
-                              alt="Registro fotográfico del ingreso"
-                              className="calidad-mobile-thumb"
-                            />
-                            <button
-                              type="button"
-                              className="equipo-imagen-remove-btn"
-                              disabled={informeBloqueado}
-                              onClick={() => setIngresoDraft((d) => ({ ...d, imagenUrl: '' }))}
-                            >
-                              Quitar imagen
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
+                      <RegistroFotograficoInput
+                        idBase="ingreso-draft-imagen"
+                        imageUrl={ingresoDraft.imagenUrl}
+                        disabled={informeBloqueado || !selectedObraId}
+                        onFileSelected={async (file) => {
+                          setIngresoError(null);
+                          try {
+                            return await uploadRegistroFotografico(file);
+                          } catch (err) {
+                            setIngresoError(err instanceof Error ? err.message : 'Error al subir imagen.');
+                            return null;
+                          }
+                        }}
+                        onUploaded={(foto) =>
+                          setIngresoDraft((d) => ({ ...d, imagenUrl: foto.url, ...fotoGeoPayload(foto) }))
+                        }
+                        onClear={() => setIngresoDraft((d) => ({ ...d, imagenUrl: '', ...clearFotoGeoPayload() }))}
+                        onPreview={setRegistroFotoPreviewUrl}
+                      />
                       <div className="personal-form-actions">
                         <button type="button" className="btn-primary" onClick={commitIngresoDraft}>
                           {ingresoEditingIndex !== null ? 'Guardar cambios' : 'Agregar a la lista'}
@@ -10715,47 +10940,25 @@ export default function DashboardPage() {
                           </button>
                         </div>
                       </div>
-                      <div className="informe-field">
-                        <label className="informe-label" htmlFor="entrega-draft-imagen">
-                          Registro fotográfico
-                        </label>
-                        <input
-                          id="entrega-draft-imagen"
-                          className="personal-input calidad-file-input equipo-imagen-input"
-                          type="file"
-                          accept="image/*"
-                          disabled={informeBloqueado || !selectedObraId}
-                          onChange={async (e) => {
-                            const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
-                            try {
-                              setEntregaError(null);
-                              const url = await uploadEquipoImagen(file);
-                              if (url) setEntregaDraft((d) => ({ ...d, imagenUrl: url }));
-                            } catch (err) {
-                              setEntregaError(err instanceof Error ? err.message : 'Error al subir imagen.');
-                            } finally {
-                              e.target.value = '';
-                            }
-                          }}
-                        />
-                        {entregaDraft.imagenUrl ? (
-                          <div className="equipo-imagen-preview">
-                            <img
-                              src={entregaDraft.imagenUrl}
-                              alt="Registro fotográfico de la entrega"
-                              className="calidad-mobile-thumb"
-                            />
-                            <button
-                              type="button"
-                              className="equipo-imagen-remove-btn"
-                              disabled={informeBloqueado}
-                              onClick={() => setEntregaDraft((d) => ({ ...d, imagenUrl: '' }))}
-                            >
-                              Quitar imagen
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
+                      <RegistroFotograficoInput
+                        idBase="entrega-draft-imagen"
+                        imageUrl={entregaDraft.imagenUrl}
+                        disabled={informeBloqueado || !selectedObraId}
+                        onFileSelected={async (file) => {
+                          setEntregaError(null);
+                          try {
+                            return await uploadRegistroFotografico(file);
+                          } catch (err) {
+                            setEntregaError(err instanceof Error ? err.message : 'Error al subir imagen.');
+                            return null;
+                          }
+                        }}
+                        onUploaded={(foto) =>
+                          setEntregaDraft((d) => ({ ...d, imagenUrl: foto.url, ...fotoGeoPayload(foto) }))
+                        }
+                        onClear={() => setEntregaDraft((d) => ({ ...d, imagenUrl: '', ...clearFotoGeoPayload() }))}
+                        onPreview={setRegistroFotoPreviewUrl}
+                      />
                       <div className="personal-form-actions">
                         <button type="button" className="btn-primary" onClick={commitEntregaDraft}>
                           {entregaEditingIndex !== null ? 'Guardar cambios' : 'Agregar a la lista'}
@@ -11213,12 +11416,13 @@ export default function DashboardPage() {
                               className="personal-input calidad-file-input"
                               type="file"
                               accept="image/*"
+                              capture="environment"
                               onChange={async (e) => {
                                 const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
                                 try {
                                   setEnsayosError(null);
-                                  const url = await uploadCalidadImagen(file);
-                                  if (url) setEnsayoDraft((prev) => ({ ...prev, imagenUrl: url }));
+                                  const foto = await uploadRegistroFotografico(file);
+                                  if (foto) setEnsayoDraft((prev) => ({ ...prev, imagenUrl: foto.url, ...fotoGeoPayload(foto) }));
                                 } catch (err) {
                                   setEnsayosError(err instanceof Error ? err.message : 'Error al subir imagen.');
                                 } finally {
@@ -11290,12 +11494,13 @@ export default function DashboardPage() {
                                   className="personal-input calidad-file-input"
                                   type="file"
                                   accept="image/*"
+                                  capture="environment"
                                   onChange={async (e) => {
                                     const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
                                     try {
                                       setEnsayosError(null);
-                                      const url = await uploadCalidadImagen(file);
-                                      if (url) updateEnsayoRow(idx, { imagenUrl: url });
+                                      const foto = await uploadRegistroFotografico(file);
+                                      if (foto) updateEnsayoRow(idx, { imagenUrl: foto.url, ...fotoGeoPayload(foto) });
                                     } catch (err) {
                                       setEnsayosError(err instanceof Error ? err.message : 'Error al subir imagen.');
                                     } finally {
@@ -11367,12 +11572,13 @@ export default function DashboardPage() {
                             className="personal-input calidad-file-input"
                             type="file"
                             accept="image/*"
+                            capture="environment"
                             onChange={async (e) => {
                               const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
                               try {
                                 setDanosError(null);
-                                const url = await uploadCalidadImagen(file);
-                                if (url) setDanoDraft((prev) => ({ ...prev, imagenUrl: url }));
+                                const foto = await uploadRegistroFotografico(file);
+                                if (foto) setDanoDraft((prev) => ({ ...prev, imagenUrl: foto.url, ...fotoGeoPayload(foto) }));
                               } catch (err) {
                                 setDanosError(err instanceof Error ? err.message : 'Error al subir imagen.');
                               } finally {
@@ -11488,12 +11694,13 @@ export default function DashboardPage() {
                                 className="personal-input calidad-file-input"
                                 type="file"
                                 accept="image/*"
+                                capture="environment"
                                 onChange={async (e) => {
                                   const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
                                   try {
                                     setDanosError(null);
-                                    const url = await uploadCalidadImagen(file);
-                                    if (url) updateDanoRow(idx, { imagenUrl: url });
+                                    const foto = await uploadRegistroFotografico(file);
+                                    if (foto) updateDanoRow(idx, { imagenUrl: foto.url, ...fotoGeoPayload(foto) });
                                   } catch (err) {
                                     setDanosError(err instanceof Error ? err.message : 'Error al subir imagen.');
                                   } finally {
@@ -11576,12 +11783,13 @@ export default function DashboardPage() {
                             className="personal-input calidad-file-input"
                             type="file"
                             accept="image/*"
+                            capture="environment"
                             onChange={async (e) => {
                               const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
                               try {
                                 setNoConformidadesError(null);
-                                const url = await uploadCalidadImagen(file);
-                                if (url) setNoConformidadDraft((prev) => ({ ...prev, imagenUrl: url }));
+                                const foto = await uploadRegistroFotografico(file);
+                                if (foto) setNoConformidadDraft((prev) => ({ ...prev, imagenUrl: foto.url, ...fotoGeoPayload(foto) }));
                               } catch (err) {
                                 setNoConformidadesError(err instanceof Error ? err.message : 'Error al subir imagen.');
                               } finally {
@@ -11668,12 +11876,13 @@ export default function DashboardPage() {
                                 className="personal-input calidad-file-input"
                                 type="file"
                                 accept="image/*"
+                                capture="environment"
                                 onChange={async (e) => {
                                   const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
                                   try {
                                     setNoConformidadesError(null);
-                                    const url = await uploadCalidadImagen(file);
-                                    if (url) updateNoConformidadRow(idx, { imagenUrl: url });
+                                    const foto = await uploadRegistroFotografico(file);
+                                    if (foto) updateNoConformidadRow(idx, { imagenUrl: foto.url, ...fotoGeoPayload(foto) });
                                   } catch (err) {
                                     setNoConformidadesError(err instanceof Error ? err.message : 'Error al subir imagen.');
                                   } finally {
@@ -12162,6 +12371,26 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+      {registroFotoPreviewUrl ? (
+        <div
+          className="registro-foto-modal-backdrop"
+          role="presentation"
+          onClick={() => setRegistroFotoPreviewUrl(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Previsualización de registro fotográfico"
+            className="registro-foto-modal"
+            onClick={(ev) => ev.stopPropagation()}
+          >
+            <img src={registroFotoPreviewUrl} alt="Previsualización del registro fotográfico" />
+            <button type="button" className="btn-primary" onClick={() => setRegistroFotoPreviewUrl(null)}>
+              Cerrar
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

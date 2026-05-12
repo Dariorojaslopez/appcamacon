@@ -55,6 +55,11 @@ export async function GET(req: NextRequest) {
         noReporte: d.noReporte,
         observacion: d.observacion,
         imagenUrl: d.imagenUrl,
+        imagenLatitud: d.imagenLatitud,
+        imagenLongitud: d.imagenLongitud,
+        imagenPrecision: d.imagenPrecision,
+        imagenGeoEstado: d.imagenGeoEstado,
+        imagenTomadaEn: d.imagenTomadaEn ? d.imagenTomadaEn.toISOString() : null,
       })),
     });
   } catch (error: unknown) {
@@ -87,6 +92,11 @@ export async function POST(req: NextRequest) {
         noReporte: string;
         observacion?: string | null;
         imagenUrl?: string | null;
+        imagenLatitud?: number | null;
+        imagenLongitud?: number | null;
+        imagenPrecision?: number | null;
+        imagenGeoEstado?: string | null;
+        imagenTomadaEn?: string | null;
       }>;
     };
 
@@ -114,6 +124,14 @@ export async function POST(req: NextRequest) {
         const noReporte = String(d.noReporte ?? '').trim();
         const observacion = typeof d.observacion === 'string' ? d.observacion.trim() : null;
         const imagenUrl = typeof d.imagenUrl === 'string' ? d.imagenUrl.trim() : null;
+        const imagenLatitud =
+          typeof d.imagenLatitud === 'number' && Number.isFinite(d.imagenLatitud) ? d.imagenLatitud : null;
+        const imagenLongitud =
+          typeof d.imagenLongitud === 'number' && Number.isFinite(d.imagenLongitud) ? d.imagenLongitud : null;
+        const imagenPrecision =
+          typeof d.imagenPrecision === 'number' && Number.isFinite(d.imagenPrecision) ? d.imagenPrecision : null;
+        const imagenGeoEstado = d.imagenGeoEstado ? String(d.imagenGeoEstado).trim() : null;
+        const imagenTomadaEn = d.imagenTomadaEn ? new Date(d.imagenTomadaEn) : null;
 
         return {
           horaReporte,
@@ -123,6 +141,11 @@ export async function POST(req: NextRequest) {
           noReporte,
           observacion,
           imagenUrl,
+          imagenLatitud,
+          imagenLongitud,
+          imagenPrecision,
+          imagenGeoEstado,
+          imagenTomadaEn,
         };
       })
       .filter((d) => d.direccion && d.tipoDano && d.entidad && d.noReporte);
@@ -192,6 +215,11 @@ export async function POST(req: NextRequest) {
         noReporte: d.noReporte,
         observacion: d.observacion,
         imagenUrl: d.imagenUrl,
+        imagenLatitud: d.imagenLatitud,
+        imagenLongitud: d.imagenLongitud,
+        imagenPrecision: d.imagenPrecision,
+        imagenGeoEstado: d.imagenGeoEstado,
+        imagenTomadaEn: d.imagenTomadaEn ? d.imagenTomadaEn.toISOString() : null,
       })),
     });
   } catch (error: unknown) {

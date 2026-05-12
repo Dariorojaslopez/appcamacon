@@ -1,7 +1,17 @@
 export type EvidenciaFase = 'antes' | 'durante' | 'despues';
 
-/** URL principal (informe / enlace). Opcionalmente miniatura para <img> (p. ej. Google Drive). */
-export type EvidenciaItem = string | { url: string; previewUrl?: string };
+/** URL principal (informe / enlace). Opcionalmente miniatura y GPS capturado al cargar/tomar foto. */
+export type EvidenciaItem =
+  | string
+  | {
+      url: string;
+      previewUrl?: string;
+      imagenLatitud?: number | null;
+      imagenLongitud?: number | null;
+      imagenPrecision?: number | null;
+      imagenGeoEstado?: string | null;
+      imagenTomadaEn?: string | null;
+    };
 
 export type EvidenciaUrlsPorFase = Record<EvidenciaFase, EvidenciaItem[]>;
 
@@ -64,10 +74,29 @@ function parseEvidenciaItem(item: unknown): EvidenciaItem {
   if (item == null) return '';
   if (typeof item === 'string') return item;
   if (typeof item === 'object' && item !== null && 'url' in item) {
-    const o = item as { url: unknown; previewUrl?: unknown };
+    const o = item as {
+      url: unknown;
+      previewUrl?: unknown;
+      imagenLatitud?: unknown;
+      imagenLongitud?: unknown;
+      imagenPrecision?: unknown;
+      imagenGeoEstado?: unknown;
+      imagenTomadaEn?: unknown;
+    };
     return {
       url: String(o.url ?? ''),
       previewUrl: o.previewUrl != null && String(o.previewUrl).trim() ? String(o.previewUrl).trim() : undefined,
+      imagenLatitud: typeof o.imagenLatitud === 'number' && Number.isFinite(o.imagenLatitud) ? o.imagenLatitud : null,
+      imagenLongitud: typeof o.imagenLongitud === 'number' && Number.isFinite(o.imagenLongitud) ? o.imagenLongitud : null,
+      imagenPrecision: typeof o.imagenPrecision === 'number' && Number.isFinite(o.imagenPrecision) ? o.imagenPrecision : null,
+      imagenGeoEstado:
+        o.imagenGeoEstado != null && String(o.imagenGeoEstado).trim()
+          ? String(o.imagenGeoEstado).trim()
+          : null,
+      imagenTomadaEn:
+        o.imagenTomadaEn != null && String(o.imagenTomadaEn).trim()
+          ? String(o.imagenTomadaEn).trim()
+          : null,
     };
   }
   return String(item);

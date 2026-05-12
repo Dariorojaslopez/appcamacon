@@ -58,6 +58,11 @@ export async function GET(req: NextRequest) {
         estado: e.estado,
         observacion: e.observacion,
         imagenUrl: e.imagenUrl,
+        imagenLatitud: e.imagenLatitud,
+        imagenLongitud: e.imagenLongitud,
+        imagenPrecision: e.imagenPrecision,
+        imagenGeoEstado: e.imagenGeoEstado,
+        imagenTomadaEn: e.imagenTomadaEn ? e.imagenTomadaEn.toISOString() : null,
         horasTrabajadas: e.horasTrabajadas,
         horaIngreso: e.horaIngreso,
         horaSalida: e.horaSalida,
@@ -99,6 +104,11 @@ export async function POST(req: NextRequest) {
         estado?: string;
         observacion?: string;
         imagenUrl?: string;
+        imagenLatitud?: number | null;
+        imagenLongitud?: number | null;
+        imagenPrecision?: number | null;
+        imagenGeoEstado?: string | null;
+        imagenTomadaEn?: string | null;
         horasTrabajadas?: number;
         horaIngreso?: string;
         horaSalida?: string;
@@ -163,6 +173,14 @@ export async function POST(req: NextRequest) {
           estado: e.estado ? String(e.estado).trim() : null,
           observacion: e.observacion ? String(e.observacion).trim() : null,
           imagenUrl: e.imagenUrl ? String(e.imagenUrl).trim() : null,
+          imagenLatitud:
+            typeof e.imagenLatitud === 'number' && Number.isFinite(e.imagenLatitud) ? e.imagenLatitud : null,
+          imagenLongitud:
+            typeof e.imagenLongitud === 'number' && Number.isFinite(e.imagenLongitud) ? e.imagenLongitud : null,
+          imagenPrecision:
+            typeof e.imagenPrecision === 'number' && Number.isFinite(e.imagenPrecision) ? e.imagenPrecision : null,
+          imagenGeoEstado: e.imagenGeoEstado ? String(e.imagenGeoEstado).trim() : null,
+          imagenTomadaEn: e.imagenTomadaEn ? new Date(e.imagenTomadaEn) : null,
           horasTrabajadas: totalHoras,
           horaIngreso: effectiveHorarios[0]?.horaIngreso || null,
           horaSalida: effectiveHorarios[effectiveHorarios.length - 1]?.horaSalida || null,
@@ -221,6 +239,11 @@ export async function POST(req: NextRequest) {
           estado: e.estado,
           observacion: e.observacion,
           imagenUrl: e.imagenUrl,
+          imagenLatitud: e.imagenLatitud,
+          imagenLongitud: e.imagenLongitud,
+          imagenPrecision: e.imagenPrecision,
+          imagenGeoEstado: e.imagenGeoEstado,
+          imagenTomadaEn: e.imagenTomadaEn,
           horasTrabajadas: e.horasTrabajadas,
           horaIngreso: e.horaIngreso,
           horaSalida: e.horaSalida,
@@ -252,6 +275,11 @@ export async function POST(req: NextRequest) {
         estado: e.estado,
         observacion: e.observacion,
         imagenUrl: e.imagenUrl,
+        imagenLatitud: e.imagenLatitud,
+        imagenLongitud: e.imagenLongitud,
+        imagenPrecision: e.imagenPrecision,
+        imagenGeoEstado: e.imagenGeoEstado,
+        imagenTomadaEn: e.imagenTomadaEn ? e.imagenTomadaEn.toISOString() : null,
         horasTrabajadas: e.horasTrabajadas,
         horaIngreso: e.horaIngreso,
         horaSalida: e.horaSalida,

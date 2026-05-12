@@ -21,6 +21,11 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx) {
       tipoClima?: string;
       horasClima?: number;
       imagenUrl?: string | null;
+      imagenLatitud?: number | null;
+      imagenLongitud?: number | null;
+      imagenPrecision?: number | null;
+      imagenGeoEstado?: string | null;
+      imagenTomadaEn?: string | null;
     };
 
     const row = await prisma.informeSuspension.findFirst({
@@ -56,6 +61,36 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx) {
               ? body.imagenUrl.trim()
               : null
             : row.imagenUrl,
+        imagenLatitud:
+          body.imagenLatitud !== undefined
+            ? typeof body.imagenLatitud === 'number' && Number.isFinite(body.imagenLatitud)
+              ? body.imagenLatitud
+              : null
+            : row.imagenLatitud,
+        imagenLongitud:
+          body.imagenLongitud !== undefined
+            ? typeof body.imagenLongitud === 'number' && Number.isFinite(body.imagenLongitud)
+              ? body.imagenLongitud
+              : null
+            : row.imagenLongitud,
+        imagenPrecision:
+          body.imagenPrecision !== undefined
+            ? typeof body.imagenPrecision === 'number' && Number.isFinite(body.imagenPrecision)
+              ? body.imagenPrecision
+              : null
+            : row.imagenPrecision,
+        imagenGeoEstado:
+          body.imagenGeoEstado !== undefined
+            ? body.imagenGeoEstado
+              ? String(body.imagenGeoEstado).trim()
+              : null
+            : row.imagenGeoEstado,
+        imagenTomadaEn:
+          body.imagenTomadaEn !== undefined
+            ? body.imagenTomadaEn
+              ? new Date(body.imagenTomadaEn)
+              : null
+            : row.imagenTomadaEn,
       },
     });
 
@@ -68,6 +103,11 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx) {
         tipoClima: updated.tipoClima ?? '',
         horasClima: updated.horasClima ?? 0,
         imagenUrl: updated.imagenUrl ?? null,
+        imagenLatitud: updated.imagenLatitud,
+        imagenLongitud: updated.imagenLongitud,
+        imagenPrecision: updated.imagenPrecision,
+        imagenGeoEstado: updated.imagenGeoEstado,
+        imagenTomadaEn: updated.imagenTomadaEn ? updated.imagenTomadaEn.toISOString() : null,
         orden: updated.orden,
       },
     });

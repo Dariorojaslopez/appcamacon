@@ -119,6 +119,11 @@ export async function GET(req: NextRequest) {
         tipoClima: s.tipoClima ?? '',
         horasClima: s.horasClima ?? 0,
         imagenUrl: s.imagenUrl ?? null,
+        imagenLatitud: s.imagenLatitud,
+        imagenLongitud: s.imagenLongitud,
+        imagenPrecision: s.imagenPrecision,
+        imagenGeoEstado: s.imagenGeoEstado,
+        imagenTomadaEn: s.imagenTomadaEn ? s.imagenTomadaEn.toISOString() : null,
         orden: s.orden,
       })),
       informeCerrado: informe.informeCerrado,
@@ -149,6 +154,11 @@ export async function POST(req: NextRequest) {
       tipoClima?: string;
       horasClima?: number;
       imagenUrl?: string | null;
+      imagenLatitud?: number | null;
+      imagenLongitud?: number | null;
+      imagenPrecision?: number | null;
+      imagenGeoEstado?: string | null;
+      imagenTomadaEn?: string | null;
     };
 
     const { projectId, date: dateStr, jornadaId } = body;
@@ -211,6 +221,20 @@ export async function POST(req: NextRequest) {
         tipoClima: body.tipoClima?.trim() || null,
         horasClima: typeof body.horasClima === 'number' ? body.horasClima : null,
         imagenUrl: typeof body.imagenUrl === 'string' && body.imagenUrl.trim() ? body.imagenUrl.trim() : null,
+        imagenLatitud:
+          typeof body.imagenLatitud === 'number' && Number.isFinite(body.imagenLatitud)
+            ? body.imagenLatitud
+            : null,
+        imagenLongitud:
+          typeof body.imagenLongitud === 'number' && Number.isFinite(body.imagenLongitud)
+            ? body.imagenLongitud
+            : null,
+        imagenPrecision:
+          typeof body.imagenPrecision === 'number' && Number.isFinite(body.imagenPrecision)
+            ? body.imagenPrecision
+            : null,
+        imagenGeoEstado: body.imagenGeoEstado ? String(body.imagenGeoEstado).trim() : null,
+        imagenTomadaEn: body.imagenTomadaEn ? new Date(body.imagenTomadaEn) : null,
         orden,
       },
     });
@@ -224,6 +248,11 @@ export async function POST(req: NextRequest) {
         tipoClima: created.tipoClima ?? '',
         horasClima: created.horasClima ?? 0,
         imagenUrl: created.imagenUrl ?? null,
+        imagenLatitud: created.imagenLatitud,
+        imagenLongitud: created.imagenLongitud,
+        imagenPrecision: created.imagenPrecision,
+        imagenGeoEstado: created.imagenGeoEstado,
+        imagenTomadaEn: created.imagenTomadaEn ? created.imagenTomadaEn.toISOString() : null,
         orden: created.orden,
       },
     });

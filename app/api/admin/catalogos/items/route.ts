@@ -115,6 +115,11 @@ export async function GET(req: NextRequest) {
       ancho: it.ancho ?? null,
       altura: it.altura ?? null,
       imagenUrl: it.imagenUrl ?? null,
+      imagenLatitud: it.imagenLatitud ?? null,
+      imagenLongitud: it.imagenLongitud ?? null,
+      imagenPrecision: it.imagenPrecision ?? null,
+      imagenGeoEstado: it.imagenGeoEstado ?? null,
+      imagenTomadaEn: it.imagenTomadaEn ? it.imagenTomadaEn.toISOString() : null,
       orden: it.orden ?? 0,
       isActive: Boolean(it.isActive),
     }));
@@ -146,6 +151,11 @@ export async function POST(req: NextRequest) {
       ancho?: number | null;
       altura?: number | null;
       imagenUrl?: string | null;
+      imagenLatitud?: number | null;
+      imagenLongitud?: number | null;
+      imagenPrecision?: number | null;
+      imagenGeoEstado?: string | null;
+      imagenTomadaEn?: string | null;
       proveedorId?: string | null;
       rawText?: string;
     };
@@ -254,6 +264,14 @@ export async function POST(req: NextRequest) {
     const rawAltura = body.altura as unknown;
     const altura = rawAltura == null || rawAltura === '' ? null : Number(rawAltura);
     const imagenUrl = body.imagenUrl != null ? String(body.imagenUrl).trim() : '';
+    const imagenLatitud =
+      typeof body.imagenLatitud === 'number' && Number.isFinite(body.imagenLatitud) ? body.imagenLatitud : null;
+    const imagenLongitud =
+      typeof body.imagenLongitud === 'number' && Number.isFinite(body.imagenLongitud) ? body.imagenLongitud : null;
+    const imagenPrecision =
+      typeof body.imagenPrecision === 'number' && Number.isFinite(body.imagenPrecision) ? body.imagenPrecision : null;
+    const imagenGeoEstado = body.imagenGeoEstado ? String(body.imagenGeoEstado).trim() : null;
+    const imagenTomadaEn = body.imagenTomadaEn ? new Date(body.imagenTomadaEn) : null;
     const proveedorId = body.proveedorId != null ? String(body.proveedorId).trim() : '';
 
     if (!codigo) return NextResponse.json({ error: 'El código es requerido' }, { status: 400 });
@@ -305,6 +323,11 @@ export async function POST(req: NextRequest) {
             ancho,
             altura,
             imagenUrl: imagenUrl || null,
+            imagenLatitud,
+            imagenLongitud,
+            imagenPrecision,
+            imagenGeoEstado,
+            imagenTomadaEn,
             proveedorId: proveedorId || null,
             orden: nextOrden,
             isActive: true,

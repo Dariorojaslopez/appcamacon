@@ -55,6 +55,11 @@ export async function GET(req: NextRequest) {
         firmaRecibido: m.firmaRecibido,
         observacion: m.observacion,
         imagenUrl: m.imagenUrl,
+        imagenLatitud: m.imagenLatitud,
+        imagenLongitud: m.imagenLongitud,
+        imagenPrecision: m.imagenPrecision,
+        imagenGeoEstado: m.imagenGeoEstado,
+        imagenTomadaEn: m.imagenTomadaEn ? m.imagenTomadaEn.toISOString() : null,
       })),
     });
   } catch (error: unknown) {
@@ -87,6 +92,11 @@ export async function POST(req: NextRequest) {
         firmaRecibido?: boolean;
         observacion?: string;
         imagenUrl?: string;
+        imagenLatitud?: number | null;
+        imagenLongitud?: number | null;
+        imagenPrecision?: number | null;
+        imagenGeoEstado?: string | null;
+        imagenTomadaEn?: string | null;
       }>;
     };
 
@@ -115,6 +125,14 @@ export async function POST(req: NextRequest) {
         firmaRecibido: Boolean(m.firmaRecibido),
         observacion: m.observacion ? String(m.observacion).trim() : null,
         imagenUrl: m.imagenUrl ? String(m.imagenUrl).trim() : null,
+        imagenLatitud:
+          typeof m.imagenLatitud === 'number' && Number.isFinite(m.imagenLatitud) ? m.imagenLatitud : null,
+        imagenLongitud:
+          typeof m.imagenLongitud === 'number' && Number.isFinite(m.imagenLongitud) ? m.imagenLongitud : null,
+        imagenPrecision:
+          typeof m.imagenPrecision === 'number' && Number.isFinite(m.imagenPrecision) ? m.imagenPrecision : null,
+        imagenGeoEstado: m.imagenGeoEstado ? String(m.imagenGeoEstado).trim() : null,
+        imagenTomadaEn: m.imagenTomadaEn ? new Date(m.imagenTomadaEn) : null,
       }))
       .filter((m) => m.tipoMaterial && m.unidad && m.contratista);
 
@@ -183,6 +201,11 @@ export async function POST(req: NextRequest) {
         firmaRecibido: m.firmaRecibido,
         observacion: m.observacion,
         imagenUrl: m.imagenUrl,
+        imagenLatitud: m.imagenLatitud,
+        imagenLongitud: m.imagenLongitud,
+        imagenPrecision: m.imagenPrecision,
+        imagenGeoEstado: m.imagenGeoEstado,
+        imagenTomadaEn: m.imagenTomadaEn ? m.imagenTomadaEn.toISOString() : null,
       })),
     });
   } catch (error: unknown) {

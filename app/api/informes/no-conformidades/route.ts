@@ -52,6 +52,11 @@ export async function GET(req: NextRequest) {
         detalle: n.detalle,
         estado: n.estado,
         imagenUrl: n.imagenUrl,
+        imagenLatitud: n.imagenLatitud,
+        imagenLongitud: n.imagenLongitud,
+        imagenPrecision: n.imagenPrecision,
+        imagenGeoEstado: n.imagenGeoEstado,
+        imagenTomadaEn: n.imagenTomadaEn ? n.imagenTomadaEn.toISOString() : null,
       })),
     });
   } catch (error: unknown) {
@@ -81,6 +86,11 @@ export async function POST(req: NextRequest) {
         detalle: string;
         estado: string;
         imagenUrl?: string | null;
+        imagenLatitud?: number | null;
+        imagenLongitud?: number | null;
+        imagenPrecision?: number | null;
+        imagenGeoEstado?: string | null;
+        imagenTomadaEn?: string | null;
       }>;
     };
 
@@ -105,7 +115,25 @@ export async function POST(req: NextRequest) {
         const detalle = String(n.detalle ?? '').trim();
         const estado = String(n.estado ?? '').trim();
         const imagenUrl = typeof n.imagenUrl === 'string' ? n.imagenUrl.trim() : null;
-        return { noConformidad, detalle, estado, imagenUrl };
+        const imagenLatitud =
+          typeof n.imagenLatitud === 'number' && Number.isFinite(n.imagenLatitud) ? n.imagenLatitud : null;
+        const imagenLongitud =
+          typeof n.imagenLongitud === 'number' && Number.isFinite(n.imagenLongitud) ? n.imagenLongitud : null;
+        const imagenPrecision =
+          typeof n.imagenPrecision === 'number' && Number.isFinite(n.imagenPrecision) ? n.imagenPrecision : null;
+        const imagenGeoEstado = n.imagenGeoEstado ? String(n.imagenGeoEstado).trim() : null;
+        const imagenTomadaEn = n.imagenTomadaEn ? new Date(n.imagenTomadaEn) : null;
+        return {
+          noConformidad,
+          detalle,
+          estado,
+          imagenUrl,
+          imagenLatitud,
+          imagenLongitud,
+          imagenPrecision,
+          imagenGeoEstado,
+          imagenTomadaEn,
+        };
       })
       .filter((n) => n.noConformidad && n.detalle && n.estado);
 
@@ -171,6 +199,11 @@ export async function POST(req: NextRequest) {
         detalle: n.detalle,
         estado: n.estado,
         imagenUrl: n.imagenUrl,
+        imagenLatitud: n.imagenLatitud,
+        imagenLongitud: n.imagenLongitud,
+        imagenPrecision: n.imagenPrecision,
+        imagenGeoEstado: n.imagenGeoEstado,
+        imagenTomadaEn: n.imagenTomadaEn ? n.imagenTomadaEn.toISOString() : null,
       })),
     });
   } catch (error: unknown) {

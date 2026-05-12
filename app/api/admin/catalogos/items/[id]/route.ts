@@ -38,6 +38,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       ancho?: number | null;
       altura?: number | null;
       imagenUrl?: string | null;
+      imagenLatitud?: number | null;
+      imagenLongitud?: number | null;
+      imagenPrecision?: number | null;
+      imagenGeoEstado?: string | null;
+      imagenTomadaEn?: string | null;
       proveedorId?: string | null;
       isActive?: boolean;
       orden?: number;
@@ -114,6 +119,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
     if (body.imagenUrl !== undefined) data.imagenUrl = body.imagenUrl ? String(body.imagenUrl).trim() : null;
+    if (body.imagenLatitud !== undefined) {
+      data.imagenLatitud =
+        typeof body.imagenLatitud === 'number' && Number.isFinite(body.imagenLatitud) ? body.imagenLatitud : null;
+    }
+    if (body.imagenLongitud !== undefined) {
+      data.imagenLongitud =
+        typeof body.imagenLongitud === 'number' && Number.isFinite(body.imagenLongitud) ? body.imagenLongitud : null;
+    }
+    if (body.imagenPrecision !== undefined) {
+      data.imagenPrecision =
+        typeof body.imagenPrecision === 'number' && Number.isFinite(body.imagenPrecision) ? body.imagenPrecision : null;
+    }
+    if (body.imagenGeoEstado !== undefined) data.imagenGeoEstado = body.imagenGeoEstado ? String(body.imagenGeoEstado).trim() : null;
+    if (body.imagenTomadaEn !== undefined) data.imagenTomadaEn = body.imagenTomadaEn ? new Date(body.imagenTomadaEn) : null;
     if (body.proveedorId !== undefined) {
       const proveedorId = String(body.proveedorId ?? '').trim();
       if (proveedorId) {
@@ -146,6 +165,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         delete fallback.ancho;
         delete fallback.altura;
         delete fallback.imagenUrl;
+        delete fallback.imagenLatitud;
+        delete fallback.imagenLongitud;
+        delete fallback.imagenPrecision;
+        delete fallback.imagenGeoEstado;
+        delete fallback.imagenTomadaEn;
         delete fallback.cantidad;
         item = await prisma.itemCatalog.update({
           where: { id },

@@ -197,6 +197,11 @@ model InformeSuspension {
   tipoClima          String?
   horasClima         Float?
   imagenUrl          String?
+  imagenLatitud      Float?
+  imagenLongitud     Float?
+  imagenPrecision    Float?
+  imagenGeoEstado    String?
+  imagenTomadaEn     DateTime?
   orden              Int           @default(0)
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
@@ -246,6 +251,11 @@ model EquipoObra {
   estado        String?  // Selección libre (ej. Operativo / Fuera de servicio)
   observacion   String?
   imagenUrl     String?
+  imagenLatitud Float?
+  imagenLongitud Float?
+  imagenPrecision Float?
+  imagenGeoEstado String?
+  imagenTomadaEn DateTime?
   horasTrabajadas Float?
   horaIngreso   String?  // "HH:mm"
   horaSalida    String?  // "HH:mm"
@@ -282,6 +292,11 @@ model MaterialIngreso {
   cantidad      Float?
   observacion   String?
   imagenUrl     String?
+  imagenLatitud Float?
+  imagenLongitud Float?
+  imagenPrecision Float?
+  imagenGeoEstado String?
+  imagenTomadaEn DateTime?
 
   informeId     String
   informe       InformeDiario @relation(fields: [informeId], references: [id], onDelete: Cascade)
@@ -299,6 +314,11 @@ model MaterialEntrega {
   firmaRecibido Boolean  @default(false)
   observacion   String?
   imagenUrl     String?
+  imagenLatitud Float?
+  imagenLongitud Float?
+  imagenPrecision Float?
+  imagenGeoEstado String?
+  imagenTomadaEn DateTime?
 
   informeId     String
   informe       InformeDiario @relation(fields: [informeId], references: [id], onDelete: Cascade)
@@ -317,6 +337,11 @@ model ActividadObra {
   observacion      Boolean  @default(false)
   observacionTexto String?
   imagenUrl        String?
+  imagenLatitud    Float?
+  imagenLongitud   Float?
+  imagenPrecision  Float?
+  imagenGeoEstado  String?
+  imagenTomadaEn   DateTime?
   largo            Float?
   ancho            Float?
   altura           Float?
@@ -340,6 +365,11 @@ model EnsayoObra {
   resultado       String
   observacion    String?
   imagenUrl      String?
+  imagenLatitud  Float?
+  imagenLongitud Float?
+  imagenPrecision Float?
+  imagenGeoEstado String?
+  imagenTomadaEn DateTime?
 
   informeId       String
   informe         InformeDiario @relation(fields: [informeId], references: [id], onDelete: Cascade)
@@ -359,6 +389,11 @@ model DanoRedesObra {
 
   observacion   String?
   imagenUrl     String?
+  imagenLatitud Float?
+  imagenLongitud Float?
+  imagenPrecision Float?
+  imagenGeoEstado String?
+  imagenTomadaEn DateTime?
 
   informeId      String
   informe        InformeDiario @relation(fields: [informeId], references: [id], onDelete: Cascade)
@@ -374,6 +409,11 @@ model NoConformidadObra {
   detalle        String
   estado         String
   imagenUrl      String?
+  imagenLatitud  Float?
+  imagenLongitud Float?
+  imagenPrecision Float?
+  imagenGeoEstado String?
+  imagenTomadaEn DateTime?
 
   informeId       String
   informe         InformeDiario @relation(fields: [informeId], references: [id], onDelete: Cascade)
@@ -487,6 +527,11 @@ model ItemCatalog {
   ancho         Float?
   altura        Float?
   imagenUrl     String?
+  imagenLatitud Float?
+  imagenLongitud Float?
+  imagenPrecision Float?
+  imagenGeoEstado String?
+  imagenTomadaEn DateTime?
   orden         Int      @default(0)
   isActive      Boolean  @default(true)
 

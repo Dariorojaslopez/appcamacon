@@ -56,6 +56,11 @@ export async function GET(req: NextRequest) {
         resultado: e.resultado,
         observacion: e.observacion,
         imagenUrl: e.imagenUrl,
+        imagenLatitud: e.imagenLatitud,
+        imagenLongitud: e.imagenLongitud,
+        imagenPrecision: e.imagenPrecision,
+        imagenGeoEstado: e.imagenGeoEstado,
+        imagenTomadaEn: e.imagenTomadaEn ? e.imagenTomadaEn.toISOString() : null,
       })),
     });
   } catch (error: unknown) {
@@ -89,6 +94,11 @@ export async function POST(req: NextRequest) {
         resultado: string;
         observacion?: string | null;
         imagenUrl?: string | null;
+        imagenLatitud?: number | null;
+        imagenLongitud?: number | null;
+        imagenPrecision?: number | null;
+        imagenGeoEstado?: string | null;
+        imagenTomadaEn?: string | null;
       }>;
     };
 
@@ -117,6 +127,14 @@ export async function POST(req: NextRequest) {
         const resultado = String(e.resultado ?? '').trim();
         const observacion = typeof e.observacion === 'string' ? e.observacion.trim() : null;
         const imagenUrl = typeof e.imagenUrl === 'string' ? e.imagenUrl.trim() : null;
+        const imagenLatitud =
+          typeof e.imagenLatitud === 'number' && Number.isFinite(e.imagenLatitud) ? e.imagenLatitud : null;
+        const imagenLongitud =
+          typeof e.imagenLongitud === 'number' && Number.isFinite(e.imagenLongitud) ? e.imagenLongitud : null;
+        const imagenPrecision =
+          typeof e.imagenPrecision === 'number' && Number.isFinite(e.imagenPrecision) ? e.imagenPrecision : null;
+        const imagenGeoEstado = e.imagenGeoEstado ? String(e.imagenGeoEstado).trim() : null;
+        const imagenTomadaEn = e.imagenTomadaEn ? new Date(e.imagenTomadaEn) : null;
 
         return {
           materialActividad,
@@ -127,6 +145,11 @@ export async function POST(req: NextRequest) {
           resultado,
           observacion,
           imagenUrl,
+          imagenLatitud,
+          imagenLongitud,
+          imagenPrecision,
+          imagenGeoEstado,
+          imagenTomadaEn,
         };
       })
       .filter((e) => e.materialActividad && e.tipoEnsayo && e.idMuestra && e.laboratorio && e.localizacion && e.resultado);
@@ -197,6 +220,11 @@ export async function POST(req: NextRequest) {
         resultado: e.resultado,
         observacion: e.observacion,
         imagenUrl: e.imagenUrl,
+        imagenLatitud: e.imagenLatitud,
+        imagenLongitud: e.imagenLongitud,
+        imagenPrecision: e.imagenPrecision,
+        imagenGeoEstado: e.imagenGeoEstado,
+        imagenTomadaEn: e.imagenTomadaEn ? e.imagenTomadaEn.toISOString() : null,
       })),
     });
   } catch (error: unknown) {
