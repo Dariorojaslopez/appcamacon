@@ -61,7 +61,7 @@ function fmtGeoLine(label: string, lat?: number | null, lon?: number | null, pre
 
 function fmtEvidenciaItemDetalle(idx: number, item: EvidenciaItem): string {
   const url = evidenciaItemUrl(item);
-  const lines = [`  ${idx + 1}. URL: ${url || '—'}`];
+  const lines = [`  ${idx + 1}. Imagen (enlace): ${url || '—'}`];
   if (typeof item === 'object' && item) {
     const g = fmtGeoLine(
       '     GPS foto',
@@ -72,7 +72,7 @@ function fmtEvidenciaItemDetalle(idx: number, item: EvidenciaItem): string {
       item.imagenTomadaEn ?? null,
     );
     if (g) lines.push(g);
-    if (item.previewUrl?.trim()) lines.push(`     Preview: ${item.previewUrl.trim()}`);
+    if (item.previewUrl?.trim()) lines.push(`     Miniatura (enlace): ${item.previewUrl.trim()}`);
   }
   return lines.join('\n');
 }

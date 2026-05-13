@@ -129,9 +129,10 @@ export async function POST(req: NextRequest) {
         console.error('obra-logo Google Drive:', detail);
         return NextResponse.json({ error: `No se pudo subir a Google Drive. ${detail}` }, { status: 502 });
       }
-      const { webUrl, thumbnailUrl } = uploaded;
+      const { fileId, webUrl, thumbnailUrl } = uploaded;
+      const url = `/api/uploads/drive-image?fileId=${encodeURIComponent(fileId)}`;
       return NextResponse.json(
-        { url: webUrl, previewUrl: thumbnailUrl, storage: 'gdrive' as const },
+        { url, webUrl, previewUrl: thumbnailUrl, storage: 'gdrive' as const },
         { status: 200 },
       );
     }

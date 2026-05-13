@@ -313,6 +313,29 @@ body {
   -webkit-text-fill-color: var(--color-text-main);
 }
 
+.obra-logo-file-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.obra-logo-file-name {
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  padding: 0.5rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.9);
+  background-color: #f9fafb;
+  box-sizing: border-box;
+}
+
 .btn-primary {
   margin-top: 0.5rem;
   border-radius: 999px;
@@ -2605,6 +2628,30 @@ ul.informe-searchable-list {
 }
 .users-table td {
   color: #111827;
+}
+
+.consolidado-export-table {
+  min-width: 2400px;
+}
+
+.consolidado-export-cell {
+  white-space: pre-wrap;
+  max-width: 380px;
+  vertical-align: top;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.consolidado-export-link {
+  color: #b45309;
+  font-weight: 600;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+.consolidado-export-link:hover {
+  color: #92400e;
 }
 .users-table-actions {
   display: flex;

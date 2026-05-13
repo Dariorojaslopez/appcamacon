@@ -35,6 +35,30 @@ export function extractGoogleDriveFileIdFromViewUrl(url: string): string | null 
   return m?.[1] ?? null;
 }
 
+/** ID de archivo Drive desde vista, miniatura u otros enlaces con parámetro id. */
+export function extractGoogleDriveFileIdFromStoredUrl(url: string): string | null {
+  const fromView = extractGoogleDriveFileIdFromViewUrl(url);
+  if (fromView) return fromView;
+  if (!url.includes('drive.google.com')) return null;
+  const m = url.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+  return m?.[1] ?? null;
+}
+
+/**
+ * URL para <img src> a partir de lo guardado en BD (Drive vista, miniatura, ruta local o ya proxy).
+ */
+export function storedMediaImgSrc(storedUrl: string | null | undefined): string | null {
+  if (storedUrl == null || !String(storedUrl).trim()) return null;
+  const s = String(storedUrl).trim();
+  if (s.startsWith('/api/uploads/drive-image')) return s;
+  const driveId = extractGoogleDriveFileIdFromStoredUrl(s);
+  if (driveId) {
+    return `/api/uploads/drive-image?fileId=${encodeURIComponent(driveId)}`;
+  }
+  if (s.startsWith('/')) return s;
+  return s;
+}
+
 /**
  * URL usable en <img src>. Para Drive, la webViewLink no sirve; usamos thumbnail de la API o fallback.
  */

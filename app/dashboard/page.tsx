@@ -8,6 +8,7 @@ import {
   useRef,
   type CSSProperties,
   type Dispatch,
+  type ReactNode,
   type SetStateAction,
 } from 'react';
 import { useRouter } from 'next/navigation';
@@ -43,6 +44,7 @@ import {
   evidenciaCarouselImgSrc,
   evidenciaItemUrl,
   normalizeEvidenciasBody,
+  storedMediaImgSrc,
   totalEvidenciasCount,
   type EvidenciaFase,
   type EvidenciaItem,
@@ -98,6 +100,108 @@ function browserPermissionPolicyAllows(feature: 'camera' | 'geolocation'): boole
   } catch {
     return true;
   }
+}
+
+/** Quita del final de una URL candidata signos que suelen pegarse al enlace en texto plano. */
+function clipTrailingUrlJunk(url: string): string {
+  let u = url;
+  while (u.length > 0 && /[)\].,;:>'"»]+$/.test(u)) u = u.slice(0, -1);
+  return u;
+}
+
+/** Texto multilínea con URLs convertidas a enlaces (export / evidencias / imágenes). */
+function renderPreformattedWithUrls(text: string): ReactNode {
+  const parts: ReactNode[] = [];
+  let last = 0;
+  let key = 0;
+  const re = /https?:\/\/[^\s<>"'()[\]]+/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const idx = m.index;
+    const raw = m[0];
+    const href = clipTrailingUrlJunk(raw);
+    if (idx > last) parts.push(text.slice(last, idx));
+    if (href) {
+      parts.push(
+        <a
+          key={`u-${key++}`}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="consolidado-export-link"
+        >
+          {href}
+        </a>,
+      );
+    }
+    const tail = raw.slice(href.length);
+    if (tail) parts.push(tail);
+    last = idx + raw.length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts.length > 0 ? parts : text;
+}
+
+function csvEscapeCell(value: string): string {
+  const s = String(value ?? '');
+  if (/[,"\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+type ConsolidadoExportRow = {
+  informeId: string;
+  obraCodigo: string;
+  obraNombre: string;
+  fecha: string;
+  jornadaNombre: string;
+  datosGenerales: string;
+  jornadaCondiciones: string;
+  personal: string;
+  equiposMateriales: string;
+  actividades: string;
+  calidad: string;
+  evidencias: string;
+};
+
+const CONSOLIDADO_SIETE_COLUMNAS = [
+  'Datos generales',
+  'Jornada y condiciones',
+  'Personal en obra',
+  'Equipos y materiales',
+  'Actividades desarrolladas',
+  'Calidad y afectaciones',
+  'Evidencias y cierre',
+] as const;
+
+function consolidadoColumnaDatosGenerales(row: ConsolidadoExportRow): string {
+  return [
+    `Obra: ${row.obraCodigo} – ${row.obraNombre}`,
+    `Fecha del informe: ${row.fecha}`,
+    `Jornada: ${row.jornadaNombre}`,
+    '',
+    row.datosGenerales,
+  ].join('\n');
+}
+
+function buildConsolidadoCsv(rows: ConsolidadoExportRow[]): string {
+  const lines: string[] = [];
+  lines.push(CONSOLIDADO_SIETE_COLUMNAS.map(csvEscapeCell).join(','));
+  for (const row of rows) {
+    lines.push(
+      [
+        consolidadoColumnaDatosGenerales(row),
+        row.jornadaCondiciones,
+        row.personal,
+        row.equiposMateriales,
+        row.actividades,
+        row.calidad,
+        row.evidencias,
+      ]
+        .map(csvEscapeCell)
+        .join(','),
+    );
+  }
+  return `\uFEFF${lines.join('\r\n')}`;
 }
 
 interface BeforeInstallPromptEvent extends Event {
@@ -1036,6 +1140,8 @@ export default function DashboardPage() {
   });
   const [savingObra, setSavingObra] = useState(false);
   const [deletingObraId, setDeletingObraId] = useState<string | null>(null);
+  const [obraCreateLogoPickLabel, setObraCreateLogoPickLabel] = useState<string | null>(null);
+  const [obraEditLogoPickLabel, setObraEditLogoPickLabel] = useState<string | null>(null);
   const [obrasForInforme, setObrasForInforme] = useState<{ id: string; name: string; code: string }[]>([]);
   const [loadingObrasForInforme, setLoadingObrasForInforme] = useState(false);
 
@@ -1553,22 +1659,7 @@ export default function DashboardPage() {
   const [exportJornadaId, setExportJornadaId] = useState<'all' | string>('all');
   const [exportDateFrom, setExportDateFrom] = useState(() => new Date().toISOString().slice(0, 10));
   const [exportDateTo, setExportDateTo] = useState(() => new Date().toISOString().slice(0, 10));
-  const [consolidadoRows, setConsolidadoRows] = useState<
-    Array<{
-      informeId: string;
-      obraCodigo: string;
-      obraNombre: string;
-      fecha: string;
-      jornadaNombre: string;
-      datosGenerales: string;
-      jornadaCondiciones: string;
-      personal: string;
-      equiposMateriales: string;
-      actividades: string;
-      calidad: string;
-      evidencias: string;
-    }>
-  >([]);
+  const [consolidadoRows, setConsolidadoRows] = useState<ConsolidadoExportRow[]>([]);
   const [consolidadoTruncated, setConsolidadoTruncated] = useState(false);
   const [loadingConsolidado, setLoadingConsolidado] = useState(false);
   const [consolidadoError, setConsolidadoError] = useState<string | null>(null);
@@ -3186,6 +3277,7 @@ export default function DashboardPage() {
           setObraError(upData.error ?? 'Obra creada pero no se pudo subir el logo.');
           setObrasList((prev) => [...prev, nuevaObra]);
           if (obraCreateLogoInputRef.current) obraCreateLogoInputRef.current.value = '';
+          setObraCreateLogoPickLabel(null);
           return;
         }
         if (typeof upData.url === 'string' && upData.url) {
@@ -3201,6 +3293,7 @@ export default function DashboardPage() {
       }
       setObrasList((prev) => [...prev, nuevaObra]);
       if (obraCreateLogoInputRef.current) obraCreateLogoInputRef.current.value = '';
+      setObraCreateLogoPickLabel(null);
       setObraForm({ name: '', startDate: '', endDate: '', evidenciasGoogleDriveFolderId: '' });
       setObraMessage('Obra creada. El consecutivo y código se asignaron automáticamente.');
       setTimeout(() => setObraMessage(null), 4000);
@@ -3231,6 +3324,7 @@ export default function DashboardPage() {
         (o.evidenciasGoogleDriveFolderId ?? o.evidenciasOnedriveShareUrl) ?? '',
       logoUrl: o.logoUrl ?? null,
     });
+    setObraEditLogoPickLabel(null);
   };
 
   const saveEditObra = async (e: React.FormEvent) => {
@@ -3274,6 +3368,7 @@ export default function DashboardPage() {
       }
       setObrasList((prev) => prev.map((x) => (x.id === editObra.id ? { ...x, ...data.obra } : x)));
       setEditObra(null);
+      setObraEditLogoPickLabel(null);
       setObraMessage('Obra actualizada.');
       setTimeout(() => setObraMessage(null), 3000);
     } catch {
@@ -7328,10 +7423,32 @@ export default function DashboardPage() {
                     <input
                       id="obra-logo-file"
                       ref={obraCreateLogoInputRef}
-                      className="form-input"
+                      className="sr-only"
                       type="file"
                       accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        setObraCreateLogoPickLabel(f ? f.name : null);
+                      }}
                     />
+                    <div className="obra-logo-file-row">
+                      <button
+                        type="button"
+                        className="registro-foto-btn registro-foto-btn-primary"
+                        onClick={() => obraCreateLogoInputRef.current?.click()}
+                      >
+                        Elegir imagen
+                      </button>
+                      {obraCreateLogoPickLabel ? (
+                        <span className="obra-logo-file-name" title={obraCreateLogoPickLabel}>
+                          {obraCreateLogoPickLabel}
+                        </span>
+                      ) : (
+                        <span className="shell-text-muted" style={{ fontSize: '0.85rem' }}>
+                          Ningún archivo seleccionado
+                        </span>
+                      )}
+                    </div>
                     <p className="shell-text-muted" style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
                       JPG, PNG, WEBP o GIF. Máximo 2 MB. Se sube automáticamente al crear la obra.
                     </p>
@@ -7365,7 +7482,7 @@ export default function DashboardPage() {
                             <td style={{ width: 56 }}>
                               {o.logoUrl ? (
                                 <img
-                                  src={o.logoUrl}
+                                  src={storedMediaImgSrc(o.logoUrl) ?? undefined}
                                   alt=""
                                   width={44}
                                   height={44}
@@ -7468,7 +7585,7 @@ export default function DashboardPage() {
                         {editObraForm.logoUrl ? (
                           <div style={{ marginBottom: '0.5rem' }}>
                             <img
-                              src={editObraForm.logoUrl}
+                              src={storedMediaImgSrc(editObraForm.logoUrl) ?? undefined}
                               alt="Logo actual"
                               width={120}
                               height={120}
@@ -7483,10 +7600,32 @@ export default function DashboardPage() {
                         <input
                           id="obra-edit-logo"
                           ref={obraEditLogoInputRef}
-                          className="form-input"
+                          className="sr-only"
                           type="file"
                           accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            setObraEditLogoPickLabel(f ? f.name : null);
+                          }}
                         />
+                        <div className="obra-logo-file-row">
+                          <button
+                            type="button"
+                            className="registro-foto-btn registro-foto-btn-primary"
+                            onClick={() => obraEditLogoInputRef.current?.click()}
+                          >
+                            Elegir imagen
+                          </button>
+                          {obraEditLogoPickLabel ? (
+                            <span className="obra-logo-file-name" title={obraEditLogoPickLabel}>
+                              {obraEditLogoPickLabel}
+                            </span>
+                          ) : (
+                            <span className="shell-text-muted" style={{ fontSize: '0.85rem' }}>
+                              Misma imagen (sin cambio)
+                            </span>
+                          )}
+                        </div>
                         <p className="shell-text-muted" style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
                           Elija archivo para reemplazar. Máx. 2 MB.
                         </p>
@@ -7498,6 +7637,7 @@ export default function DashboardPage() {
                           onClick={() => {
                             setEditObraForm((f) => ({ ...f, logoUrl: null }));
                             if (obraEditLogoInputRef.current) obraEditLogoInputRef.current.value = '';
+                            setObraEditLogoPickLabel(null);
                           }}
                         >
                             Quitar logo (guardar para aplicar)
@@ -7511,6 +7651,7 @@ export default function DashboardPage() {
                         <button type="button" className="btn-cancel" onClick={() => {
                           setEditObra(null);
                           if (obraEditLogoInputRef.current) obraEditLogoInputRef.current.value = '';
+                          setObraEditLogoPickLabel(null);
                         }}>
                           Cancelar
                         </button>
@@ -13514,11 +13655,10 @@ export default function DashboardPage() {
           <section className="shell-card shell-card-wide">
             <h1 className="shell-title">Informe diario – Exportar</h1>
             <p className="shell-text-muted" style={{ marginBottom: '1rem' }}>
-              Filtra por obra, jornada y rango de fechas del reporte. Cada fila es un informe (obra · día · jornada). El
-              texto incluye metadatos (IDs, usuario, fechas de sistema), catálogos vinculados, clima de bitácora,
-              suspensiones con imagen y GPS, personal, equipos con horarios e imagen, ingresos/entregas con foto y GPS,
-              actividades con dimensiones y foto, ensayos/daños/no conformidades completos, evidencias por fase
-              (antes/durante/después) con URL y GPS por foto, y firmas con código y fecha.
+              Filtra por obra, jornada y rango de fechas. Cada fila es un informe. La tabla y el CSV tienen{' '}
+              <strong>siete columnas</strong>, alineadas con las secciones del formulario: en «Datos generales» se
+              incluye también obra, fecha y jornada. Las URLs (fotos, Drive, archivos) aparecen como enlaces en la
+              tabla; en el CSV quedan como texto para abrirlas desde Excel u otro programa.
             </p>
 
             <div
@@ -13647,113 +13787,59 @@ export default function DashboardPage() {
             {loadingConsolidado ? <p className="shell-text-muted">Cargando informes…</p> : null}
 
             {!loadingConsolidado && consolidadoRows.length > 0 ? (
-              <div className="users-table-wrap" style={{ marginTop: '0.75rem' }}>
-                <table className="users-table" style={{ minWidth: 3200 }}>
-                  <thead>
-                    <tr>
-                      <th>Obra</th>
-                      <th>Fecha</th>
-                      <th>Jornada</th>
-                      <th>Datos generales</th>
-                      <th>Jornada y condiciones</th>
-                      <th>Personal en obra</th>
-                      <th>Equipos y materiales</th>
-                      <th>Actividades desarrolladas</th>
-                      <th>Calidad e incidentes</th>
-                      <th>Evidencias y cierre</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {consolidadoRows.map((row) => (
-                      <tr key={row.informeId}>
-                        <td style={{ whiteSpace: 'nowrap' }}>
-                          <strong>{row.obraCodigo}</strong>
-                          <br />
-                          <span style={{ fontSize: '0.85rem' }}>{row.obraNombre}</span>
-                        </td>
-                        <td style={{ whiteSpace: 'nowrap' }}>{row.fecha}</td>
-                        <td style={{ minWidth: 140, maxWidth: 220 }}>{row.jornadaNombre}</td>
-                        <td
-                          style={{
-                            whiteSpace: 'pre-wrap',
-                            maxWidth: 520,
-                            verticalAlign: 'top',
-                            fontSize: '0.8rem',
-                            lineHeight: 1.45,
-                          }}
-                        >
-                          {row.datosGenerales}
-                        </td>
-                        <td
-                          style={{
-                            whiteSpace: 'pre-wrap',
-                            maxWidth: 520,
-                            verticalAlign: 'top',
-                            fontSize: '0.8rem',
-                            lineHeight: 1.45,
-                          }}
-                        >
-                          {row.jornadaCondiciones}
-                        </td>
-                        <td
-                          style={{
-                            whiteSpace: 'pre-wrap',
-                            maxWidth: 520,
-                            verticalAlign: 'top',
-                            fontSize: '0.8rem',
-                            lineHeight: 1.45,
-                          }}
-                        >
-                          {row.personal}
-                        </td>
-                        <td
-                          style={{
-                            whiteSpace: 'pre-wrap',
-                            maxWidth: 520,
-                            verticalAlign: 'top',
-                            fontSize: '0.8rem',
-                            lineHeight: 1.45,
-                          }}
-                        >
-                          {row.equiposMateriales}
-                        </td>
-                        <td
-                          style={{
-                            whiteSpace: 'pre-wrap',
-                            maxWidth: 520,
-                            verticalAlign: 'top',
-                            fontSize: '0.8rem',
-                            lineHeight: 1.45,
-                          }}
-                        >
-                          {row.actividades}
-                        </td>
-                        <td
-                          style={{
-                            whiteSpace: 'pre-wrap',
-                            maxWidth: 520,
-                            verticalAlign: 'top',
-                            fontSize: '0.8rem',
-                            lineHeight: 1.45,
-                          }}
-                        >
-                          {row.calidad}
-                        </td>
-                        <td
-                          style={{
-                            whiteSpace: 'pre-wrap',
-                            maxWidth: 520,
-                            verticalAlign: 'top',
-                            fontSize: '0.8rem',
-                            lineHeight: 1.45,
-                          }}
-                        >
-                          {row.evidencias}
-                        </td>
+              <div style={{ marginTop: '0.75rem' }}>
+                <div style={{ marginBottom: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => {
+                      const csv = buildConsolidadoCsv(consolidadoRows);
+                      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `informes_diarios_export_${exportDateFrom}_${exportDateTo}.csv`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                  >
+                    Descargar CSV (7 columnas)
+                  </button>
+                </div>
+                <div className="users-table-wrap">
+                  <table className="users-table consolidado-export-table">
+                    <thead>
+                      <tr>
+                        {CONSOLIDADO_SIETE_COLUMNAS.map((titulo) => (
+                          <th key={titulo}>{titulo}</th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {consolidadoRows.map((row) => (
+                        <tr key={row.informeId}>
+                          <td className="consolidado-export-cell">
+                            {renderPreformattedWithUrls(consolidadoColumnaDatosGenerales(row))}
+                          </td>
+                          <td className="consolidado-export-cell">
+                            {renderPreformattedWithUrls(row.jornadaCondiciones)}
+                          </td>
+                          <td className="consolidado-export-cell">
+                            {renderPreformattedWithUrls(row.personal)}
+                          </td>
+                          <td className="consolidado-export-cell">
+                            {renderPreformattedWithUrls(row.equiposMateriales)}
+                          </td>
+                          <td className="consolidado-export-cell">
+                            {renderPreformattedWithUrls(row.actividades)}
+                          </td>
+                          <td className="consolidado-export-cell">{renderPreformattedWithUrls(row.calidad)}</td>
+                          <td className="consolidado-export-cell">{renderPreformattedWithUrls(row.evidencias)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             ) : null}
 
