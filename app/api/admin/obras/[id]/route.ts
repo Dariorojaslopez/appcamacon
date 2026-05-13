@@ -24,6 +24,7 @@ export async function PATCH(
       isActive?: boolean;
       evidenciasOnedriveShareUrl?: string | null;
       evidenciasGoogleDriveFolderId?: string | null;
+      logoUrl?: string | null;
     };
     const data: Record<string, unknown> = {};
     if (body.name !== undefined) data.name = body.name.trim();
@@ -41,6 +42,10 @@ export async function PATCH(
       data.evidenciasGoogleDriveFolderId =
         s != null && String(s).trim() ? String(s).trim() : null;
     }
+    if (body.logoUrl !== undefined) {
+      const s = body.logoUrl;
+      data.logoUrl = s != null && String(s).trim() ? String(s).trim() : null;
+    }
 
     const obra = await prisma.project.update({
       where: { id },
@@ -57,6 +62,7 @@ export async function PATCH(
         endDate: obra.endDate,
         evidenciasOnedriveShareUrl: obra.evidenciasOnedriveShareUrl,
         evidenciasGoogleDriveFolderId: obra.evidenciasGoogleDriveFolderId,
+        logoUrl: obra.logoUrl,
         isActive: obra.isActive,
         createdAt: obra.createdAt,
         updatedAt: obra.updatedAt,

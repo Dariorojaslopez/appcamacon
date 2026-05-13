@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
         endDate: o.endDate,
         evidenciasOnedriveShareUrl: o.evidenciasOnedriveShareUrl,
         evidenciasGoogleDriveFolderId: o.evidenciasGoogleDriveFolderId,
+        logoUrl: o.logoUrl,
         isActive: o.isActive,
         createdAt: o.createdAt,
         updatedAt: o.updatedAt,
@@ -59,6 +60,7 @@ export async function POST(req: NextRequest) {
       endDate?: string;
       evidenciasOnedriveShareUrl?: string | null;
       evidenciasGoogleDriveFolderId?: string | null;
+      logoUrl?: string | null;
     };
     const { name, description, startDate, endDate, evidenciasOnedriveShareUrl, evidenciasGoogleDriveFolderId } =
       body;
@@ -103,6 +105,7 @@ export async function POST(req: NextRequest) {
           endDate: obra.endDate,
           evidenciasOnedriveShareUrl: obra.evidenciasOnedriveShareUrl,
           evidenciasGoogleDriveFolderId: obra.evidenciasGoogleDriveFolderId,
+          logoUrl: obra.logoUrl,
           isActive: obra.isActive,
           createdAt: obra.createdAt,
           updatedAt: obra.updatedAt,

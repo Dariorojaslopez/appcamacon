@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessToken } from '../../../../src/infrastructure/auth/tokens';
 import prisma from '../../../../src/lib/prisma';
+import {
+  EVIDENCIA_FASES,
+  evidenciaItemUrl,
+  parseEvidenciasStored,
+  type EvidenciaItem,
+} from '../../../../src/lib/evidenciasUrlPayload';
 
-const MAX_ROWS = 400;
+const MAX_ROWS = 600;
 
 function ymdUtc(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -23,6 +29,69 @@ function joinBlocks(parts: (string | null | undefined)[], sep = '\n\n'): string 
     .map((p) => (typeof p === 'string' ? p.trim() : ''))
     .filter(Boolean)
     .join(sep);
+}
+
+function fmtSiNo(v: boolean | null | undefined): string {
+  if (v === true) return 'Sí';
+  if (v === false) return 'No';
+  return '—';
+}
+
+function fmtNum(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(Number(n))) return '—';
+  return String(n);
+}
+
+function fmtGeoLine(label: string, lat?: number | null, lon?: number | null, prec?: number | null, estado?: string | null, tomada?: Date | string | null): string | null {
+  const has =
+    (lat != null && Number.isFinite(lat)) ||
+    (lon != null && Number.isFinite(lon)) ||
+    (prec != null && Number.isFinite(prec)) ||
+    (estado != null && String(estado).trim()) ||
+    tomada != null;
+  if (!has) return null;
+  const t =
+    tomada instanceof Date
+      ? tomada.toISOString()
+      : tomada != null && String(tomada).trim()
+        ? String(tomada)
+        : '—';
+  return `${label}: lat ${fmtNum(lat)} · lon ${fmtNum(lon)} · precisión m ${fmtNum(prec)} · estado ${estado?.trim() || '—'} · capturada ${t}`;
+}
+
+function fmtEvidenciaItemDetalle(idx: number, item: EvidenciaItem): string {
+  const url = evidenciaItemUrl(item);
+  const lines = [`  ${idx + 1}. URL: ${url || '—'}`];
+  if (typeof item === 'object' && item) {
+    const g = fmtGeoLine(
+      '     GPS foto',
+      item.imagenLatitud,
+      item.imagenLongitud,
+      item.imagenPrecision,
+      item.imagenGeoEstado,
+      item.imagenTomadaEn ?? null,
+    );
+    if (g) lines.push(g);
+    if (item.previewUrl?.trim()) lines.push(`     Preview: ${item.previewUrl.trim()}`);
+  }
+  return lines.join('\n');
+}
+
+function fmtEvidenciasPorFase(raw: string | null | undefined): string | null {
+  if (!raw?.trim()) return null;
+  const porFase = parseEvidenciasStored(raw);
+  const bloques: string[] = [];
+  for (const { key, label } of EVIDENCIA_FASES) {
+    const arr = porFase[key] ?? [];
+    if (arr.length === 0) continue;
+    bloques.push(
+      `${label} (${arr.length}):\n${arr.map((it, i) => fmtEvidenciaItemDetalle(i, it)).join('\n')}`,
+    );
+  }
+  if (bloques.length === 0 && raw.trim()) {
+    return `Evidencias (raw JSON no estándar, primeros 2000 caracteres):\n${raw.trim().slice(0, 2000)}`;
+  }
+  return bloques.length ? bloques.join('\n\n') : null;
 }
 
 export async function GET(req: NextRequest) {
@@ -65,7 +134,12 @@ export async function GET(req: NextRequest) {
       orderBy: [{ date: 'asc' }, { projectId: 'asc' }, { jornadaCatalogoId: 'asc' }],
       include: {
         project: { select: { code: true, name: true } },
-        jornadaCatalogo: { select: { nombre: true, horaInicio: true, horaFin: true } },
+        jornadaCatalogo: { select: { id: true, nombre: true, horaInicio: true, horaFin: true } },
+        user: { select: { id: true, name: true, identification: true, email: true, role: true } },
+        frenteObraCatalogo: { select: { id: true, nombre: true } },
+        contratistaCatalog: { select: { id: true, nombre: true, cedula: true } },
+        encargadoReporteCatalog: { select: { id: true, nombre: true, cedula: true } },
+        cargoCatalog: { select: { id: true, nombre: true, consecutivo: true } },
         personal: { orderBy: { createdAt: 'asc' } },
         equipos: {
           orderBy: { createdAt: 'asc' },
@@ -79,6 +153,7 @@ export async function GET(req: NextRequest) {
         noConformidadesObra: { orderBy: { createdAt: 'asc' } },
         suspensiones: { orderBy: { orden: 'asc' } },
         firmas: { orderBy: { slot: 'asc' } },
+        bitacoraClimas: { orderBy: { createdAt: 'asc' } },
       },
     });
 
@@ -90,85 +165,226 @@ export async function GET(req: NextRequest) {
         ? `${inf.jornadaCatalogo.nombre} (${inf.jornadaCatalogo.horaInicio}–${inf.jornadaCatalogo.horaFin})`
         : '— (sin jornada)';
 
-      const datosGenerales = joinBlocks(
+      const metadatos = joinBlocks(
         [
-          inf.informeNo ? `Informe N°: ${inf.informeNo}` : null,
-          inf.centroTrabajo ? `Centro de trabajo: ${inf.centroTrabajo}` : null,
-          inf.frenteObra ? `Frente de obra: ${inf.frenteObra}` : null,
-          inf.contratista ? `Contratista: ${inf.contratista}` : null,
-          inf.encargadoReporte ? `Encargado reporte: ${inf.encargadoReporte}` : null,
-          inf.cargo ? `Cargo: ${inf.cargo}` : null,
-          inf.horaEntrada || inf.horaSalida
-            ? `Horario obra: ${inf.horaEntrada ?? '—'} – ${inf.horaSalida ?? '—'}`
+          `ID informe: ${inf.id}`,
+          `ID obra: ${inf.projectId}`,
+          `ID jornada catálogo: ${inf.jornadaCatalogoId ?? '—'}`,
+          `Usuario informe (ID): ${inf.userId}`,
+          inf.user
+            ? `Usuario: ${inf.user.name} · CC/NIT ${inf.user.identification} · ${inf.user.email} · Rol ${inf.user.role}`
             : null,
-          inf.informeCerrado ? 'Estado informe: CERRADO' : 'Estado informe: Abierto',
+          `Creado: ${inf.createdAt.toISOString()} · Actualizado: ${inf.updatedAt.toISOString()}`,
+          inf.informeCerrado && inf.cerradoEn ? `Cerrado en: ${inf.cerradoEn.toISOString()}` : null,
         ],
         '\n',
       );
 
-      const jornadaCondiciones = joinBlocks(
+      const datosGenerales = joinBlocks(
         [
-          inf.condiciones ? `Condiciones: ${inf.condiciones}` : null,
-          inf.actividades ? `Actividades (texto): ${inf.actividades}` : null,
-          inf.incidentes ? `Incidentes: ${inf.incidentes}` : null,
-          inf.huboSuspension != null
-            ? `Suspensión jornada (cabecera): ${inf.huboSuspension ? 'Sí' : 'No'}${inf.motivoSuspension ? ` — ${inf.motivoSuspension}` : ''}`
+          metadatos,
+          inf.informeConsecutivo != null ? `Consecutivo informe: ${inf.informeConsecutivo}` : null,
+          inf.informeNo ? `Informe N°: ${inf.informeNo}` : null,
+          inf.centroTrabajoConsecutivo != null ? `Consecutivo centro trabajo: ${inf.centroTrabajoConsecutivo}` : null,
+          inf.centroTrabajo ? `Centro de trabajo: ${inf.centroTrabajo}` : null,
+          inf.frenteObra ? `Frente (texto): ${inf.frenteObra}` : null,
+          inf.frenteObraCatalogoId
+            ? `Frente catálogo ID: ${inf.frenteObraCatalogoId}${inf.frenteObraCatalogo ? ` · ${inf.frenteObraCatalogo.nombre}` : ''}`
             : null,
-          inf.horaSuspension || inf.horaReinicio
-            ? `Hora susp./reinicio (cabecera): ${inf.horaSuspension ?? '—'} / ${inf.horaReinicio ?? '—'}`
+          inf.contratista ? `Contratista (texto): ${inf.contratista}` : null,
+          inf.contratistaCatalogoId
+            ? `Contratista catálogo ID: ${inf.contratistaCatalogoId}${
+                inf.contratistaCatalog
+                  ? ` · ${inf.contratistaCatalog.nombre} · NIT/CC ${inf.contratistaCatalog.cedula}`
+                  : ''
+              }`
             : null,
-          inf.tipoClima ? `Clima: ${inf.tipoClima}${inf.horasClima != null ? ` (${inf.horasClima} h)` : ''}` : null,
-          inf.suspensiones.length > 0
-            ? `Suspensiones detalle:\n${inf.suspensiones
-                .map(
-                  (s, i) =>
-                    `  ${i + 1}. ${s.motivoSuspension} · ${s.horaSuspension}–${s.horaReinicio}${s.tipoClima ? ` · clima ${s.tipoClima}` : ''}`,
-                )
-                .join('\n')}`
+          inf.encargadoReporte ? `Encargado (texto): ${inf.encargadoReporte}` : null,
+          inf.encargadoReporteCatalogoId
+            ? `Encargado catálogo ID: ${inf.encargadoReporteCatalogoId}${
+                inf.encargadoReporteCatalog
+                  ? ` · ${inf.encargadoReporteCatalog.nombre} · ${inf.encargadoReporteCatalog.cedula}`
+                  : ''
+              }`
             : null,
+          inf.cargo ? `Cargo (texto): ${inf.cargo}` : null,
+          inf.cargoCatalogoId
+            ? `Cargo catálogo ID: ${inf.cargoCatalogoId}${
+                inf.cargoCatalog
+                  ? ` · ${inf.cargoCatalog.nombre}${inf.cargoCatalog.consecutivo != null ? ` · cons. ${inf.cargoCatalog.consecutivo}` : ''}`
+                  : ''
+              }`
+            : null,
+          inf.horaEntrada || inf.horaSalida
+            ? `Horario obra: ${inf.horaEntrada ?? '—'} – ${inf.horaSalida ?? '—'}`
+            : null,
+          `Informe cerrado: ${fmtSiNo(inf.informeCerrado)}`,
         ],
         '\n',
+      );
+
+      const climaBitacora =
+        inf.bitacoraClimas.length > 0
+          ? inf.bitacoraClimas
+              .map(
+                (c, i) =>
+                  `${i + 1}. ${c.tipo} · Temp ${fmtNum(c.temperatura)} · Hum ${fmtNum(c.humedad)} · Obs: ${c.observaciones ?? '—'}\n${fmtGeoLine('   GPS clima', c.latitud, c.longitud, c.precisionGps, null, c.capturadoEn) ?? '   (sin GPS clima)'}`,
+              )
+              .join('\n\n')
+          : null;
+
+      const jornadaCondiciones = joinBlocks(
+        [
+          climaBitacora ? `Clima (bitácora / registro diario):\n${climaBitacora}` : null,
+          inf.condiciones ? `Condiciones de obra: ${inf.condiciones}` : null,
+          inf.actividades ? `Actividades (texto libre del informe): ${inf.actividades}` : null,
+          inf.incidentes ? `Incidentes: ${inf.incidentes}` : null,
+          `Suspensión en cabecera (legacy): ${fmtSiNo(inf.huboSuspension)}${inf.motivoSuspension ? ` — ${inf.motivoSuspension}` : ''}`,
+          inf.horaSuspension || inf.horaReinicio
+            ? `Hora susp./reinicio cabecera: ${inf.horaSuspension ?? '—'} / ${inf.horaReinicio ?? '—'}`
+            : null,
+          inf.tipoClima ? `Tipo clima cabecera: ${inf.tipoClima}${inf.horasClima != null ? ` · ${inf.horasClima} h` : ''}` : null,
+          inf.suspensiones.length > 0
+            ? `Suspensiones (detalle completo):\n${inf.suspensiones
+                .map((s, i) => {
+                  const geo =
+                    fmtGeoLine(
+                      '  GPS imagen',
+                      s.imagenLatitud,
+                      s.imagenLongitud,
+                      s.imagenPrecision,
+                      s.imagenGeoEstado,
+                      s.imagenTomadaEn,
+                    ) ?? '';
+                  return [
+                    `  ${i + 1}. ${s.motivoSuspension}`,
+                    `     Horas: ${s.horaSuspension} – ${s.horaReinicio}`,
+                    s.tipoClima ? `     Clima fila: ${s.tipoClima} · ${fmtNum(s.horasClima)} h` : null,
+                    s.imagenUrl ? `     Imagen: ${s.imagenUrl}` : null,
+                    geo || null,
+                    `     Orden: ${s.orden} · ID: ${s.id}`,
+                  ]
+                    .filter(Boolean)
+                    .join('\n');
+                })
+                .join('\n\n')}`
+            : null,
+        ],
+        '\n\n',
       );
 
       const personalTxt =
         inf.personal.length > 0
           ? inf.personal
               .map((p, i) => {
-                const sub = p.subcontratista ? ` · Sub: ${p.subcontratista}` : '';
-                const he = p.horaEntrada && p.horaSalida ? ` · ${p.horaEntrada}–${p.horaSalida}` : '';
-                return `${i + 1}. ${p.nombre} (${p.cargo})${sub}${he}`;
+                const he =
+                  p.horaEntrada || p.horaSalida
+                    ? `Entrada/salida: ${p.horaEntrada ?? '—'} – ${p.horaSalida ?? '—'}`
+                    : 'Entrada/salida: —';
+                return [
+                  `${i + 1}. ${p.nombre}`,
+                  `   Cargo: ${p.cargo}`,
+                  p.subcontratista ? `   Subcontratista: ${p.subcontratista}` : null,
+                  `   ${he}`,
+                  `   ID fila: ${p.id}`,
+                ]
+                  .filter(Boolean)
+                  .join('\n');
               })
-              .join('\n')
+              .join('\n\n')
           : '—';
 
       const equiposTxt = joinBlocks(
         [
           inf.equipos.length > 0
-            ? inf.equipos
+            ? `Equipos:\n${inf.equipos
                 .map((eq, i) => {
-                  const hz = eq.horarios
-                    .map((h) => `${h.horaIngreso}–${h.horaSalida} (${h.horasTrabajadas} h)`)
-                    .join(' | ');
-                  const base = `${i + 1}. ${eq.descripcion}${eq.placaRef ? ` · ${eq.placaRef}` : ''}${eq.propiedad ? ` · ${eq.propiedad}` : ''}${eq.estado ? ` · ${eq.estado}` : ''}${eq.horasTrabajadas != null ? ` · Total h: ${eq.horasTrabajadas}` : ''}`;
-                  return hz ? `${base}\n   Horarios: ${hz}` : base;
+                  const hz = eq.horarios.length
+                    ? eq.horarios
+                        .map(
+                          (h, j) =>
+                            `     Horario ${j + 1}: ${h.horaIngreso}–${h.horaSalida} · ${h.horasTrabajadas} h (id ${h.id})`,
+                        )
+                        .join('\n')
+                    : '     (sin horarios)';
+                  const geo =
+                    fmtGeoLine(
+                      '   GPS equipo/foto',
+                      eq.imagenLatitud,
+                      eq.imagenLongitud,
+                      eq.imagenPrecision,
+                      eq.imagenGeoEstado,
+                      eq.imagenTomadaEn,
+                    ) ?? null;
+                  return [
+                    `  ${i + 1}. ${eq.descripcion}`,
+                    eq.placaRef ? `     Placa/ref: ${eq.placaRef}` : null,
+                    eq.propiedad ? `     Propiedad: ${eq.propiedad}` : null,
+                    eq.estado ? `     Estado: ${eq.estado}` : null,
+                    eq.observacion ? `     Observación: ${eq.observacion}` : null,
+                    eq.horaIngreso || eq.horaSalida
+                      ? `     Ingreso/salida equipo: ${eq.horaIngreso ?? '—'} – ${eq.horaSalida ?? '—'}`
+                      : null,
+                    eq.horasTrabajadas != null ? `     Horas trabajadas (total): ${eq.horasTrabajadas}` : null,
+                    eq.imagenUrl ? `     Imagen URL: ${eq.imagenUrl}` : null,
+                    geo,
+                    `     ID: ${eq.id}`,
+                    hz,
+                  ]
+                    .filter(Boolean)
+                    .join('\n');
                 })
-                .join('\n\n')
+                .join('\n\n')}`
             : null,
           inf.materialIngresos.length > 0
             ? `Ingresos materiales:\n${inf.materialIngresos
-                .map(
-                  (m, i) =>
-                    `  ${i + 1}. ${m.tipoMaterial} · ${m.proveedor} · Rem. ${m.noRemision} · ${m.cantidad ?? '—'} ${m.unidad}${m.observacion ? ` · ${m.observacion}` : ''}`,
-                )
-                .join('\n')}`
+                .map((m, i) => {
+                  const geo =
+                    fmtGeoLine(
+                      '  GPS',
+                      m.imagenLatitud,
+                      m.imagenLongitud,
+                      m.imagenPrecision,
+                      m.imagenGeoEstado,
+                      m.imagenTomadaEn,
+                    ) ?? null;
+                  return [
+                    `  ${i + 1}. ${m.tipoMaterial} · Proveedor: ${m.proveedor}`,
+                    `     Remisión: ${m.noRemision} · Cant ${fmtNum(m.cantidad)} ${m.unidad}`,
+                    m.observacion ? `     Obs: ${m.observacion}` : null,
+                    m.imagenUrl ? `     Imagen: ${m.imagenUrl}` : null,
+                    geo,
+                    `     ID: ${m.id}`,
+                  ]
+                    .filter(Boolean)
+                    .join('\n');
+                })
+                .join('\n\n')}`
             : null,
           inf.materialEntregas.length > 0
             ? `Entregas materiales:\n${inf.materialEntregas
-                .map(
-                  (m, i) =>
-                    `  ${i + 1}. ${m.tipoMaterial} · ${m.cantidad ?? '—'} ${m.unidad} · ${m.contratista} · Firma: ${m.firmaRecibido ? 'Sí' : 'No'}${m.observacion ? ` · ${m.observacion}` : ''}`,
-                )
-                .join('\n')}`
+                .map((m, i) => {
+                  const geo =
+                    fmtGeoLine(
+                      '  GPS',
+                      m.imagenLatitud,
+                      m.imagenLongitud,
+                      m.imagenPrecision,
+                      m.imagenGeoEstado,
+                      m.imagenTomadaEn,
+                    ) ?? null;
+                  return [
+                    `  ${i + 1}. ${m.tipoMaterial} · ${fmtNum(m.cantidad)} ${m.unidad}`,
+                    `     Contratista: ${m.contratista} · Firma recibido: ${fmtSiNo(m.firmaRecibido)}`,
+                    m.observacion ? `     Obs: ${m.observacion}` : null,
+                    m.imagenUrl ? `     Imagen: ${m.imagenUrl}` : null,
+                    geo,
+                    `     ID: ${m.id}`,
+                  ]
+                    .filter(Boolean)
+                    .join('\n');
+                })
+                .join('\n\n')}`
             : null,
         ],
         '\n\n',
@@ -180,57 +396,137 @@ export async function GET(req: NextRequest) {
               .map((a, i) => {
                 const abs =
                   [a.abscisadoInicial, a.abscisadoFinal].filter(Boolean).join(' → ') || '—';
-                const obs = a.observacionTexto ? ` · Obs: ${a.observacionTexto}` : '';
-                return `${i + 1}. PK ${a.pk} · Abs. ${abs} · Ítem ${a.itemContractual} · ${a.descripcion} · ${a.cantidadTotal ?? '—'} ${a.unidadMedida}${obs}`;
+                const geo =
+                  fmtGeoLine(
+                    '   GPS',
+                    a.imagenLatitud,
+                    a.imagenLongitud,
+                    a.imagenPrecision,
+                    a.imagenGeoEstado,
+                    a.imagenTomadaEn,
+                  ) ?? null;
+                return [
+                  `${i + 1}. PK: ${a.pk} · Abscisados: ${abs}`,
+                  `   Ítem: ${a.itemContractual} · ${a.descripcion}`,
+                  `   Unidad: ${a.unidadMedida} · Cantidad total: ${fmtNum(a.cantidadTotal)}`,
+                  `   L×A×H: ${fmtNum(a.largo)} × ${fmtNum(a.ancho)} × ${fmtNum(a.altura)}`,
+                  `   Marcó observación (flag): ${fmtSiNo(a.observacion)}`,
+                  a.observacionTexto ? `   Texto observación: ${a.observacionTexto}` : null,
+                  a.imagenUrl ? `   Imagen: ${a.imagenUrl}` : null,
+                  geo,
+                  `   ID: ${a.id}`,
+                ]
+                  .filter(Boolean)
+                  .join('\n');
               })
-              .join('\n')
+              .join('\n\n')
           : '—';
 
       const calidadTxt = joinBlocks(
         [
           inf.ensayosObra.length > 0
             ? `Ensayos:\n${inf.ensayosObra
-                .map(
-                  (e, i) =>
-                    `  ${i + 1}. ${e.tipoEnsayo} · ${e.materialActividad} · Muestra ${e.idMuestra} · ${e.laboratorio} · ${e.localizacion} · ${e.resultado}${e.observacion ? ` · ${e.observacion}` : ''}`,
-                )
-                .join('\n')}`
+                .map((e, i) => {
+                  const geo =
+                    fmtGeoLine(
+                      '  GPS',
+                      e.imagenLatitud,
+                      e.imagenLongitud,
+                      e.imagenPrecision,
+                      e.imagenGeoEstado,
+                      e.imagenTomadaEn,
+                    ) ?? null;
+                  return [
+                    `  ${i + 1}. ${e.tipoEnsayo} · Material/actividad: ${e.materialActividad}`,
+                    `     Muestra: ${e.idMuestra} · Lab: ${e.laboratorio} · Loc: ${e.localizacion}`,
+                    e.descripcion ? `     Descripción: ${e.descripcion}` : null,
+                    `     Resultado: ${e.resultado}`,
+                    e.observacion ? `     Obs: ${e.observacion}` : null,
+                    e.imagenUrl ? `     Imagen: ${e.imagenUrl}` : null,
+                    geo,
+                    `     ID: ${e.id}`,
+                  ]
+                    .filter(Boolean)
+                    .join('\n');
+                })
+                .join('\n\n')}`
             : null,
           inf.danosRedesObra.length > 0
-            ? `Daños redes:\n${inf.danosRedesObra
-                .map(
-                  (d, i) =>
-                    `  ${i + 1}. ${d.tipoDano} · ${d.direccion} · ${d.entidad} · Reporte ${d.noReporte}${d.observacion ? ` · ${d.observacion}` : ''}`,
-                )
-                .join('\n')}`
+            ? `Daños a redes:\n${inf.danosRedesObra
+                .map((d, i) => {
+                  const geo =
+                    fmtGeoLine(
+                      '  GPS',
+                      d.imagenLatitud,
+                      d.imagenLongitud,
+                      d.imagenPrecision,
+                      d.imagenGeoEstado,
+                      d.imagenTomadaEn,
+                    ) ?? null;
+                  return [
+                    `  ${i + 1}. ${d.tipoDano} · ${d.direccion}`,
+                    `     Entidad: ${d.entidad} · Reporte N°: ${d.noReporte}`,
+                    d.horaReporte ? `     Hora reporte: ${d.horaReporte}` : null,
+                    d.observacion ? `     Obs: ${d.observacion}` : null,
+                    d.imagenUrl ? `     Imagen: ${d.imagenUrl}` : null,
+                    geo,
+                    `     ID: ${d.id}`,
+                  ]
+                    .filter(Boolean)
+                    .join('\n');
+                })
+                .join('\n\n')}`
             : null,
           inf.noConformidadesObra.length > 0
             ? `No conformidades:\n${inf.noConformidadesObra
-                .map(
-                  (n, i) =>
-                    `  ${i + 1}. ${n.noConformidad} · ${n.estado}${n.detalle ? ` · ${n.detalle}` : ''}${n.origen ? ` · Origen: ${n.origen}` : ''}`,
-                )
-                .join('\n')}`
+                .map((n, i) => {
+                  const geo =
+                    fmtGeoLine(
+                      '  GPS',
+                      n.imagenLatitud,
+                      n.imagenLongitud,
+                      n.imagenPrecision,
+                      n.imagenGeoEstado,
+                      n.imagenTomadaEn,
+                    ) ?? null;
+                  return [
+                    `  ${i + 1}. ${n.noConformidad} · Estado: ${n.estado}`,
+                    n.detalle ? `     Detalle: ${n.detalle}` : null,
+                    n.origen ? `     Origen: ${n.origen}` : null,
+                    n.imagenUrl ? `     Imagen: ${n.imagenUrl}` : null,
+                    geo,
+                    `     ID: ${n.id}`,
+                  ]
+                    .filter(Boolean)
+                    .join('\n');
+                })
+                .join('\n\n')}`
             : null,
         ],
         '\n\n',
       );
 
+      const fotosEvidencias = fmtEvidenciasPorFase(inf.evidenciasUrl);
+
       const evidenciasTxt = joinBlocks(
         [
-          inf.registroFotografico != null
-            ? `Registro fotográfico cargado: ${inf.registroFotografico ? 'Sí' : 'No'}`
-            : null,
+          `Registro fotográfico (¿se cargó?): ${inf.registroFotografico == null ? '—' : fmtSiNo(inf.registroFotografico)}`,
+          fotosEvidencias ? `Evidencias fotográficas por fase:\n${fotosEvidencias}` : null,
           inf.observacionesGenerales ? `Observaciones generales:\n${inf.observacionesGenerales}` : null,
-          inf.observaciones ? `Observaciones (campo histórico):\n${inf.observaciones}` : null,
-          inf.evidenciasUrl ? `Evidencias URL: ${inf.evidenciasUrl}` : null,
+          inf.observaciones ? `Observaciones (campo adicional):\n${inf.observaciones}` : null,
           inf.firmas.length > 0
-            ? `Firmas:\n${inf.firmas
-                .map(
-                  (f) =>
-                    `  · ${f.slot}: ${f.firmado ? 'Firmado' : 'Pendiente'}${f.observacion ? ` — ${f.observacion}` : ''}`,
+            ? `Firmas (detalle completo):\n${inf.firmas
+                .map((f) =>
+                  [
+                    `  · Slot: ${f.slot}`,
+                    `    Firmado: ${fmtSiNo(f.firmado)}`,
+                    `    Código ingresado: ${f.codigo ? f.codigo : '(vacío)'}`,
+                    f.observacion ? `    Observación: ${f.observacion}` : '    Observación: —',
+                    f.firmadoEn ? `    Firmado en: ${f.firmadoEn.toISOString()}` : '    Firmado en: —',
+                    `    ID firma: ${f.id}`,
+                  ].join('\n'),
                 )
-                .join('\n')}`
+                .join('\n\n')}`
             : null,
         ],
         '\n\n',

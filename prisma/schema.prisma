@@ -33,6 +33,7 @@ model Project {
   evidenciasOnedriveShareUrl String?
   // ID o URL de carpeta Google Drive para evidencias de esta obra. Si está vacío, se usa GOOGLE_DRIVE_FOLDER_ID del .env.
   evidenciasGoogleDriveFolderId String?
+  logoUrl       String?
   isActive    Boolean         @default(true)
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt

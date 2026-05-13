@@ -1002,6 +1002,7 @@ export default function DashboardPage() {
       endDate: string | null;
       evidenciasOnedriveShareUrl: string | null;
       evidenciasGoogleDriveFolderId: string | null;
+      logoUrl: string | null;
       isActive: boolean;
     }[]
   >([]);
@@ -1024,12 +1025,14 @@ export default function DashboardPage() {
     endDate: string | null;
     evidenciasOnedriveShareUrl: string | null;
     evidenciasGoogleDriveFolderId: string | null;
+    logoUrl: string | null;
   } | null>(null);
   const [editObraForm, setEditObraForm] = useState({
     name: '',
     startDate: '',
     endDate: '',
     evidenciasGoogleDriveFolderId: '',
+    logoUrl: null as string | null,
   });
   const [savingObra, setSavingObra] = useState(false);
   const [deletingObraId, setDeletingObraId] = useState<string | null>(null);
@@ -1365,6 +1368,8 @@ export default function DashboardPage() {
   const [informeMessage, setInformeMessage] = useState<string | null>(null);
   const [informeError, setInformeError] = useState<string | null>(null);
   const informeDropdownRef = useRef<HTMLDivElement>(null);
+  const obraCreateLogoInputRef = useRef<HTMLInputElement>(null);
+  const obraEditLogoInputRef = useRef<HTMLInputElement>(null);
   const speechRecognitionRef = useRef<{ abort: () => void } | null>(null);
 
   const evidenciaFileInputRefs = useRef<Record<EvidenciaFase, HTMLInputElement | null>>({
@@ -1789,9 +1794,10 @@ export default function DashboardPage() {
               endDate: string | null;
               evidenciasOnedriveShareUrl: string | null;
               evidenciasGoogleDriveFolderId: string | null;
+              logoUrl?: string | null;
               isActive: boolean;
             }[];
-          }) => setObrasList(data.obras ?? []),
+          }) => setObrasList((data.obras ?? []).map((o) => ({ ...o, logoUrl: o.logoUrl ?? null }))),
         )
         .catch(() => setObrasList([]))
         .finally(() => setLoadingObras(false));
@@ -3168,7 +3174,33 @@ export default function DashboardPage() {
         setObraError(data.error ?? 'No se pudo crear la obra');
         return;
       }
-      setObrasList((prev) => [...prev, data.obra]);
+      let nuevaObra = data.obra as (typeof obrasList)[number];
+      const logoFile = obraCreateLogoInputRef.current?.files?.[0];
+      if (logoFile && nuevaObra?.id) {
+        const fd = new FormData();
+        fd.append('file', logoFile);
+        fd.append('projectId', nuevaObra.id);
+        const upRes = await fetch('/api/uploads/obra-logo', { method: 'POST', body: fd, credentials: 'include' });
+        const upData = (await upRes.json()) as { url?: string; error?: string };
+        if (!upRes.ok) {
+          setObraError(upData.error ?? 'Obra creada pero no se pudo subir el logo.');
+          setObrasList((prev) => [...prev, nuevaObra]);
+          if (obraCreateLogoInputRef.current) obraCreateLogoInputRef.current.value = '';
+          return;
+        }
+        if (typeof upData.url === 'string' && upData.url) {
+          const pRes = await fetch(`/api/admin/obras/${nuevaObra.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ logoUrl: upData.url }),
+          });
+          const pData = await pRes.json();
+          if (pRes.ok && pData.obra) nuevaObra = pData.obra as (typeof obrasList)[number];
+        }
+      }
+      setObrasList((prev) => [...prev, nuevaObra]);
+      if (obraCreateLogoInputRef.current) obraCreateLogoInputRef.current.value = '';
       setObraForm({ name: '', startDate: '', endDate: '', evidenciasGoogleDriveFolderId: '' });
       setObraMessage('Obra creada. El consecutivo y código se asignaron automáticamente.');
       setTimeout(() => setObraMessage(null), 4000);
@@ -3188,6 +3220,7 @@ export default function DashboardPage() {
     endDate: string | null;
     evidenciasOnedriveShareUrl: string | null;
     evidenciasGoogleDriveFolderId: string | null;
+    logoUrl: string | null;
   }) => {
     setEditObra(o);
     setEditObraForm({
@@ -3196,6 +3229,7 @@ export default function DashboardPage() {
       endDate: o.endDate ? o.endDate.slice(0, 10) : '',
       evidenciasGoogleDriveFolderId:
         (o.evidenciasGoogleDriveFolderId ?? o.evidenciasOnedriveShareUrl) ?? '',
+      logoUrl: o.logoUrl ?? null,
     });
   };
 
@@ -3205,6 +3239,22 @@ export default function DashboardPage() {
     setSavingObra(true);
     setObraError(null);
     try {
+      let nextLogoUrl = editObraForm.logoUrl;
+      const logoFile = obraEditLogoInputRef.current?.files?.[0];
+      if (logoFile && editObra.id) {
+        const fd = new FormData();
+        fd.append('file', logoFile);
+        fd.append('projectId', editObra.id);
+        const upRes = await fetch('/api/uploads/obra-logo', { method: 'POST', body: fd, credentials: 'include' });
+        const upData = (await upRes.json()) as { url?: string; error?: string };
+        if (!upRes.ok) {
+          setObraError(upData.error ?? 'No se pudo subir el logo');
+          return;
+        }
+        if (typeof upData.url === 'string' && upData.url) nextLogoUrl = upData.url;
+      }
+      if (obraEditLogoInputRef.current) obraEditLogoInputRef.current.value = '';
+
       const res = await fetch(`/api/admin/obras/${editObra.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -3214,6 +3264,7 @@ export default function DashboardPage() {
           startDate: editObraForm.startDate || null,
           endDate: editObraForm.endDate || null,
           evidenciasGoogleDriveFolderId: editObraForm.evidenciasGoogleDriveFolderId.trim() || null,
+          logoUrl: nextLogoUrl,
         }),
       });
       const data = await res.json();
@@ -7270,6 +7321,21 @@ export default function DashboardPage() {
                       }
                     />
                   </div>
+                  <div className="form-field">
+                    <label className="form-label" htmlFor="obra-logo-file">
+                      Logo de la obra (opcional)
+                    </label>
+                    <input
+                      id="obra-logo-file"
+                      ref={obraCreateLogoInputRef}
+                      className="form-input"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
+                    />
+                    <p className="shell-text-muted" style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
+                      JPG, PNG, WEBP o GIF. Máximo 2 MB. Se sube automáticamente al crear la obra.
+                    </p>
+                  </div>
                   <button type="submit" className="btn-primary" disabled={creatingObra}>
                     {creatingObra ? 'Creando...' : 'Crear obra'}
                   </button>
@@ -7284,6 +7350,7 @@ export default function DashboardPage() {
                       <thead>
                         <tr>
                           <th>Consec.</th>
+                          <th>Logo</th>
                           <th>Código</th>
                           <th>Nombre</th>
                           <th>Inicio</th>
@@ -7295,6 +7362,19 @@ export default function DashboardPage() {
                         {obrasList.map((o) => (
                           <tr key={o.id}>
                             <td>{o.consecutivo ?? '—'}</td>
+                            <td style={{ width: 56 }}>
+                              {o.logoUrl ? (
+                                <img
+                                  src={o.logoUrl}
+                                  alt=""
+                                  width={44}
+                                  height={44}
+                                  style={{ objectFit: 'cover', borderRadius: 6, display: 'block' }}
+                                />
+                              ) : (
+                                <span className="shell-text-muted">—</span>
+                              )}
+                            </td>
                             <td>{o.code}</td>
                             <td>{o.name}</td>
                             <td>{o.startDate ? new Date(o.startDate).toLocaleDateString('es') : '—'}</td>
@@ -7381,11 +7461,57 @@ export default function DashboardPage() {
                           }
                         />
                       </div>
+                      <div className="form-field">
+                        <label className="form-label" htmlFor="obra-edit-logo">
+                          Logo de la obra
+                        </label>
+                        {editObraForm.logoUrl ? (
+                          <div style={{ marginBottom: '0.5rem' }}>
+                            <img
+                              src={editObraForm.logoUrl}
+                              alt="Logo actual"
+                              width={120}
+                              height={120}
+                              style={{ objectFit: 'contain', borderRadius: 8, border: '1px solid #e5e7eb' }}
+                            />
+                          </div>
+                        ) : (
+                          <p className="shell-text-muted" style={{ fontSize: '0.85rem', marginBottom: '0.35rem' }}>
+                            Sin logo.
+                          </p>
+                        )}
+                        <input
+                          id="obra-edit-logo"
+                          ref={obraEditLogoInputRef}
+                          className="form-input"
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
+                        />
+                        <p className="shell-text-muted" style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
+                          Elija archivo para reemplazar. Máx. 2 MB.
+                        </p>
+                        {editObraForm.logoUrl ? (
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          style={{ marginTop: '0.35rem' }}
+                          onClick={() => {
+                            setEditObraForm((f) => ({ ...f, logoUrl: null }));
+                            if (obraEditLogoInputRef.current) obraEditLogoInputRef.current.value = '';
+                          }}
+                        >
+                            Quitar logo (guardar para aplicar)
+                          </button>
+                        ) : null}
+                      </div>
                       <div className="form-actions-row">
                         <button type="submit" className="btn-primary" disabled={savingObra}>
                           {savingObra ? 'Guardando...' : 'Guardar'}
                         </button>
-                        <button type="button" className="btn-cancel" onClick={() => setEditObra(null)}>
+                        <button type="button" className="btn-cancel" onClick={() => {
+                          setEditObra(null);
+                          if (obraEditLogoInputRef.current) obraEditLogoInputRef.current.value = '';
+                        }}>
                           Cancelar
                         </button>
                       </div>
@@ -13388,8 +13514,11 @@ export default function DashboardPage() {
           <section className="shell-card shell-card-wide">
             <h1 className="shell-title">Informe diario – Exportar</h1>
             <p className="shell-text-muted" style={{ marginBottom: '1rem' }}>
-              Filtra por obra, jornada y rango de fechas del reporte. Cada fila es un informe (obra · día · jornada); el
-              contenido de personal, equipos, actividades, calidad y evidencias se muestra agregado en celdas de texto.
+              Filtra por obra, jornada y rango de fechas del reporte. Cada fila es un informe (obra · día · jornada). El
+              texto incluye metadatos (IDs, usuario, fechas de sistema), catálogos vinculados, clima de bitácora,
+              suspensiones con imagen y GPS, personal, equipos con horarios e imagen, ingresos/entregas con foto y GPS,
+              actividades con dimensiones y foto, ensayos/daños/no conformidades completos, evidencias por fase
+              (antes/durante/después) con URL y GPS por foto, y firmas con código y fecha.
             </p>
 
             <div
@@ -13519,7 +13648,7 @@ export default function DashboardPage() {
 
             {!loadingConsolidado && consolidadoRows.length > 0 ? (
               <div className="users-table-wrap" style={{ marginTop: '0.75rem' }}>
-                <table className="users-table" style={{ minWidth: 2200 }}>
+                <table className="users-table" style={{ minWidth: 3200 }}>
                   <thead>
                     <tr>
                       <th>Obra</th>
@@ -13547,7 +13676,7 @@ export default function DashboardPage() {
                         <td
                           style={{
                             whiteSpace: 'pre-wrap',
-                            maxWidth: 340,
+                            maxWidth: 520,
                             verticalAlign: 'top',
                             fontSize: '0.8rem',
                             lineHeight: 1.45,
@@ -13558,7 +13687,7 @@ export default function DashboardPage() {
                         <td
                           style={{
                             whiteSpace: 'pre-wrap',
-                            maxWidth: 340,
+                            maxWidth: 520,
                             verticalAlign: 'top',
                             fontSize: '0.8rem',
                             lineHeight: 1.45,
@@ -13569,7 +13698,7 @@ export default function DashboardPage() {
                         <td
                           style={{
                             whiteSpace: 'pre-wrap',
-                            maxWidth: 340,
+                            maxWidth: 520,
                             verticalAlign: 'top',
                             fontSize: '0.8rem',
                             lineHeight: 1.45,
@@ -13580,7 +13709,7 @@ export default function DashboardPage() {
                         <td
                           style={{
                             whiteSpace: 'pre-wrap',
-                            maxWidth: 340,
+                            maxWidth: 520,
                             verticalAlign: 'top',
                             fontSize: '0.8rem',
                             lineHeight: 1.45,
@@ -13591,7 +13720,7 @@ export default function DashboardPage() {
                         <td
                           style={{
                             whiteSpace: 'pre-wrap',
-                            maxWidth: 340,
+                            maxWidth: 520,
                             verticalAlign: 'top',
                             fontSize: '0.8rem',
                             lineHeight: 1.45,
@@ -13602,7 +13731,7 @@ export default function DashboardPage() {
                         <td
                           style={{
                             whiteSpace: 'pre-wrap',
-                            maxWidth: 340,
+                            maxWidth: 520,
                             verticalAlign: 'top',
                             fontSize: '0.8rem',
                             lineHeight: 1.45,
@@ -13613,7 +13742,7 @@ export default function DashboardPage() {
                         <td
                           style={{
                             whiteSpace: 'pre-wrap',
-                            maxWidth: 340,
+                            maxWidth: 520,
                             verticalAlign: 'top',
                             fontSize: '0.8rem',
                             lineHeight: 1.45,
