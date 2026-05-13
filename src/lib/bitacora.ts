@@ -494,7 +494,7 @@ export async function syncBitacoraFromInforme({
     push({
       tipoEvento: 'REGISTRO',
       moduloOrigen: 'CALIDAD',
-      descripcion: `Ensayo ${e.tipoEnsayo}: ${e.resultado}.`,
+      descripcion: e.resultado ? `Ensayo ${e.tipoEnsayo}: ${e.resultado}.` : `Ensayo ${e.tipoEnsayo}.`,
       fecha,
       hora: horaFromDate(e.createdAt),
       timestampUtc: e.createdAt,

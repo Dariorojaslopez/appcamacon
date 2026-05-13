@@ -637,7 +637,8 @@ const emptyEntregaDraft = () => ({
 
 const emptyActividadDraft = () => ({
   pk: '',
-  abscisado: '',
+  abscisadoInicial: '',
+  abscisadoFinal: '',
   itemContractual: '',
   descripcion: '',
   unidadMedida: '',
@@ -649,6 +650,15 @@ const emptyActividadDraft = () => ({
   altura: 0,
   cantidadTotal: 0,
 });
+
+function resumenAbscisadoActividad(inicial: string, final: string): string {
+  const i = inicial.trim();
+  const f = final.trim();
+  if (i && f) return `${i} – ${f}`;
+  if (i) return i;
+  if (f) return f;
+  return '—';
+}
 
 const emptyEnsayoDraft = () => ({
   materialActividad: '',
@@ -1409,7 +1419,8 @@ export default function DashboardPage() {
     Array<{
       id?: string;
       pk: string;
-      abscisado: string;
+      abscisadoInicial: string;
+      abscisadoFinal: string;
       itemContractual: string;
       descripcion: string;
       unidadMedida: string;
@@ -1539,14 +1550,35 @@ export default function DashboardPage() {
   const [firmaSlotPermissions, setFirmaSlotPermissions] = useState<Record<FirmaEvidenciaKey, boolean> | null>(null);
 
   useEffect(() => {
-    // Evitar validación automática de sesión para no disparar 401 en consola ni cierres forzados.
-    setFirmaToken(null);
-    setFirmaSlotPermissions({
-      responsableDiligenciamiento: false,
-      residenteObra: false,
-      auxiliarIngenieria: false,
-      vistoBuenoDirectorObra: false,
-    });
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'include' });
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as {
+          firmaToken?: string | null;
+          firmaSlotPermissions?: Partial<Record<FirmaEvidenciaKey, boolean>> | null;
+        };
+        if (cancelled) return;
+        setFirmaToken(typeof data.firmaToken === 'string' && data.firmaToken ? data.firmaToken : null);
+        const perms = data.firmaSlotPermissions;
+        if (perms && typeof perms === 'object') {
+          setFirmaSlotPermissions({
+            responsableDiligenciamiento: Boolean(perms.responsableDiligenciamiento),
+            residenteObra: Boolean(perms.residenteObra),
+            auxiliarIngenieria: Boolean(perms.auxiliarIngenieria),
+            vistoBuenoDirectorObra: Boolean(perms.vistoBuenoDirectorObra),
+          });
+        } else {
+          setFirmaSlotPermissions(null);
+        }
+      } catch {
+        /* no forzar logout ni spamear consola */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -1594,7 +1626,7 @@ export default function DashboardPage() {
   }, [isAppInstalled]);
 
   const canSee = (menuKey: string) =>
-    menuKey === 'bitacora' || allowedMenus.length === 0 || allowedMenus.includes(menuKey);
+    allowedMenus.length === 0 || allowedMenus.includes(menuKey);
 
   async function bitacoraGeoHeaders(): Promise<Record<string, string>> {
     if (typeof window === 'undefined' || !navigator.geolocation) return {};
@@ -1648,10 +1680,12 @@ export default function DashboardPage() {
   }, [datosGeneralesForm.fechaReporte, selectedJornadaId, selectedObraId]);
 
   useEffect(() => {
-    if (activeSection === 'bitacora') {
-      void loadBitacoraDigital();
-    }
-  }, [activeSection, loadBitacoraDigital]);
+    if (activeSection !== 'bitacora') return;
+    const puedeBitacora =
+      allowedMenus.length === 0 || allowedMenus.includes('bitacora');
+    if (!puedeBitacora) return;
+    void loadBitacoraDigital();
+  }, [activeSection, loadBitacoraDigital, allowedMenus]);
 
   const openBitacoraPdf = () => {
     if (!selectedObraId || !selectedJornadaId) {
@@ -2693,7 +2727,8 @@ export default function DashboardPage() {
             list.map((a) => ({
               id: a.id,
               pk: a.pk ?? '',
-              abscisado: a.abscisado ?? '',
+              abscisadoInicial: a.abscisadoInicial ?? '',
+              abscisadoFinal: a.abscisadoFinal ?? '',
               itemContractual: a.itemContractual ?? '',
               descripcion: a.descripcion ?? '',
               unidadMedida: a.unidadMedida ?? '',
@@ -5590,7 +5625,8 @@ export default function DashboardPage() {
     if (!r) return;
     setActividadDraft({
       pk: r.pk,
-      abscisado: r.abscisado,
+      abscisadoInicial: r.abscisadoInicial,
+      abscisadoFinal: r.abscisadoFinal,
       itemContractual: r.itemContractual,
       descripcion: r.descripcion,
       unidadMedida: r.unidadMedida,
@@ -5640,13 +5676,12 @@ export default function DashboardPage() {
     const normalizedDraftWithTotal = { ...normalizedDraft, cantidadTotal };
     const invalid =
       !normalizedDraftWithTotal.pk.trim() ||
-      !normalizedDraftWithTotal.abscisado.trim() ||
       !normalizedDraftWithTotal.itemContractual.trim() ||
       !normalizedDraftWithTotal.descripcion.trim() ||
       !normalizedDraftWithTotal.unidadMedida.trim() ||
       !(Number(normalizedDraftWithTotal.cantidadTotal) > 0);
     if (invalid) {
-      setActividadError('Completa PK, Abscisado, Ítem contractual y Cantidad mayor a 0.');
+      setActividadError('Completa PK, ítem contractual y cantidad mayor a 0.');
       return;
     }
     setActividadError(null);
@@ -5707,7 +5742,6 @@ export default function DashboardPage() {
     const invalid = actividadRows.some(
       (r) =>
         !r.pk.trim() ||
-        !r.abscisado.trim() ||
         !r.itemContractual.trim() ||
         !r.descripcion.trim() ||
         !r.unidadMedida.trim() ||
@@ -5718,7 +5752,7 @@ export default function DashboardPage() {
       return;
     }
     if (invalid) {
-      setActividadError('Completa PK, Abscisado, Ítem contractual, Descripción, Unidad y Cantidad mayor a 0.');
+      setActividadError('Completa PK, ítem contractual, descripción, unidad y cantidad mayor a 0.');
       return;
     }
 
@@ -5735,7 +5769,8 @@ export default function DashboardPage() {
           jornadaId: selectedJornadaId,
           actividades: actividadRows.map((a) => ({
             pk: a.pk,
-            abscisado: a.abscisado,
+            abscisadoInicial: a.abscisadoInicial,
+            abscisadoFinal: a.abscisadoFinal,
             itemContractual: a.itemContractual,
             descripcion: a.descripcion,
             unidadMedida: a.unidadMedida,
@@ -5760,7 +5795,8 @@ export default function DashboardPage() {
         list.map((a: any) => ({
           id: a.id,
           pk: a.pk ?? '',
-          abscisado: a.abscisado ?? '',
+          abscisadoInicial: a.abscisadoInicial ?? '',
+          abscisadoFinal: a.abscisadoFinal ?? '',
           itemContractual: a.itemContractual ?? '',
           descripcion: a.descripcion ?? '',
           unidadMedida: a.unidadMedida ?? '',
@@ -5920,10 +5956,9 @@ export default function DashboardPage() {
       !ensayoDraft.tipoEnsayo.trim() ||
       !ensayoDraft.idMuestra.trim() ||
       !ensayoDraft.laboratorio.trim() ||
-      !ensayoDraft.localizacion.trim() ||
-      !ensayoDraft.resultado.trim()
+      !ensayoDraft.localizacion.trim()
     ) {
-      setEnsayosError('Completa: material/actividad, tipo de ensayo, ID muestra, laboratorio, localización y resultado.');
+      setEnsayosError('Completa: material/actividad, tipo de ensayo, ID muestra, laboratorio y localización.');
       return;
     }
     setEnsayosError(null);
@@ -5966,11 +6001,10 @@ export default function DashboardPage() {
         !r.tipoEnsayo.trim() ||
         !r.idMuestra.trim() ||
         !r.laboratorio.trim() ||
-        !r.localizacion.trim() ||
-        !r.resultado.trim(),
+        !r.localizacion.trim(),
     );
     if (invalid) {
-      setEnsayosError('Completa: material/actividad, tipo de ensayo, ID muestra, laboratorio, localización y resultado.');
+      setEnsayosError('Completa: material/actividad, tipo de ensayo, ID muestra, laboratorio y localización.');
       return;
     }
 
@@ -6763,7 +6797,7 @@ export default function DashboardPage() {
           </section>
         )}
 
-        {activeSection === 'bitacora' && (
+        {activeSection === 'bitacora' && canSee('bitacora') && (
           <section className="shell-card shell-card-wide bitacora-shell">
             <div className="bitacora-header">
               <div>
@@ -11792,16 +11826,29 @@ export default function DashboardPage() {
                       />
                     </div>
                     <div className="informe-field">
-                      <label className="informe-label" htmlFor="actividad-draft-abscisado">
-                        Abscisado *
+                      <label className="informe-label" htmlFor="actividad-draft-abscisado-inicial">
+                        Abscisado inicial
                       </label>
                       <input
-                        id="actividad-draft-abscisado"
+                        id="actividad-draft-abscisado-inicial"
                         className="personal-input"
                         type="text"
                         placeholder="Ej. +000"
-                        value={actividadDraft.abscisado}
-                        onChange={(e) => updateActividadDraft({ abscisado: e.target.value })}
+                        value={actividadDraft.abscisadoInicial}
+                        onChange={(e) => updateActividadDraft({ abscisadoInicial: e.target.value })}
+                      />
+                    </div>
+                    <div className="informe-field">
+                      <label className="informe-label" htmlFor="actividad-draft-abscisado-final">
+                        Abscisado final
+                      </label>
+                      <input
+                        id="actividad-draft-abscisado-final"
+                        className="personal-input"
+                        type="text"
+                        placeholder="Ej. +050"
+                        value={actividadDraft.abscisadoFinal}
+                        onChange={(e) => updateActividadDraft({ abscisadoFinal: e.target.value })}
                       />
                     </div>
                     <div className="informe-field">
@@ -11939,7 +11986,7 @@ export default function DashboardPage() {
                     >
                       <div className="personal-list-card-head">
                         <div className="personal-list-card-name">
-                          {r.pk.trim() || '—'} · {r.abscisado.trim() || '—'}
+                          {r.pk.trim() || '—'} · {resumenAbscisadoActividad(r.abscisadoInicial, r.abscisadoFinal)}
                         </div>
                         <div className="personal-list-card-actions">
                           <button
@@ -12020,6 +12067,28 @@ export default function DashboardPage() {
                         : 0;
                     return (
                       <div className="actividad-detalle-grid">
+                        <label className="actividad-detalle-field">
+                          <span>PK</span>
+                          <input className="personal-input personal-input-readonly" type="text" value={row.pk || '—'} readOnly />
+                        </label>
+                        <label className="actividad-detalle-field">
+                          <span>Abscisado inicial</span>
+                          <input
+                            className="personal-input personal-input-readonly"
+                            type="text"
+                            value={row.abscisadoInicial.trim() || '—'}
+                            readOnly
+                          />
+                        </label>
+                        <label className="actividad-detalle-field">
+                          <span>Abscisado final</span>
+                          <input
+                            className="personal-input personal-input-readonly"
+                            type="text"
+                            value={row.abscisadoFinal.trim() || '—'}
+                            readOnly
+                          />
+                        </label>
                         {unidad ? (
                           <label className="actividad-detalle-field">
                             <span>Unidad de medida</span>

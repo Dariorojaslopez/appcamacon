@@ -86,7 +86,8 @@ export async function GET(req: NextRequest) {
 
     const actividades = (informe?.actividadesObra ?? []).map((a: any) => ({
       pk: String(a.pk ?? ''),
-      abscisado: a.abscisado != null ? String(a.abscisado) : null,
+      abscisadoInicial: a.abscisadoInicial != null ? String(a.abscisadoInicial) : null,
+      abscisadoFinal: a.abscisadoFinal != null ? String(a.abscisadoFinal) : null,
       itemContractual: String(a.itemContractual ?? ''),
       descripcion: String(a.descripcion ?? ''),
       unidadMedida: a.unidadMedida != null ? String(a.unidadMedida) : null,

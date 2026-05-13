@@ -25,7 +25,8 @@ export type TabulacionItemRow = {
 
 export type TabulacionActividadRow = {
   pk: string;
-  abscisado: string | null;
+  abscisadoInicial: string | null;
+  abscisadoFinal: string | null;
   itemContractual: string;
   descripcion: string;
   unidadMedida: string | null;
@@ -237,7 +238,9 @@ export async function buildFormatoTabulacionWorkbookBuffer(opts: {
     const precio = byPrecio.get(code) ?? 0;
     const itemMeta = byItemMeta.get(code);
     const directCost = qty * precio;
-    const tramo = a.abscisado ? String(a.abscisado) : '';
+    const ini = a.abscisadoInicial ? String(a.abscisadoInicial).trim() : '';
+    const fin = a.abscisadoFinal ? String(a.abscisadoFinal).trim() : '';
+    const tramo = ini && fin ? `${ini} – ${fin}` : ini || fin || '';
     const civ = a.pk ? String(a.pk) : '';
     const pmt = a.pk ? String(a.pk) : '';
 

@@ -156,7 +156,7 @@ export async function POST(req: NextRequest) {
           imagenTomadaEn,
         };
       })
-      .filter((e) => e.materialActividad && e.tipoEnsayo && e.idMuestra && e.laboratorio && e.localizacion && e.resultado);
+      .filter((e) => e.materialActividad && e.tipoEnsayo && e.idMuestra && e.laboratorio && e.localizacion);
 
     const informe = await prisma.informeDiario.findFirst({
       where: { projectId, date, jornadaCatalogoId: jr.id },

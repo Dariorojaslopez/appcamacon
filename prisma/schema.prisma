@@ -334,7 +334,8 @@ model MaterialEntrega {
 model ActividadObra {
   id               String   @id @default(cuid())
   pk               String
-  abscisado        String
+  abscisadoInicial String?
+  abscisadoFinal   String?
   itemContractual  String
   descripcion      String
   unidadMedida     String

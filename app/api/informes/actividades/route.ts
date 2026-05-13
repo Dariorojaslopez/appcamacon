@@ -48,7 +48,8 @@ export async function GET(req: NextRequest) {
       actividades: (informe?.actividadesObra ?? []).map((a) => ({
         id: a.id,
         pk: a.pk,
-        abscisado: a.abscisado,
+        abscisadoInicial: a.abscisadoInicial ?? '',
+        abscisadoFinal: a.abscisadoFinal ?? '',
         itemContractual: a.itemContractual,
         descripcion: a.descripcion,
         unidadMedida: a.unidadMedida,
@@ -90,7 +91,8 @@ export async function POST(req: NextRequest) {
       jornadaCatalogoId?: string;
       actividades?: Array<{
         pk: string;
-        abscisado: string;
+        abscisadoInicial?: string;
+        abscisadoFinal?: string;
         itemContractual: string;
         descripcion: string;
         unidadMedida: string;
@@ -127,7 +129,8 @@ export async function POST(req: NextRequest) {
     const cleaned = items
       .map((a) => {
         const pk = String(a.pk ?? '').trim();
-        const abscisado = String(a.abscisado ?? '').trim();
+        const abscisadoInicial = String(a.abscisadoInicial ?? '').trim() || null;
+        const abscisadoFinal = String(a.abscisadoFinal ?? '').trim() || null;
         const itemContractual = String(a.itemContractual ?? '').trim();
         const descripcion = String(a.descripcion ?? '').trim();
         const unidadMedida = String(a.unidadMedida ?? '').trim();
@@ -155,7 +158,8 @@ export async function POST(req: NextRequest) {
 
         return {
           pk,
-          abscisado,
+          abscisadoInicial,
+          abscisadoFinal,
           itemContractual,
           descripcion,
           unidadMedida,
@@ -173,7 +177,7 @@ export async function POST(req: NextRequest) {
           cantidadTotal,
         };
       })
-      .filter((a) => a.pk && a.abscisado && a.itemContractual && a.descripcion && a.unidadMedida);
+      .filter((a) => a.pk && a.itemContractual && a.descripcion && a.unidadMedida);
 
     const informe = await prisma.informeDiario.findFirst({
       where: { projectId, date, jornadaCatalogoId: jr.id },
@@ -219,7 +223,8 @@ export async function POST(req: NextRequest) {
       await prisma.actividadObra.createMany({
         data: cleaned.map((a) => ({
             pk: a.pk,
-            abscisado: a.abscisado,
+            abscisadoInicial: a.abscisadoInicial,
+            abscisadoFinal: a.abscisadoFinal,
             itemContractual: a.itemContractual,
             descripcion: a.descripcion,
             unidadMedida: a.unidadMedida,
@@ -249,7 +254,8 @@ export async function POST(req: NextRequest) {
       actividades: saved.map((a) => ({
         id: a.id,
         pk: a.pk,
-        abscisado: a.abscisado,
+        abscisadoInicial: a.abscisadoInicial ?? '',
+        abscisadoFinal: a.abscisadoFinal ?? '',
         itemContractual: a.itemContractual,
         descripcion: a.descripcion,
         unidadMedida: a.unidadMedida,
