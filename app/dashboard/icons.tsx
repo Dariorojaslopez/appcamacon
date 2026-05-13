@@ -222,6 +222,18 @@ export function IconTabulacion() {
   );
 }
 
+/** Exportar / consolidado de informes */
+export function IconExport() {
+  return (
+    <svg className={iconClass} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 3v12" />
+      <polyline points="8 11 12 15 16 11" />
+      <path d="M4 21h16" />
+      <path d="M4 17v1a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1" />
+    </svg>
+  );
+}
+
 export function IconClock() {
   return (
     <svg className={iconClass} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>

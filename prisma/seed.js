@@ -51,6 +51,8 @@ async function main() {
     'calidad',
     'evidencias',
     'tabulacion',
+    'informeExportar',
+    'bitacora',
     'settings',
     'users',
   ];

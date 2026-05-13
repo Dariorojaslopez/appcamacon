@@ -33,6 +33,7 @@ import {
   IconCalendar,
   IconClock,
   IconTabulacion,
+  IconExport,
   IconLogout,
 } from './icons';
 import { InformeSearchableSelect } from './InformeSearchableSelect';
@@ -717,6 +718,7 @@ const INFORME_STEPS = [
   { id: 'calidad' as const, label: 'Calidad y afectaciones', Icon: IconAlert },
   { id: 'evidencias' as const, label: 'Evidencias y cierre', Icon: IconCamera },
   { id: 'tabulacion' as const, label: 'Formato de tabulación', Icon: IconTabulacion },
+  { id: 'informeExportar' as const, label: 'Exportar', Icon: IconExport },
 ] as const;
 
 type FirmaEvidenciaState = {
@@ -913,6 +915,7 @@ export default function DashboardPage() {
     | 'calidad'
     | 'evidencias'
     | 'tabulacion'
+    | 'informeExportar'
     | 'bitacora'
   >('home');
   const isInformeSection = useMemo(
@@ -926,6 +929,10 @@ export default function DashboardPage() {
       activeSection === 'evidencias' ||
       activeSection === 'tabulacion',
     [activeSection],
+  );
+  const isInformeNavSection = useMemo(
+    () => isInformeSection || activeSection === 'informeExportar',
+    [isInformeSection, activeSection],
   );
   const [usersSubSection, setUsersSubSection] = useState<'crear' | 'administrar' | 'roles'>('crear');
   const [bitacoraTab, setBitacoraTab] = useState<BitacoraTab>('dashboard');
@@ -1537,6 +1544,30 @@ export default function DashboardPage() {
   const [evidenciasError, setEvidenciasError] = useState<string | null>(null);
   const [tabulacionExportError, setTabulacionExportError] = useState<string | null>(null);
   const [tabulacionExporting, setTabulacionExporting] = useState(false);
+  const [exportObraId, setExportObraId] = useState<'all' | string>('all');
+  const [exportJornadaId, setExportJornadaId] = useState<'all' | string>('all');
+  const [exportDateFrom, setExportDateFrom] = useState(() => new Date().toISOString().slice(0, 10));
+  const [exportDateTo, setExportDateTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [consolidadoRows, setConsolidadoRows] = useState<
+    Array<{
+      informeId: string;
+      obraCodigo: string;
+      obraNombre: string;
+      fecha: string;
+      jornadaNombre: string;
+      datosGenerales: string;
+      jornadaCondiciones: string;
+      personal: string;
+      equiposMateriales: string;
+      actividades: string;
+      calidad: string;
+      evidencias: string;
+    }>
+  >([]);
+  const [consolidadoTruncated, setConsolidadoTruncated] = useState(false);
+  const [loadingConsolidado, setLoadingConsolidado] = useState(false);
+  const [consolidadoError, setConsolidadoError] = useState<string | null>(null);
+  const [exportBusquedaHecha, setExportBusquedaHecha] = useState(false);
   const [uploadingEvidencia, setUploadingEvidencia] = useState(false);
   const [registroFotoPreviewUrl, setRegistroFotoPreviewUrl] = useState<string | null>(null);
   const [mediaPermissionState, setMediaPermissionState] = useState<{
@@ -2096,6 +2127,7 @@ export default function DashboardPage() {
       activeSection === 'calidad' ||
       activeSection === 'evidencias' ||
       activeSection === 'tabulacion' ||
+      activeSection === 'informeExportar' ||
       activeSection === 'bitacora'
     ) {
       setLoadingObrasForInforme(true);
@@ -6566,12 +6598,13 @@ export default function DashboardPage() {
             canSee('actividades') ||
             canSee('calidad') ||
             canSee('evidencias') ||
-            canSee('tabulacion')) && (
+            canSee('tabulacion') ||
+            canSee('informeExportar')) && (
             <div className="topbar-dropdown-wrap" ref={informeDropdownRef}>
               <button
                 type="button"
                 className={`topbar-link ${
-                  isInformeSection ? 'topbar-link-active' : ''
+                  isInformeNavSection ? 'topbar-link-active' : ''
                 } ${informeDropdownOpen ? 'topbar-link-open' : ''}`}
                 onClick={() => setInformeDropdownOpen(!informeDropdownOpen)}
                 aria-expanded={informeDropdownOpen}
@@ -6675,7 +6708,8 @@ export default function DashboardPage() {
               canSee('actividades') ||
               canSee('calidad') ||
               canSee('evidencias') ||
-              canSee('tabulacion')) && (
+              canSee('tabulacion') ||
+              canSee('informeExportar')) && (
               <div className="nav-section">
                 <button
                   type="button"
@@ -13347,6 +13381,260 @@ export default function DashboardPage() {
             >
               {tabulacionExporting ? 'Generando…' : 'Descargar Excel (.xlsx)'}
             </button>
+          </section>
+        )}
+
+        {activeSection === 'informeExportar' && (
+          <section className="shell-card shell-card-wide">
+            <h1 className="shell-title">Informe diario – Exportar</h1>
+            <p className="shell-text-muted" style={{ marginBottom: '1rem' }}>
+              Filtra por obra, jornada y rango de fechas del reporte. Cada fila es un informe (obra · día · jornada); el
+              contenido de personal, equipos, actividades, calidad y evidencias se muestra agregado en celdas de texto.
+            </p>
+
+            <div
+              className="calidad-mobile-grid"
+              style={{ marginBottom: '1rem', alignItems: 'flex-end', gap: '0.75rem' }}
+            >
+              <div className="informe-field">
+                <label className="informe-label" htmlFor="export-obra">
+                  Obra
+                </label>
+                <select
+                  id="export-obra"
+                  className="personal-input"
+                  value={exportObraId}
+                  onChange={(e) => setExportObraId(e.target.value === 'all' ? 'all' : e.target.value)}
+                  disabled={loadingObrasForInforme}
+                >
+                  <option value="all">Todas las obras</option>
+                  {obrasForInforme.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.code} – {o.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="informe-field">
+                <label className="informe-label" htmlFor="export-jornada">
+                  Jornada
+                </label>
+                <select
+                  id="export-jornada"
+                  className="personal-input"
+                  value={exportJornadaId}
+                  onChange={(e) => setExportJornadaId(e.target.value === 'all' ? 'all' : e.target.value)}
+                  disabled={loadingJornadasCatalog}
+                >
+                  <option value="all">Todas las jornadas</option>
+                  {jornadasCatalog.map((j) => (
+                    <option key={j.id} value={j.id}>
+                      {j.nombre} ({j.horaInicio} – {j.horaFin})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="informe-field">
+                <label className="informe-label" htmlFor="export-desde">
+                  Fecha desde
+                </label>
+                <input
+                  id="export-desde"
+                  className="personal-input"
+                  type="date"
+                  value={exportDateFrom}
+                  onChange={(e) => setExportDateFrom(e.target.value)}
+                />
+              </div>
+              <div className="informe-field">
+                <label className="informe-label" htmlFor="export-hasta">
+                  Fecha hasta
+                </label>
+                <input
+                  id="export-hasta"
+                  className="personal-input"
+                  type="date"
+                  value={exportDateTo}
+                  onChange={(e) => setExportDateTo(e.target.value)}
+                />
+              </div>
+              <div className="informe-field" style={{ gridColumn: '1 / -1' }}>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={loadingConsolidado || !exportDateFrom || !exportDateTo}
+                  onClick={async () => {
+                    setConsolidadoError(null);
+                    if (exportDateFrom > exportDateTo) {
+                      setConsolidadoError('La fecha desde no puede ser posterior a la fecha hasta.');
+                      return;
+                    }
+                    setLoadingConsolidado(true);
+                    setConsolidadoRows([]);
+                    setConsolidadoTruncated(false);
+                    setExportBusquedaHecha(false);
+                    try {
+                      const q = new URLSearchParams({
+                        dateFrom: exportDateFrom,
+                        dateTo: exportDateTo,
+                      });
+                      if (exportObraId !== 'all') q.set('projectId', exportObraId);
+                      if (exportJornadaId !== 'all') q.set('jornadaId', exportJornadaId);
+                      const res = await fetch(`/api/informes/consolidado?${q}`, { credentials: 'include' });
+                      const data = await res.json().catch(() => ({}));
+                      if (!res.ok) {
+                        setConsolidadoError(
+                          typeof (data as { error?: string }).error === 'string'
+                            ? (data as { error: string }).error
+                            : 'No se pudo cargar el consolidado.',
+                        );
+                        return;
+                      }
+                      const rows = Array.isArray((data as { rows?: unknown }).rows)
+                        ? (data as { rows: typeof consolidadoRows }).rows
+                        : [];
+                      setConsolidadoRows(rows);
+                      setConsolidadoTruncated(Boolean((data as { truncated?: boolean }).truncated));
+                      setExportBusquedaHecha(true);
+                    } catch {
+                      setConsolidadoError('Error de conexión.');
+                    } finally {
+                      setLoadingConsolidado(false);
+                    }
+                  }}
+                >
+                  {loadingConsolidado ? 'Consultando…' : 'Consultar'}
+                </button>
+              </div>
+            </div>
+
+            {consolidadoError ? <p className="feedback feedback-error">{consolidadoError}</p> : null}
+            {consolidadoTruncated ? (
+              <p className="feedback feedback-error" style={{ marginBottom: '0.5rem' }}>
+                Resultado limitado a los primeros registros por rendimiento. Acote fechas u obra si necesita ver todo.
+              </p>
+            ) : null}
+
+            {loadingConsolidado ? <p className="shell-text-muted">Cargando informes…</p> : null}
+
+            {!loadingConsolidado && consolidadoRows.length > 0 ? (
+              <div className="users-table-wrap" style={{ marginTop: '0.75rem' }}>
+                <table className="users-table" style={{ minWidth: 2200 }}>
+                  <thead>
+                    <tr>
+                      <th>Obra</th>
+                      <th>Fecha</th>
+                      <th>Jornada</th>
+                      <th>Datos generales</th>
+                      <th>Jornada y condiciones</th>
+                      <th>Personal en obra</th>
+                      <th>Equipos y materiales</th>
+                      <th>Actividades desarrolladas</th>
+                      <th>Calidad e incidentes</th>
+                      <th>Evidencias y cierre</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {consolidadoRows.map((row) => (
+                      <tr key={row.informeId}>
+                        <td style={{ whiteSpace: 'nowrap' }}>
+                          <strong>{row.obraCodigo}</strong>
+                          <br />
+                          <span style={{ fontSize: '0.85rem' }}>{row.obraNombre}</span>
+                        </td>
+                        <td style={{ whiteSpace: 'nowrap' }}>{row.fecha}</td>
+                        <td style={{ minWidth: 140, maxWidth: 220 }}>{row.jornadaNombre}</td>
+                        <td
+                          style={{
+                            whiteSpace: 'pre-wrap',
+                            maxWidth: 340,
+                            verticalAlign: 'top',
+                            fontSize: '0.8rem',
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          {row.datosGenerales}
+                        </td>
+                        <td
+                          style={{
+                            whiteSpace: 'pre-wrap',
+                            maxWidth: 340,
+                            verticalAlign: 'top',
+                            fontSize: '0.8rem',
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          {row.jornadaCondiciones}
+                        </td>
+                        <td
+                          style={{
+                            whiteSpace: 'pre-wrap',
+                            maxWidth: 340,
+                            verticalAlign: 'top',
+                            fontSize: '0.8rem',
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          {row.personal}
+                        </td>
+                        <td
+                          style={{
+                            whiteSpace: 'pre-wrap',
+                            maxWidth: 340,
+                            verticalAlign: 'top',
+                            fontSize: '0.8rem',
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          {row.equiposMateriales}
+                        </td>
+                        <td
+                          style={{
+                            whiteSpace: 'pre-wrap',
+                            maxWidth: 340,
+                            verticalAlign: 'top',
+                            fontSize: '0.8rem',
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          {row.actividades}
+                        </td>
+                        <td
+                          style={{
+                            whiteSpace: 'pre-wrap',
+                            maxWidth: 340,
+                            verticalAlign: 'top',
+                            fontSize: '0.8rem',
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          {row.calidad}
+                        </td>
+                        <td
+                          style={{
+                            whiteSpace: 'pre-wrap',
+                            maxWidth: 340,
+                            verticalAlign: 'top',
+                            fontSize: '0.8rem',
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          {row.evidencias}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+
+            {!loadingConsolidado && exportBusquedaHecha && consolidadoRows.length === 0 && !consolidadoError ? (
+              <p className="shell-text-muted">No hay informes en el rango y filtros seleccionados.</p>
+            ) : null}
+
+            {!loadingConsolidado && !exportBusquedaHecha && !consolidadoError ? (
+              <p className="shell-text-muted">Pulse «Consultar» para ver resultados.</p>
+            ) : null}
           </section>
         )}
       </main>
