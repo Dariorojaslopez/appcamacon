@@ -195,7 +195,6 @@ function labelEstadoInformeExport(row: ConsolidadoExportRow): string {
 function consolidadoColumnaDatosGenerales(row: ConsolidadoExportRow): string {
   return [
     `Obra: ${row.obraCodigo} – ${row.obraNombre}`,
-    `Fecha del informe: ${row.fecha}`,
     `Jornada: ${row.jornadaNombre}`,
     '',
     row.datosGenerales,
@@ -14240,9 +14239,10 @@ export default function DashboardPage() {
             <h1 className="shell-title">Informe diario – Exportar</h1>
             <p className="shell-text-muted" style={{ marginBottom: '1rem' }}>
               Filtra por obra, jornada y rango de fechas. Cada fila es un informe. La primera columna es el{' '}
-              <strong>estado</strong> (abierto o cerrado por las cuatro firmas). La tabla, el CSV y el Excel tienen{' '}
-              <strong>ocho columnas</strong>, alineadas con las secciones del formulario; en «Datos generales» se incluye
-              obra, fecha y jornada. Las URLs aparecen como enlaces en la tabla; en CSV y Excel quedan como texto.
+              <strong>estado</strong> (abierto o cerrado por las cuatro firmas). El texto de cada columna sigue las
+              mismas etiquetas que el formulario en pantalla (sin IDs internos). La tabla, el CSV y el Excel tienen{' '}
+              <strong>ocho columnas</strong>. Las URLs aparecen como enlaces en la tabla; en CSV y Excel quedan como
+              texto.
             </p>
 
             <div

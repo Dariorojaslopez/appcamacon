@@ -8,6 +8,7 @@ import {
   type EvidenciaItem,
 } from '../../../../src/lib/evidenciasUrlPayload';
 import { buildConsolidadoExportWorkbookBuffer } from '../../../../src/lib/consolidadoExportExcel';
+import { FIRMA_SLOT_KEYS, FIRMA_SLOT_LABELS, type FirmaSlotKey } from '../../../../src/shared/firmaPolicies';
 
 const MAX_ROWS = 600;
 
@@ -65,7 +66,7 @@ function fmtEvidenciaItemDetalle(idx: number, item: EvidenciaItem): string {
   const lines = [`  ${idx + 1}. Imagen (enlace): ${url || '—'}`];
   if (typeof item === 'object' && item) {
     const g = fmtGeoLine(
-      '     GPS foto',
+      '     Ubicación (foto)',
       item.imagenLatitud,
       item.imagenLongitud,
       item.imagenPrecision,
@@ -93,6 +94,55 @@ function fmtEvidenciasPorFase(raw: string | null | undefined): string | null {
     return `Evidencias (raw JSON no estándar, primeros 2000 caracteres):\n${raw.trim().slice(0, 2000)}`;
   }
   return bloques.length ? bloques.join('\n\n') : null;
+}
+
+function fmtFechaInformeEs(ymd: string): string {
+  const d = new Date(`${ymd}T12:00:00.000Z`);
+  if (Number.isNaN(d.getTime())) return ymd;
+  return d.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function fmtFechaHoraEs(d: Date): string {
+  return d.toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' });
+}
+
+function formatHorasTotalesOperacion(
+  horaEntrada: string | null | undefined,
+  horaSalida: string | null | undefined,
+): string {
+  const entrada = (horaEntrada ?? '').trim();
+  const salida = (horaSalida ?? '').trim();
+  if (!entrada || !salida) return '—';
+  const [eh, em] = entrada.split(':').map(Number);
+  const [sh, sm] = salida.split(':').map(Number);
+  if (![eh, em, sh, sm].every((n) => Number.isFinite(n))) return '—';
+  let min = sh * 60 + sm - (eh * 60 + em);
+  if (min < 0) min += 24 * 60;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `${h}h ${m}m`;
+}
+
+function etiquetaFirmaSlot(slot: string): string {
+  if ((FIRMA_SLOT_KEYS as readonly string[]).includes(slot)) {
+    return FIRMA_SLOT_LABELS[slot as FirmaSlotKey];
+  }
+  return slot;
+}
+
+function etiquetaPropiedadEquipo(v: string | null | undefined): string {
+  const s = (v ?? '').trim();
+  if (s === 'PROPIO') return 'Propio';
+  if (s === 'ALQUILADO') return 'Alquilado';
+  return s || '—';
+}
+
+function etiquetaEstadoEquipo(v: string | null | undefined): string {
+  const s = (v ?? '').trim();
+  if (s === 'OPERATIVO') return 'Operativo';
+  if (s === 'EN_MANTENIMIENTO') return 'En mantenimiento';
+  if (s === 'FUERA_DE_SERVICIO') return 'Fuera de servicio';
+  return s || '—';
 }
 
 export async function GET(req: NextRequest) {
@@ -166,59 +216,46 @@ export async function GET(req: NextRequest) {
         ? `${inf.jornadaCatalogo.nombre} (${inf.jornadaCatalogo.horaInicio}–${inf.jornadaCatalogo.horaFin})`
         : '— (sin jornada)';
 
-      const metadatos = joinBlocks(
-        [
-          `ID informe: ${inf.id}`,
-          `ID obra: ${inf.projectId}`,
-          `ID jornada catálogo: ${inf.jornadaCatalogoId ?? '—'}`,
-          `Usuario informe (ID): ${inf.userId}`,
-          inf.user
-            ? `Usuario: ${inf.user.name} · CC/NIT ${inf.user.identification} · ${inf.user.email} · Rol ${inf.user.role}`
-            : null,
-          `Creado: ${inf.createdAt.toISOString()} · Actualizado: ${inf.updatedAt.toISOString()}`,
-          inf.informeCerrado && inf.cerradoEn ? `Cerrado en: ${inf.cerradoEn.toISOString()}` : null,
-        ],
-        '\n',
-      );
+      const frenteLine =
+        inf.frenteObraCatalogo?.nombre?.trim() || inf.frenteObra?.trim() || '—';
+
+      const contratistaLine = inf.contratistaCatalog
+        ? `${String(inf.contratistaCatalog.cedula ?? '').trim() || '—'} - ${String(inf.contratistaCatalog.nombre ?? '').trim() || '—'}`
+        : inf.contratista?.trim() || '—';
+
+      const encargadoLine = inf.encargadoReporteCatalog
+        ? `${String(inf.encargadoReporteCatalog.cedula ?? '').trim() || '—'} - ${String(inf.encargadoReporteCatalog.nombre ?? '').trim() || '—'}`
+        : inf.encargadoReporte?.trim() || '—';
+
+      const cargoLine = inf.cargoCatalog?.nombre?.trim()
+        ? `${inf.cargoCatalog.consecutivo != null ? `${inf.cargoCatalog.consecutivo}. ` : ''}${inf.cargoCatalog.nombre.trim()}`
+        : inf.cargo?.trim() || '—';
+
+      const horasTotalesStr = formatHorasTotalesOperacion(inf.horaEntrada, inf.horaSalida);
+
+      const registradoPorLine = inf.user
+        ? `${inf.user.name?.trim() || '—'}${inf.user.identification ? ` · ${String(inf.user.identification).trim()}` : ''}${inf.user.role ? ` · Rol: ${inf.user.role}` : ''}`
+        : '—';
+
+      const estadoInformeLine = inf.informeCerrado
+        ? `Estado del informe: Cerrado${inf.cerradoEn ? ` · ${fmtFechaHoraEs(inf.cerradoEn)}` : ''}`
+        : 'Estado del informe: Abierto';
 
       const datosGenerales = joinBlocks(
         [
-          metadatos,
-          inf.informeConsecutivo != null ? `Consecutivo informe: ${inf.informeConsecutivo}` : null,
-          inf.informeNo ? `Informe N°: ${inf.informeNo}` : null,
-          inf.centroTrabajoConsecutivo != null ? `Consecutivo centro trabajo: ${inf.centroTrabajoConsecutivo}` : null,
-          inf.centroTrabajo ? `Centro de trabajo: ${inf.centroTrabajo}` : null,
-          inf.frenteObra ? `Frente (texto): ${inf.frenteObra}` : null,
-          inf.frenteObraCatalogoId
-            ? `Frente catálogo ID: ${inf.frenteObraCatalogoId}${inf.frenteObraCatalogo ? ` · ${inf.frenteObraCatalogo.nombre}` : ''}`
-            : null,
-          inf.contratista ? `Contratista (texto): ${inf.contratista}` : null,
-          inf.contratistaCatalogoId
-            ? `Contratista catálogo ID: ${inf.contratistaCatalogoId}${
-                inf.contratistaCatalog
-                  ? ` · ${inf.contratistaCatalog.nombre} · NIT/CC ${inf.contratistaCatalog.cedula}`
-                  : ''
-              }`
-            : null,
-          inf.encargadoReporte ? `Encargado (texto): ${inf.encargadoReporte}` : null,
-          inf.encargadoReporteCatalogoId
-            ? `Encargado catálogo ID: ${inf.encargadoReporteCatalogoId}${
-                inf.encargadoReporteCatalog
-                  ? ` · ${inf.encargadoReporteCatalog.nombre} · ${inf.encargadoReporteCatalog.cedula}`
-                  : ''
-              }`
-            : null,
-          inf.cargo ? `Cargo (texto): ${inf.cargo}` : null,
-          inf.cargoCatalogoId
-            ? `Cargo catálogo ID: ${inf.cargoCatalogoId}${
-                inf.cargoCatalog
-                  ? ` · ${inf.cargoCatalog.nombre}${inf.cargoCatalog.consecutivo != null ? ` · cons. ${inf.cargoCatalog.consecutivo}` : ''}`
-                  : ''
-              }`
-            : null,
-          inf.horaEntrada || inf.horaSalida
-            ? `Horario obra: ${inf.horaEntrada ?? '—'} – ${inf.horaSalida ?? '—'}`
-            : null,
+          `FECHA DE REPORTE: ${fmtFechaInformeEs(fecha)}`,
+          `INFORME N°: ${inf.informeNo?.trim() || '—'}`,
+          `CENTRO DE TRABAJO: ${inf.centroTrabajo?.trim() || '—'}`,
+          `FRENTE DE OBRA: ${frenteLine}`,
+          `CONTRATISTA: ${contratistaLine}`,
+          `ENCARGADO DE REPORTE: ${encargadoLine}`,
+          `CARGO: ${cargoLine}`,
+          `HORA DE ENTRADA: ${inf.horaEntrada?.trim() || '—'}`,
+          `HORA DE SALIDA: ${inf.horaSalida?.trim() || '—'}`,
+          `HORAS TOTALES DE OPERACIÓN: ${horasTotalesStr}`,
+          '',
+          `Registrado por: ${registradoPorLine}`,
+          estadoInformeLine,
         ],
         '\n',
       );
@@ -228,40 +265,43 @@ export async function GET(req: NextRequest) {
           ? inf.bitacoraClimas
               .map(
                 (c, i) =>
-                  `${i + 1}. ${c.tipo} · Temp ${fmtNum(c.temperatura)} · Hum ${fmtNum(c.humedad)} · Obs: ${c.observaciones ?? '—'}\n${fmtGeoLine('   GPS clima', c.latitud, c.longitud, c.precisionGps, null, c.capturadoEn) ?? '   (sin GPS clima)'}`,
+                  `Registro de clima ${i + 1}: ${c.tipo} · Temperatura: ${fmtNum(c.temperatura)} °C · Humedad: ${fmtNum(c.humedad)} % · Observaciones: ${c.observaciones ?? '—'}\n${fmtGeoLine('   Ubicación (clima)', c.latitud, c.longitud, c.precisionGps, null, c.capturadoEn) ?? '   (sin ubicación GPS)'}`,
               )
               .join('\n\n')
           : null;
 
       const franjasClimaDia =
         inf.franjaClimaMananaCodigo || inf.franjaClimaTardeCodigo || inf.franjaClimaNocheCodigo
-          ? [
-              inf.franjaClimaMananaCodigo ? `  · Mañana: ${inf.franjaClimaMananaCodigo}` : null,
-              inf.franjaClimaTardeCodigo ? `  · Tarde: ${inf.franjaClimaTardeCodigo}` : null,
-              inf.franjaClimaNocheCodigo ? `  · Noche: ${inf.franjaClimaNocheCodigo}` : null,
-            ]
-              .filter(Boolean)
-              .join('\n')
+          ? joinBlocks(
+              [
+                inf.franjaClimaMananaCodigo ? `Mañana: ${inf.franjaClimaMananaCodigo}` : null,
+                inf.franjaClimaTardeCodigo ? `Tarde: ${inf.franjaClimaTardeCodigo}` : null,
+                inf.franjaClimaNocheCodigo ? `Noche: ${inf.franjaClimaNocheCodigo}` : null,
+              ],
+              '\n',
+            )
           : null;
 
       const jornadaCondiciones = joinBlocks(
         [
-          franjasClimaDia ? `Condición climática por franja (día):\n${franjasClimaDia}` : null,
-          climaBitacora ? `Clima (bitácora / registro diario):\n${climaBitacora}` : null,
-          inf.condiciones ? `Condiciones de obra: ${inf.condiciones}` : null,
-          inf.actividades ? `Actividades (texto libre del informe): ${inf.actividades}` : null,
-          inf.incidentes ? `Incidentes: ${inf.incidentes}` : null,
-          `Suspensión en cabecera (legacy): ${fmtSiNo(inf.huboSuspension)}${inf.motivoSuspension ? ` — ${inf.motivoSuspension}` : ''}`,
+          franjasClimaDia ? `CONDICIÓN CLIMÁTICA POR FRANJA\n${franjasClimaDia}` : null,
+          climaBitacora ? `REGISTRO DE CLIMA (BITÁCORA)\n${climaBitacora}` : null,
+          inf.condiciones ? `Condiciones de obra:\n${inf.condiciones}` : null,
+          inf.actividades ? `Actividades u observaciones (texto del día):\n${inf.actividades}` : null,
+          inf.incidentes ? `Incidentes:\n${inf.incidentes}` : null,
+          `¿Hubo suspensión (resumen en cabecera)?: ${fmtSiNo(inf.huboSuspension)}${inf.motivoSuspension ? `\nMotivo: ${inf.motivoSuspension}` : ''}`,
           inf.horaSuspension || inf.horaReinicio
-            ? `Hora susp./reinicio cabecera: ${inf.horaSuspension ?? '—'} / ${inf.horaReinicio ?? '—'}`
+            ? `Horas suspensión / reinicio (cabecera): ${inf.horaSuspension ?? '—'} / ${inf.horaReinicio ?? '—'}`
             : null,
-          inf.tipoClima ? `Tipo clima cabecera: ${inf.tipoClima}${inf.horasClima != null ? ` · ${inf.horasClima} h` : ''}` : null,
+          inf.tipoClima
+            ? `Tipo de clima (cabecera): ${inf.tipoClima}${inf.horasClima != null ? ` · Horas: ${fmtNum(inf.horasClima)} h` : ''}`
+            : null,
           inf.suspensiones.length > 0
-            ? `Suspensiones (detalle completo):\n${inf.suspensiones
+            ? `Suspensiones registradas\n${inf.suspensiones
                 .map((s, i) => {
                   const geo =
                     fmtGeoLine(
-                      '  GPS imagen',
+                      '  Ubicación (imagen)',
                       s.imagenLatitud,
                       s.imagenLongitud,
                       s.imagenPrecision,
@@ -269,12 +309,11 @@ export async function GET(req: NextRequest) {
                       s.imagenTomadaEn,
                     ) ?? '';
                   return [
-                    `  ${i + 1}. ${s.motivoSuspension}`,
-                    `     Horas: ${s.horaSuspension} – ${s.horaReinicio}`,
-                    s.tipoClima ? `     Clima fila: ${s.tipoClima} · ${fmtNum(s.horasClima)} h` : null,
-                    s.imagenUrl ? `     Imagen: ${s.imagenUrl}` : null,
+                    `  ${i + 1}. Motivo: ${s.motivoSuspension}`,
+                    `     Desde – hasta: ${s.horaSuspension} – ${s.horaReinicio}`,
+                    s.tipoClima ? `     Tipo de clima: ${s.tipoClima} · Horas: ${fmtNum(s.horasClima)} h` : null,
+                    s.imagenUrl ? `     Foto (enlace): ${s.imagenUrl}` : null,
                     geo || null,
-                    `     Orden: ${s.orden} · ID: ${s.id}`,
                   ]
                     .filter(Boolean)
                     .join('\n');
@@ -291,14 +330,14 @@ export async function GET(req: NextRequest) {
               .map((p, i) => {
                 const he =
                   p.horaEntrada || p.horaSalida
-                    ? `Entrada/salida: ${p.horaEntrada ?? '—'} – ${p.horaSalida ?? '—'}`
-                    : 'Entrada/salida: —';
+                    ? `Horario: ${p.horaEntrada ?? '—'} – ${p.horaSalida ?? '—'}`
+                    : 'Horario: —';
                 return [
-                  `${i + 1}. ${p.nombre}`,
-                  `   Cargo: ${p.cargo}`,
-                  p.subcontratista ? `   Subcontratista: ${p.subcontratista}` : null,
-                  `   ${he}`,
-                  `   ID fila: ${p.id}`,
+                  `Persona en obra ${i + 1}`,
+                  `  Nombre: ${p.nombre}`,
+                  `  Cargo: ${p.cargo}`,
+                  p.subcontratista ? `  Subcontratista: ${p.subcontratista}` : null,
+                  `  ${he}`,
                 ]
                   .filter(Boolean)
                   .join('\n');
@@ -309,19 +348,19 @@ export async function GET(req: NextRequest) {
       const equiposTxt = joinBlocks(
         [
           inf.equipos.length > 0
-            ? `Equipos:\n${inf.equipos
+            ? `Maquinaria y equipos\n${inf.equipos
                 .map((eq, i) => {
                   const hz = eq.horarios.length
                     ? eq.horarios
                         .map(
                           (h, j) =>
-                            `     Horario ${j + 1}: ${h.horaIngreso}–${h.horaSalida} · ${h.horasTrabajadas} h (id ${h.id})`,
+                            `     Horario ${j + 1}: ${h.horaIngreso} – ${h.horaSalida} · ${h.horasTrabajadas} h`,
                         )
                         .join('\n')
-                    : '     (sin horarios)';
+                    : '     (sin horarios detallados)';
                   const geo =
                     fmtGeoLine(
-                      '   GPS equipo/foto',
+                      '   Ubicación (foto del equipo)',
                       eq.imagenLatitud,
                       eq.imagenLongitud,
                       eq.imagenPrecision,
@@ -329,18 +368,17 @@ export async function GET(req: NextRequest) {
                       eq.imagenTomadaEn,
                     ) ?? null;
                   return [
-                    `  ${i + 1}. ${eq.descripcion}`,
-                    eq.placaRef ? `     Placa/ref: ${eq.placaRef}` : null,
-                    eq.propiedad ? `     Propiedad: ${eq.propiedad}` : null,
-                    eq.estado ? `     Estado: ${eq.estado}` : null,
+                    `  Equipo ${i + 1}: ${eq.descripcion}`,
+                    eq.placaRef ? `     Placa / referencia: ${eq.placaRef}` : null,
+                    eq.propiedad ? `     Propio / alquilado: ${etiquetaPropiedadEquipo(eq.propiedad)}` : null,
+                    eq.estado ? `     Estado: ${etiquetaEstadoEquipo(eq.estado)}` : null,
                     eq.observacion ? `     Observación: ${eq.observacion}` : null,
                     eq.horaIngreso || eq.horaSalida
-                      ? `     Ingreso/salida equipo: ${eq.horaIngreso ?? '—'} – ${eq.horaSalida ?? '—'}`
+                      ? `     Resumen horario (equipo): ${eq.horaIngreso ?? '—'} – ${eq.horaSalida ?? '—'}`
                       : null,
                     eq.horasTrabajadas != null ? `     Horas trabajadas (total): ${eq.horasTrabajadas}` : null,
-                    eq.imagenUrl ? `     Imagen URL: ${eq.imagenUrl}` : null,
+                    eq.imagenUrl ? `     Registro fotográfico (enlace): ${eq.imagenUrl}` : null,
                     geo,
-                    `     ID: ${eq.id}`,
                     hz,
                   ]
                     .filter(Boolean)
@@ -349,11 +387,11 @@ export async function GET(req: NextRequest) {
                 .join('\n\n')}`
             : null,
           inf.materialIngresos.length > 0
-            ? `Ingresos materiales:\n${inf.materialIngresos
+            ? `Ingreso de materiales\n${inf.materialIngresos
                 .map((m, i) => {
                   const geo =
                     fmtGeoLine(
-                      '  GPS',
+                      '  Ubicación (foto)',
                       m.imagenLatitud,
                       m.imagenLongitud,
                       m.imagenPrecision,
@@ -361,12 +399,12 @@ export async function GET(req: NextRequest) {
                       m.imagenTomadaEn,
                     ) ?? null;
                   return [
-                    `  ${i + 1}. ${m.tipoMaterial} · Proveedor: ${m.proveedor}`,
-                    `     Remisión: ${m.noRemision} · Cant ${fmtNum(m.cantidad)} ${m.unidad}`,
-                    m.observacion ? `     Obs: ${m.observacion}` : null,
-                    m.imagenUrl ? `     Imagen: ${m.imagenUrl}` : null,
+                    `  Ingreso ${i + 1}: ${m.tipoMaterial}`,
+                    `     Proveedor: ${m.proveedor}`,
+                    `     N° remisión: ${m.noRemision} · Cantidad: ${fmtNum(m.cantidad)} ${m.unidad}`,
+                    m.observacion ? `     Observación: ${m.observacion}` : null,
+                    m.imagenUrl ? `     Foto (enlace): ${m.imagenUrl}` : null,
                     geo,
-                    `     ID: ${m.id}`,
                   ]
                     .filter(Boolean)
                     .join('\n');
@@ -374,11 +412,11 @@ export async function GET(req: NextRequest) {
                 .join('\n\n')}`
             : null,
           inf.materialEntregas.length > 0
-            ? `Entregas materiales:\n${inf.materialEntregas
+            ? `Entregas de material\n${inf.materialEntregas
                 .map((m, i) => {
                   const geo =
                     fmtGeoLine(
-                      '  GPS',
+                      '  Ubicación (foto)',
                       m.imagenLatitud,
                       m.imagenLongitud,
                       m.imagenPrecision,
@@ -386,12 +424,12 @@ export async function GET(req: NextRequest) {
                       m.imagenTomadaEn,
                     ) ?? null;
                   return [
-                    `  ${i + 1}. ${m.tipoMaterial} · ${fmtNum(m.cantidad)} ${m.unidad}`,
-                    `     Contratista: ${m.contratista} · Firma recibido: ${fmtSiNo(m.firmaRecibido)}`,
-                    m.observacion ? `     Obs: ${m.observacion}` : null,
-                    m.imagenUrl ? `     Imagen: ${m.imagenUrl}` : null,
+                    `  Entrega ${i + 1}: ${m.tipoMaterial}`,
+                    `     Cantidad: ${fmtNum(m.cantidad)} ${m.unidad}`,
+                    `     Contratista: ${m.contratista} · ¿Firma recibido?: ${fmtSiNo(m.firmaRecibido)}`,
+                    m.observacion ? `     Observación: ${m.observacion}` : null,
+                    m.imagenUrl ? `     Foto (enlace): ${m.imagenUrl}` : null,
                     geo,
-                    `     ID: ${m.id}`,
                   ]
                     .filter(Boolean)
                     .join('\n');
@@ -410,7 +448,7 @@ export async function GET(req: NextRequest) {
                   [a.abscisadoInicial, a.abscisadoFinal].filter(Boolean).join(' → ') || '—';
                 const geo =
                   fmtGeoLine(
-                    '   GPS',
+                    '   Ubicación (foto)',
                     a.imagenLatitud,
                     a.imagenLongitud,
                     a.imagenPrecision,
@@ -418,15 +456,17 @@ export async function GET(req: NextRequest) {
                     a.imagenTomadaEn,
                   ) ?? null;
                 return [
-                  `${i + 1}. PK: ${a.pk} · Abscisados: ${abs}`,
-                  `   Ítem: ${a.itemContractual} · ${a.descripcion}`,
-                  `   Unidad: ${a.unidadMedida} · Cantidad total: ${fmtNum(a.cantidadTotal)}`,
-                  `   L×A×H: ${fmtNum(a.largo)} × ${fmtNum(a.ancho)} × ${fmtNum(a.altura)}`,
-                  `   Marcó observación (flag): ${fmtSiNo(a.observacion)}`,
-                  a.observacionTexto ? `   Texto observación: ${a.observacionTexto}` : null,
-                  a.imagenUrl ? `   Imagen: ${a.imagenUrl}` : null,
+                  `Actividad ${i + 1}`,
+                  `  Punto kilométrico (PK): ${a.pk}`,
+                  `  Abscisados: ${abs}`,
+                  `  Ítem contractual: ${a.itemContractual}`,
+                  `  Descripción: ${a.descripcion}`,
+                  `  Unidad de medida: ${a.unidadMedida ?? '—'} · Cantidad total: ${fmtNum(a.cantidadTotal)}`,
+                  `  Largo × ancho × altura: ${fmtNum(a.largo)} × ${fmtNum(a.ancho)} × ${fmtNum(a.altura)}`,
+                  `  ¿Marcó observación?: ${fmtSiNo(a.observacion)}`,
+                  a.observacionTexto ? `  Texto de la observación: ${a.observacionTexto}` : null,
+                  a.imagenUrl ? `  Foto (enlace): ${a.imagenUrl}` : null,
                   geo,
-                  `   ID: ${a.id}`,
                 ]
                   .filter(Boolean)
                   .join('\n');
@@ -437,11 +477,11 @@ export async function GET(req: NextRequest) {
       const calidadTxt = joinBlocks(
         [
           inf.ensayosObra.length > 0
-            ? `Ensayos:\n${inf.ensayosObra
+            ? `Ensayos\n${inf.ensayosObra
                 .map((e, i) => {
                   const geo =
                     fmtGeoLine(
-                      '  GPS',
+                      '  Ubicación (foto)',
                       e.imagenLatitud,
                       e.imagenLongitud,
                       e.imagenPrecision,
@@ -449,14 +489,14 @@ export async function GET(req: NextRequest) {
                       e.imagenTomadaEn,
                     ) ?? null;
                   return [
-                    `  ${i + 1}. ${e.tipoEnsayo} · Material/actividad: ${e.materialActividad}`,
-                    `     Muestra: ${e.idMuestra} · Lab: ${e.laboratorio} · Loc: ${e.localizacion}`,
+                    `  Ensayo ${i + 1}: ${e.tipoEnsayo}`,
+                    `     Material o actividad: ${e.materialActividad}`,
+                    `     ID muestra: ${e.idMuestra} · Laboratorio: ${e.laboratorio} · Localización: ${e.localizacion}`,
                     e.descripcion ? `     Descripción: ${e.descripcion}` : null,
                     `     Resultado: ${e.resultado}`,
-                    e.observacion ? `     Obs: ${e.observacion}` : null,
-                    e.imagenUrl ? `     Imagen: ${e.imagenUrl}` : null,
+                    e.observacion ? `     Observación: ${e.observacion}` : null,
+                    e.imagenUrl ? `     Foto (enlace): ${e.imagenUrl}` : null,
                     geo,
-                    `     ID: ${e.id}`,
                   ]
                     .filter(Boolean)
                     .join('\n');
@@ -464,11 +504,11 @@ export async function GET(req: NextRequest) {
                 .join('\n\n')}`
             : null,
           inf.danosRedesObra.length > 0
-            ? `Daños a redes:\n${inf.danosRedesObra
+            ? `Daños a redes\n${inf.danosRedesObra
                 .map((d, i) => {
                   const geo =
                     fmtGeoLine(
-                      '  GPS',
+                      '  Ubicación (foto)',
                       d.imagenLatitud,
                       d.imagenLongitud,
                       d.imagenPrecision,
@@ -476,13 +516,13 @@ export async function GET(req: NextRequest) {
                       d.imagenTomadaEn,
                     ) ?? null;
                   return [
-                    `  ${i + 1}. ${d.tipoDano} · ${d.direccion}`,
-                    `     Entidad: ${d.entidad} · Reporte N°: ${d.noReporte}`,
-                    d.horaReporte ? `     Hora reporte: ${d.horaReporte}` : null,
-                    d.observacion ? `     Obs: ${d.observacion}` : null,
-                    d.imagenUrl ? `     Imagen: ${d.imagenUrl}` : null,
+                    `  Registro ${i + 1}: ${d.tipoDano}`,
+                    `     Dirección: ${d.direccion}`,
+                    `     Entidad: ${d.entidad} · N° reporte: ${d.noReporte}`,
+                    d.horaReporte ? `     Hora del reporte: ${d.horaReporte}` : null,
+                    d.observacion ? `     Observación: ${d.observacion}` : null,
+                    d.imagenUrl ? `     Foto (enlace): ${d.imagenUrl}` : null,
                     geo,
-                    `     ID: ${d.id}`,
                   ]
                     .filter(Boolean)
                     .join('\n');
@@ -490,11 +530,11 @@ export async function GET(req: NextRequest) {
                 .join('\n\n')}`
             : null,
           inf.noConformidadesObra.length > 0
-            ? `No conformidades:\n${inf.noConformidadesObra
+            ? `No conformidades\n${inf.noConformidadesObra
                 .map((n, i) => {
                   const geo =
                     fmtGeoLine(
-                      '  GPS',
+                      '  Ubicación (foto)',
                       n.imagenLatitud,
                       n.imagenLongitud,
                       n.imagenPrecision,
@@ -502,12 +542,12 @@ export async function GET(req: NextRequest) {
                       n.imagenTomadaEn,
                     ) ?? null;
                   return [
-                    `  ${i + 1}. ${n.noConformidad} · Estado: ${n.estado}`,
+                    `  Caso ${i + 1}: ${n.noConformidad}`,
+                    `     Estado: ${n.estado}`,
                     n.detalle ? `     Detalle: ${n.detalle}` : null,
                     n.origen ? `     Origen: ${n.origen}` : null,
-                    n.imagenUrl ? `     Imagen: ${n.imagenUrl}` : null,
+                    n.imagenUrl ? `     Foto (enlace): ${n.imagenUrl}` : null,
                     geo,
-                    `     ID: ${n.id}`,
                   ]
                     .filter(Boolean)
                     .join('\n');
@@ -522,21 +562,21 @@ export async function GET(req: NextRequest) {
 
       const evidenciasTxt = joinBlocks(
         [
-          `Registro fotográfico (¿se cargó?): ${inf.registroFotografico == null ? '—' : fmtSiNo(inf.registroFotografico)}`,
-          fotosEvidencias ? `Evidencias fotográficas por fase:\n${fotosEvidencias}` : null,
+          `¿Se cargó registro fotográfico?: ${inf.registroFotografico == null ? '—' : fmtSiNo(inf.registroFotografico)}`,
+          fotosEvidencias ? `Carga de fotografías (Antes / Durante / Después)\n${fotosEvidencias}` : null,
           inf.observacionesGenerales ? `Observaciones generales:\n${inf.observacionesGenerales}` : null,
-          inf.observaciones ? `Observaciones (campo adicional):\n${inf.observaciones}` : null,
+          inf.observaciones ? `Observaciones adicionales:\n${inf.observaciones}` : null,
           inf.firmas.length > 0
-            ? `Firmas (detalle completo):\n${inf.firmas
+            ? `Firmas y responsables\n${inf.firmas
                 .map((f) =>
                   [
-                    `  · Slot: ${f.slot}`,
-                    `    Firmado: ${fmtSiNo(f.firmado)}`,
-                    `    Código ingresado: ${f.codigo ? f.codigo : '(vacío)'}`,
-                    f.observacion ? `    Observación: ${f.observacion}` : '    Observación: —',
-                    f.firmadoEn ? `    Firmado en: ${f.firmadoEn.toISOString()}` : '    Firmado en: —',
-                    `    ID firma: ${f.id}`,
-                  ].join('\n'),
+                    `  ${etiquetaFirmaSlot(f.slot)}`,
+                    `     Estado: ${f.firmado ? 'Firma completa' : 'Pendiente'}`,
+                    f.observacion ? `     Observación: ${f.observacion}` : '     Observación: —',
+                    f.firmadoEn ? `     Fecha de registro: ${fmtFechaHoraEs(f.firmadoEn)}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join('\n'),
                 )
                 .join('\n\n')}`
             : null,

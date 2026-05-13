@@ -44,9 +44,10 @@ export async function buildConsolidadoExportWorkbookBuffer(rows: ConsolidadoExpo
     'Evidencias y cierre',
   ];
   const headerRow = ws.addRow(headers);
-  headerRow.font = { bold: true };
+  headerRow.height = 22;
+  headerRow.font = { bold: true, size: 11, color: { argb: 'FF1E293B' } };
   headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE7EEF7' } };
-  headerRow.alignment = { vertical: 'middle', wrapText: true };
+  headerRow.alignment = { vertical: 'middle', wrapText: true, horizontal: 'center' };
 
   for (const row of rows) {
     const r = ws.addRow([
