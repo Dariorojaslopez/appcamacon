@@ -1158,6 +1158,8 @@ export default function DashboardPage() {
     { id: string; nombre: string; consecutivo?: number | null }[]
   >([]);
   const [frentesObraOptions, setFrentesObraOptions] = useState<{ id: string; nombre: string }[]>([]);
+  const [loadingFrentesObraCatalog, setLoadingFrentesObraCatalog] = useState(false);
+  const [frentesObraCatalogError, setFrentesObraCatalogError] = useState<string | null>(null);
   const [itemsCatalogOptions, setItemsCatalogOptions] = useState<
     {
       id: string;
@@ -2568,19 +2570,46 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!selectedObraId) {
       setFrentesObraOptions([]);
+      setFrentesObraCatalogError(null);
+      setLoadingFrentesObraCatalog(false);
       return;
     }
     let cancelled = false;
-    fetch(`/api/catalogos/frentes-obra?projectId=${encodeURIComponent(selectedObraId)}`, {
-      credentials: 'include',
-    })
-      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
-      .then((data: { items?: { id: string; nombre: string }[] }) => {
-        if (!cancelled) setFrentesObraOptions(Array.isArray(data.items) ? data.items : []);
-      })
-      .catch(() => {
-        if (!cancelled) setFrentesObraOptions([]);
-      });
+    setLoadingFrentesObraCatalog(true);
+    setFrentesObraCatalogError(null);
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/catalogos/frentes-obra?projectId=${encodeURIComponent(selectedObraId)}`,
+          { credentials: 'include' },
+        );
+        let data: { items?: { id: string; nombre: string }[]; error?: string } = {};
+        try {
+          data = (await res.json()) as typeof data;
+        } catch {
+          data = {};
+        }
+        if (cancelled) return;
+        if (!res.ok) {
+          setFrentesObraOptions([]);
+          setFrentesObraCatalogError(
+            typeof data.error === 'string' && data.error.trim()
+              ? data.error
+              : 'No se pudieron cargar los frentes de obra.',
+          );
+          return;
+        }
+        setFrentesObraOptions(Array.isArray(data.items) ? data.items : []);
+        setFrentesObraCatalogError(null);
+      } catch {
+        if (!cancelled) {
+          setFrentesObraOptions([]);
+          setFrentesObraCatalogError('Error de red al cargar frentes de obra.');
+        }
+      } finally {
+        if (!cancelled) setLoadingFrentesObraCatalog(false);
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -10779,7 +10808,7 @@ export default function DashboardPage() {
                   <InformeSearchableSelect
                     id="frente-obra"
                     value={frenteSelectValue}
-                    disabled={!selectedObraId}
+                    disabled={!selectedObraId || loadingFrentesObraCatalog}
                     emptyOptionLabel={selectedObraId ? 'Seleccione...' : 'Seleccione una obra arriba'}
                     searchPlaceholder="Buscar frente de obra…"
                     options={frenteSelectOptions.map((o) => ({ value: o.id, label: o.nombre }))}
@@ -10807,6 +10836,25 @@ export default function DashboardPage() {
                       });
                     }}
                   />
+                  {selectedObraId && loadingFrentesObraCatalog && (
+                    <p className="shell-text-muted" style={{ fontSize: '0.85rem', marginTop: '0.35rem' }}>
+                      Cargando frentes de obra…
+                    </p>
+                  )}
+                  {frentesObraCatalogError && (
+                    <p className="feedback feedback-error" style={{ marginTop: '0.35rem' }}>
+                      {frentesObraCatalogError}
+                    </p>
+                  )}
+                  {selectedObraId &&
+                    !loadingFrentesObraCatalog &&
+                    !frentesObraCatalogError &&
+                    frentesObraOptions.length === 0 && (
+                      <p className="shell-text-muted" style={{ fontSize: '0.85rem', marginTop: '0.35rem' }}>
+                        No hay frentes en el catálogo para esta obra. Configúrelos en Configuración general → Frentes
+                        de obra (ítems activos por proyecto).
+                      </p>
+                    )}
                 </div>
               </div>
               <div className="informe-field">
