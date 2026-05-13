@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessToken } from '../../../../src/infrastructure/auth/tokens';
 import prisma from '../../../../src/lib/prisma';
+import {
+  jsonRegistroBitacoraSchemaPendiente,
+  prismaIndicaTablaRegistroBitacoraDesactualizada,
+} from '../../../../src/lib/prismaRegistroBitacoraSchema';
 import { storedMediaImgSrc } from '../../../../src/lib/evidenciasUrlPayload';
 import { diffInclusiveCalendarDaysUtc, parseYmdUtc } from '../../../../src/lib/registroBitacoraFecha';
 
@@ -182,6 +186,10 @@ export async function GET(req: NextRequest) {
     const err = error as { name?: string };
     if (err.name === 'TokenExpiredError' || err.name === 'JsonWebTokenError') {
       return NextResponse.json({ error: 'Sesión expirada' }, { status: 401 });
+    }
+    if (prismaIndicaTablaRegistroBitacoraDesactualizada(error)) {
+      console.error('GET /api/registro-bitacora/pdf (schema)', error);
+      return jsonRegistroBitacoraSchemaPendiente();
     }
     console.error('GET /api/registro-bitacora/pdf', error);
     return NextResponse.json({ error: 'Error al generar el documento' }, { status: 500 });

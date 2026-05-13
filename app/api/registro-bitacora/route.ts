@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessToken } from '../../../src/infrastructure/auth/tokens';
 import prisma from '../../../src/lib/prisma';
+import {
+  jsonRegistroBitacoraSchemaPendiente,
+  prismaIndicaTablaRegistroBitacoraDesactualizada,
+} from '../../../src/lib/prismaRegistroBitacoraSchema';
 import { fechaRegistroEnRangoObra, parseYmdUtc, toYmdUtc } from '../../../src/lib/registroBitacoraFecha';
 
 type SlotPayload = {
@@ -83,6 +87,10 @@ export async function GET(req: NextRequest) {
     const err = error as { name?: string };
     if (err.name === 'TokenExpiredError' || err.name === 'JsonWebTokenError') {
       return NextResponse.json({ error: 'Sesión expirada' }, { status: 401 });
+    }
+    if (prismaIndicaTablaRegistroBitacoraDesactualizada(error)) {
+      console.error('GET /api/registro-bitacora (schema)', error);
+      return jsonRegistroBitacoraSchemaPendiente();
     }
     console.error('GET /api/registro-bitacora', error);
     return NextResponse.json({ error: 'Error al cargar el registro' }, { status: 500 });
@@ -195,6 +203,10 @@ export async function POST(req: NextRequest) {
     }
     if (err?.code === 'P2002') {
       return NextResponse.json({ error: 'Ya existe un registro para esa obra y fecha.' }, { status: 409 });
+    }
+    if (prismaIndicaTablaRegistroBitacoraDesactualizada(error)) {
+      console.error('POST /api/registro-bitacora (schema)', error);
+      return jsonRegistroBitacoraSchemaPendiente();
     }
     console.error('POST /api/registro-bitacora', error);
     return NextResponse.json({ error: 'Error al guardar el registro' }, { status: 500 });

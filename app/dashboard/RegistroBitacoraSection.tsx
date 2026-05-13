@@ -34,6 +34,11 @@ type ProyectoMeta = {
   code: string;
 };
 
+type ProyectoApiResponse = ProyectoMeta & {
+  error?: string;
+  tiposCondicion?: { value: string; label: string }[];
+};
+
 type TipoCondicionOpt = { value: string; label: string };
 
 type PersistedUrls = {
@@ -244,26 +249,9 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch('/api/catalogos/tipos-condicion', { credentials: 'include' });
-        const data = (await res.json()) as { items?: { value: string; label: string }[] };
-        if (!cancelled && res.ok && Array.isArray(data.items)) {
-          setTipoCondicionOpts(data.items.map((it) => ({ value: it.value, label: it.label })));
-        }
-      } catch {
-        /* noop */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
     if (!projectId) {
       setProyectoMeta(null);
+      setTipoCondicionOpts([]);
       return;
     }
     let cancelled = false;
@@ -274,11 +262,12 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
         const res = await fetch(`/api/registro-bitacora/proyecto?projectId=${encodeURIComponent(projectId)}`, {
           credentials: 'include',
         });
-        const data = (await res.json()) as ProyectoMeta & { error?: string };
+        const data = (await res.json()) as ProyectoApiResponse;
         if (cancelled) return;
         if (!res.ok) {
           setErr(data.error ?? 'No se pudo cargar la obra');
           setProyectoMeta(null);
+          setTipoCondicionOpts([]);
           return;
         }
         setProyectoMeta({
@@ -287,6 +276,7 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
           name: data.name,
           code: data.code,
         });
+        setTipoCondicionOpts(Array.isArray(data.tiposCondicion) ? data.tiposCondicion : []);
         setFechaDia((prev) => clampYmd(prev, data.fechaMin ?? null, data.fechaMax ?? null));
       } finally {
         if (!cancelled) setLoadingMeta(false);
@@ -654,6 +644,10 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
 
         <div className="form-field">
           <span className="form-label">Condición climática</span>
+          <p className="informe-label-hint" style={{ marginTop: 0, marginBottom: '0.5rem', maxWidth: '36rem' }}>
+            Catálogo global del sistema (Administración → Tipos de condición), el mismo que usa el informe diario; no es un
+            listado distinto por obra.
+          </p>
           <div style={{ display: 'grid', gap: '0.65rem', maxWidth: '28rem' }}>
             <label className="shell-text-muted" style={{ fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
               Mañana
@@ -694,6 +688,12 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
               </select>
             </label>
           </div>
+          {projectId && !loadingMeta && tipoCondicionOpts.length === 0 && (
+            <p className="informe-label-hint" style={{ marginTop: '0.5rem', maxWidth: '32rem' }}>
+              No hay tipos de condición climática activos en el sistema. Créalos en Administración → Catálogos → Tipos de
+              condición (son los mismos que usa el informe diario; no son un listado distinto por obra).
+            </p>
+          )}
         </div>
 
         <div className="form-field" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
