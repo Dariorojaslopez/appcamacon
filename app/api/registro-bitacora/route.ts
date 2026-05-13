@@ -23,13 +23,6 @@ function asOptionalUrl(v: unknown): string | null {
   return t.length > 0 ? t : null;
 }
 
-function asOptionalCodigo(v: unknown): string | null {
-  if (v === null || v === undefined) return null;
-  if (typeof v !== 'string') return null;
-  const t = v.trim();
-  return t.length > 0 ? t : null;
-}
-
 export async function GET(req: NextRequest) {
   try {
     const authCookie = req.cookies.get('access_token')?.value;
@@ -59,9 +52,6 @@ export async function GET(req: NextRequest) {
         id: true,
         fecha: true,
         consecutivo: true,
-        franjaClimaMananaCodigo: true,
-        franjaClimaTardeCodigo: true,
-        franjaClimaNocheCodigo: true,
         contratistaObservaciones: true,
         contratistaFotoUrl: true,
         contratistaFirmaUrl: true,
@@ -107,9 +97,6 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as {
       projectId?: unknown;
       fecha?: unknown;
-      franjaClimaMananaCodigo?: unknown;
-      franjaClimaTardeCodigo?: unknown;
-      franjaClimaNocheCodigo?: unknown;
       contratista?: SlotPayload;
       interventoria?: SlotPayload;
       idu?: SlotPayload;
@@ -141,10 +128,6 @@ export async function POST(req: NextRequest) {
     const i = body.interventoria ?? {};
     const d = body.idu ?? {};
 
-    const climaM = asOptionalCodigo(body.franjaClimaMananaCodigo);
-    const climaT = asOptionalCodigo(body.franjaClimaTardeCodigo);
-    const climaN = asOptionalCodigo(body.franjaClimaNocheCodigo);
-
     const dataSlots = {
       contratistaObservaciones: asString(c.observaciones),
       contratistaFotoUrl: asOptionalUrl(c.fotoUrl),
@@ -155,9 +138,9 @@ export async function POST(req: NextRequest) {
       iduObservaciones: asString(d.observaciones),
       iduFotoUrl: asOptionalUrl(d.fotoUrl),
       iduFirmaUrl: asOptionalUrl(d.firmaUrl),
-      franjaClimaMananaCodigo: climaM,
-      franjaClimaTardeCodigo: climaT,
-      franjaClimaNocheCodigo: climaN,
+      franjaClimaMananaCodigo: null,
+      franjaClimaTardeCodigo: null,
+      franjaClimaNocheCodigo: null,
     };
 
     const { row, created } = await prisma.$transaction(async (tx) => {

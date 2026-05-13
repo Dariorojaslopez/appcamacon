@@ -60,22 +60,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No hay registro de bitácora para esa fecha. Guárdelo primero.' }, { status: 404 });
     }
 
-    const codigos = [reg.franjaClimaMananaCodigo, reg.franjaClimaTardeCodigo, reg.franjaClimaNocheCodigo].filter(
-      (c): c is string => !!c && c.trim().length > 0,
-    );
-    const tipos =
-      codigos.length > 0
-        ? await prisma.tipoCondicionCatalog.findMany({
-            where: { codigo: { in: codigos }, isActive: true },
-            select: { codigo: true, nombre: true },
-          })
-        : [];
-    const nombreClima = (cod: string | null | undefined) => {
-      if (!cod?.trim()) return '—';
-      const t = tipos.find((x) => x.codigo === cod);
-      return t?.nombre ?? cod;
-    };
-
     let plazoDias: number | null = null;
     let transcurridoDias: number | null = null;
     if (project.startDate && project.endDate) {
@@ -118,7 +102,6 @@ export async function GET(req: NextRequest) {
     .obra-side2 td, .obra-side2 th { border: 1px solid #374151; }
     h1 { margin: 0 0 6px; font-size: 15px; text-transform: uppercase; }
     .muted { color: #6b7280; font-size: 12px; }
-    .clima-ico { font-size: 18px; margin-right: 6px; }
     @media print { button { display: none; } body { margin: 12mm; } }
   </style>
 </head>
@@ -150,14 +133,6 @@ export async function GET(req: NextRequest) {
       </table>
     </div>
   </div>
-
-  <table style="margin-bottom:16px;max-width:520px;">
-    <tr><th colspan="2">Condición climática</th></tr>
-    <tr><th>Tiempo</th><th>Estado</th></tr>
-    <tr><td>Mañana</td><td><span class="clima-ico">☀</span>${esc(nombreClima(reg.franjaClimaMananaCodigo))}</td></tr>
-    <tr><td>Tarde</td><td><span class="clima-ico">☀</span>${esc(nombreClima(reg.franjaClimaTardeCodigo))}</td></tr>
-    <tr><td>Noche</td><td><span class="clima-ico">☁</span>${esc(nombreClima(reg.franjaClimaNocheCodigo))}</td></tr>
-  </table>
 
   <h2 style="font-size:14px;border-bottom:1px solid #d1d5db;padding-bottom:4px;">Contratista</h2>
   <p style="white-space:pre-wrap;">${esc(reg.contratistaObservaciones || '—')}</p>

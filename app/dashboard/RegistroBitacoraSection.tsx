@@ -36,10 +36,7 @@ type ProyectoMeta = {
 
 type ProyectoApiResponse = ProyectoMeta & {
   error?: string;
-  tiposCondicion?: { value: string; label: string }[];
 };
-
-type TipoCondicionOpt = { value: string; label: string };
 
 type PersistedUrls = {
   contratistaFotoUrl: string | null;
@@ -61,9 +58,6 @@ const emptyPersisted: PersistedUrls = {
 
 type ApiRegistro = {
   consecutivo: number;
-  franjaClimaMananaCodigo: string | null;
-  franjaClimaTardeCodigo: string | null;
-  franjaClimaNocheCodigo: string | null;
   contratistaObservaciones: string;
   contratistaFotoUrl: string | null;
   contratistaFirmaUrl: string | null;
@@ -207,10 +201,6 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
   const [loadingMeta, setLoadingMeta] = useState(false);
   const [loadingRegistro, setLoadingRegistro] = useState(false);
   const [consecutivo, setConsecutivo] = useState<number | null>(null);
-  const [tipoCondicionOpts, setTipoCondicionOpts] = useState<TipoCondicionOpt[]>([]);
-  const [climaM, setClimaM] = useState('');
-  const [climaT, setClimaT] = useState('');
-  const [climaN, setClimaN] = useState('');
 
   const [obsC, setObsC] = useState('');
   const [obsI, setObsI] = useState('');
@@ -251,7 +241,6 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
   useEffect(() => {
     if (!projectId) {
       setProyectoMeta(null);
-      setTipoCondicionOpts([]);
       return;
     }
     let cancelled = false;
@@ -267,7 +256,6 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
         if (!res.ok) {
           setErr(data.error ?? 'No se pudo cargar la obra');
           setProyectoMeta(null);
-          setTipoCondicionOpts([]);
           return;
         }
         setProyectoMeta({
@@ -276,7 +264,6 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
           name: data.name,
           code: data.code,
         });
-        setTipoCondicionOpts(Array.isArray(data.tiposCondicion) ? data.tiposCondicion : []);
         setFechaDia((prev) => clampYmd(prev, data.fechaMin ?? null, data.fechaMax ?? null));
       } finally {
         if (!cancelled) setLoadingMeta(false);
@@ -290,9 +277,6 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
   const applyRegistro = useCallback((r: ApiRegistro | null) => {
     if (!r) {
       setConsecutivo(null);
-      setClimaM('');
-      setClimaT('');
-      setClimaN('');
       setObsC('');
       setObsI('');
       setObsD('');
@@ -315,9 +299,6 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
       return;
     }
     setConsecutivo(r.consecutivo);
-    setClimaM(r.franjaClimaMananaCodigo ?? '');
-    setClimaT(r.franjaClimaTardeCodigo ?? '');
-    setClimaN(r.franjaClimaNocheCodigo ?? '');
     setObsC(r.contratistaObservaciones ?? '');
     setObsI(r.interventoriaObservaciones ?? '');
     setObsD(r.iduObservaciones ?? '');
@@ -517,9 +498,6 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
         body: JSON.stringify({
           projectId,
           fecha: fechaDia,
-          franjaClimaMananaCodigo: climaM.trim() || null,
-          franjaClimaTardeCodigo: climaT.trim() || null,
-          franjaClimaNocheCodigo: climaN.trim() || null,
           contratista: {
             observaciones: obsC,
             fotoUrl: urlFotoC,
@@ -641,60 +619,6 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
           </p>
         )}
         {loadingRegistro && projectId && <p className="shell-text-muted">Cargando datos del día…</p>}
-
-        <div className="form-field">
-          <span className="form-label">Condición climática</span>
-          <p className="informe-label-hint" style={{ marginTop: 0, marginBottom: '0.5rem', maxWidth: '36rem' }}>
-            Catálogo global del sistema (Administración → Tipos de condición), el mismo que usa el informe diario; no es un
-            listado distinto por obra.
-          </p>
-          <div style={{ display: 'grid', gap: '0.65rem', maxWidth: '28rem' }}>
-            <label className="shell-text-muted" style={{ fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              Mañana
-              <select
-                className="form-input"
-                value={climaM}
-                onChange={(e) => setClimaM(e.target.value)}
-                disabled={!projectId}
-              >
-                <option value="">—</option>
-                {tipoCondicionOpts.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="shell-text-muted" style={{ fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              Tarde
-              <select className="form-input" value={climaT} onChange={(e) => setClimaT(e.target.value)} disabled={!projectId}>
-                <option value="">—</option>
-                {tipoCondicionOpts.map((o) => (
-                  <option key={`t-${o.value}`} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="shell-text-muted" style={{ fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              Noche
-              <select className="form-input" value={climaN} onChange={(e) => setClimaN(e.target.value)} disabled={!projectId}>
-                <option value="">—</option>
-                {tipoCondicionOpts.map((o) => (
-                  <option key={`n-${o.value}`} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          {projectId && !loadingMeta && tipoCondicionOpts.length === 0 && (
-            <p className="informe-label-hint" style={{ marginTop: '0.5rem', maxWidth: '32rem' }}>
-              No hay tipos de condición climática activos en el sistema. Créalos en Administración → Catálogos → Tipos de
-              condición (son los mismos que usa el informe diario; no son un listado distinto por obra).
-            </p>
-          )}
-        </div>
 
         <div className="form-field" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
           <button type="button" className="btn-secondary" onClick={handleImprimir} disabled={!projectId || !fechaDia}>

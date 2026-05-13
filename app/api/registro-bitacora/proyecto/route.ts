@@ -14,25 +14,18 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'projectId es requerido' }, { status: 400 });
     }
 
-    const [p, tiposCondicion] = await Promise.all([
-      prisma.project.findFirst({
-        where: { id: projectId, isActive: true },
-        select: {
-          id: true,
-          name: true,
-          code: true,
-          startDate: true,
-          endDate: true,
-          logoUrl: true,
-          consecutivo: true,
-        },
-      }),
-      prisma.tipoCondicionCatalog.findMany({
-        where: { isActive: true },
-        orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
-        select: { codigo: true, nombre: true },
-      }),
-    ]);
+    const p = await prisma.project.findFirst({
+      where: { id: projectId, isActive: true },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        startDate: true,
+        endDate: true,
+        logoUrl: true,
+        consecutivo: true,
+      },
+    });
     if (!p) return NextResponse.json({ error: 'Obra no encontrada o inactiva' }, { status: 404 });
 
     return NextResponse.json({
@@ -45,8 +38,6 @@ export async function GET(req: NextRequest) {
       fechaMax: p.endDate ? toYmdUtc(p.endDate) : null,
       logoUrl: p.logoUrl,
       consecutivoObra: p.consecutivo,
-      /** Mismo catálogo que el informe diario (no es por obra en el modelo). */
-      tiposCondicion: tiposCondicion.map((t) => ({ value: t.codigo, label: t.nombre })),
     });
   } catch (error: unknown) {
     const err = error as { name?: string };
