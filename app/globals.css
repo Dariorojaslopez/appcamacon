@@ -3465,3 +3465,12 @@ ul.informe-searchable-list {
   border-radius: 6px;
   touch-action: none;
 }
+
+.registro-bitacora-obs-wrap.informe-input-wrap {
+  align-items: flex-start;
+}
+
+.registro-bitacora-obs-wrap .informe-icon-button {
+  top: 0.65rem;
+  transform: none;
+}

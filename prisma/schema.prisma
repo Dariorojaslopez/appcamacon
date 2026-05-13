@@ -579,12 +579,20 @@ model BitacoraClima {
 }
 
 /// Registro manual de bitácora por obra (contratista, interventoría, IDU): observaciones, foto y firma cada uno.
+/// Un registro por obra y día civil (`fecha`); `consecutivo` es el número de registro dentro de la obra.
 model RegistroBitacoraObra {
   id        String  @id @default(cuid())
   projectId String
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   userId    String
   user      User    @relation(fields: [userId], references: [id])
+
+  fecha       DateTime @db.Date
+  consecutivo Int
+
+  franjaClimaMananaCodigo String?
+  franjaClimaTardeCodigo   String?
+  franjaClimaNocheCodigo   String?
 
   contratistaObservaciones String  @default("")
   contratistaFotoUrl       String?
@@ -601,7 +609,8 @@ model RegistroBitacoraObra {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([projectId, createdAt])
+  @@unique([projectId, fecha])
+  @@index([projectId, fecha])
   @@map("registro_bitacora_obra")
 }
 
