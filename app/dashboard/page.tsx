@@ -416,6 +416,7 @@ type ItemCatalogNode = {
   unidad?: string | null;
   precioUnitario?: number | null;
   cantidad?: number | null;
+  cantidadPresupuesto?: number | null;
   largo?: number | null;
   ancho?: number | null;
   altura?: number | null;
@@ -1272,6 +1273,7 @@ export default function DashboardPage() {
   const [itemNewLargo, setItemNewLargo] = useState('');
   const [itemNewAncho, setItemNewAncho] = useState('');
   const [itemNewAltura, setItemNewAltura] = useState('');
+  const [itemNewCantidadPresupuesto, setItemNewCantidadPresupuesto] = useState('');
   const [itemNewImagenUrl, setItemNewImagenUrl] = useState('');
   const [itemNewFotoGeo, setItemNewFotoGeo] = useState<FotoGeoFields>(emptyFotoGeoFields);
   const [itemNewProveedorId, setItemNewProveedorId] = useState('');
@@ -1282,6 +1284,7 @@ export default function DashboardPage() {
     unidad: '',
     precioUnitario: '',
     cantidad: '',
+    cantidadPresupuesto: '',
     largo: '',
     ancho: '',
     altura: '',
@@ -4140,10 +4143,6 @@ export default function DashboardPage() {
         setItemsError('Seleccione una unidad de medida.');
         return;
       }
-      if (!itemNewProveedorId) {
-        setItemsError('Seleccione el proveedor del ítem.');
-        return;
-      }
       const kindNew = itemCatalogCaptureKind(itemNewUnidad.trim());
       if (kindNew !== 'none' && kindNew !== 'manual') {
         if (
@@ -4166,6 +4165,12 @@ export default function DashboardPage() {
         itemNewAltura,
         itemNewCantidad,
       );
+      const cpTrim = itemNewCantidadPresupuesto.trim();
+      const cantidadPresupuestoNum = cpTrim ? Number(cpTrim.replace(',', '.')) : null;
+      if (cantidadPresupuestoNum != null && (!Number.isFinite(cantidadPresupuestoNum) || cantidadPresupuestoNum < 0)) {
+        setItemsError('Cantidad presupuesto no válida (use un número ≥ 0).');
+        return;
+      }
       const codigoAuto = nextAutonumericItemCatalogCodigo(itemsAdminFlat);
       const res = await fetch('/api/admin/catalogos/items', {
         method: 'POST',
@@ -4184,7 +4189,8 @@ export default function DashboardPage() {
           altura: icPayload.altura,
           imagenUrl: itemNewImagenUrl.trim() || null,
           ...fotoGeoPayload(itemNewFotoGeo),
-          proveedorId: itemNewProveedorId,
+          proveedorId: itemNewProveedorId.trim() || null,
+          cantidadPresupuesto: cantidadPresupuestoNum,
         }),
       });
       const data = await res.json();
@@ -4201,6 +4207,7 @@ export default function DashboardPage() {
       setItemNewLargo('');
       setItemNewAncho('');
       setItemNewAltura('');
+      setItemNewCantidadPresupuesto('');
       setItemNewImagenUrl('');
       setItemNewFotoGeo(emptyFotoGeoFields());
       setItemNewProveedorId(itemProveedorOptions[0]?.id ?? '');
@@ -4217,10 +4224,6 @@ export default function DashboardPage() {
     try {
       if (!editingItemForm.unidad.trim()) {
         setItemsError('Seleccione una unidad de medida.');
-        return;
-      }
-      if (!editingItemForm.proveedorId.trim()) {
-        setItemsError('Seleccione el proveedor del ítem.');
         return;
       }
       const kindEd = itemCatalogCaptureKind(editingItemForm.unidad.trim());
@@ -4245,6 +4248,12 @@ export default function DashboardPage() {
         editingItemForm.altura,
         editingItemForm.cantidad,
       );
+      const cpEditTrim = editingItemForm.cantidadPresupuesto.trim();
+      const cantidadPresupuestoEdit = cpEditTrim ? Number(cpEditTrim.replace(',', '.')) : null;
+      if (cantidadPresupuestoEdit != null && (!Number.isFinite(cantidadPresupuestoEdit) || cantidadPresupuestoEdit < 0)) {
+        setItemsError('Cantidad presupuesto no válida (use un número ≥ 0).');
+        return;
+      }
       const res = await fetch(`/api/admin/catalogos/items/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -4263,7 +4272,8 @@ export default function DashboardPage() {
           altura: icEdit.altura,
           imagenUrl: editingItemForm.imagenUrl.trim() || null,
           ...fotoGeoPayload(editingItemForm),
-          proveedorId: editingItemForm.proveedorId.trim(),
+          proveedorId: editingItemForm.proveedorId.trim() || null,
+          cantidadPresupuesto: cantidadPresupuestoEdit,
           isActive: editingItemForm.isActive,
         }),
       });
@@ -4280,6 +4290,7 @@ export default function DashboardPage() {
         unidad: '',
         precioUnitario: '',
         cantidad: '',
+        cantidadPresupuesto: '',
         largo: '',
         ancho: '',
         altura: '',
@@ -4316,6 +4327,7 @@ export default function DashboardPage() {
           unidad: '',
           precioUnitario: '',
           cantidad: '',
+          cantidadPresupuesto: '',
           largo: '',
           ancho: '',
           altura: '',
@@ -9803,26 +9815,25 @@ export default function DashboardPage() {
                   </div>
                   <div className="form-field" style={{ marginBottom: '0.75rem' }}>
                     <label className="form-label" htmlFor="item-new-proveedor">
-                      Proveedor
+                      Proveedor (opcional)
                     </label>
                     <select
                       id="item-new-proveedor"
                       className="form-input"
-                      required
                       value={itemNewProveedorId}
                       onChange={(e) => setItemNewProveedorId(e.target.value)}
-                      disabled={itemsSaving || itemProveedorOptions.length === 0}
+                      disabled={itemsSaving}
                     >
-                      {itemProveedorOptions.length === 0 ? (
-                        <option value="">— Primero cree un proveedor activo —</option>
-                      ) : (
-                        itemProveedorOptions.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {(p.nombreComercial || p.nombreRazonSocial)} · {p.nitDocumento}
-                          </option>
-                        ))
-                      )}
+                      <option value="">— Sin proveedor —</option>
+                      {itemProveedorOptions.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {(p.nombreComercial || p.nombreRazonSocial)} · {p.nitDocumento}
+                        </option>
+                      ))}
                     </select>
+                    <p className="informe-label-hint" style={{ marginTop: '0.35rem', marginBottom: 0 }}>
+                      Puede crear el ítem sin proveedor y asignarlo después.
+                    </p>
                   </div>
                   <div className="form-row-inline">
                     <div className="form-field" style={{ marginBottom: 0 }}>
@@ -9965,6 +9976,24 @@ export default function DashboardPage() {
                       />
                     </div>
                   </div>
+                  <div className="form-field" style={{ marginBottom: '0.75rem' }}>
+                    <label className="form-label" htmlFor="item-new-cantidad-presupuesto">
+                      Cantidad presupuesto
+                    </label>
+                    <input
+                      id="item-new-cantidad-presupuesto"
+                      className="form-input"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="Opcional · referencia de presupuesto"
+                      value={itemNewCantidadPresupuesto}
+                      onChange={(e) => setItemNewCantidadPresupuesto(e.target.value)}
+                    />
+                    <p className="informe-label-hint" style={{ marginTop: '0.35rem', marginBottom: 0 }}>
+                      Valor de referencia en presupuesto; es independiente de la cantidad calculada o manual del ítem.
+                    </p>
+                  </div>
                   <RegistroFotograficoInput
                     idBase="item-new-imagen"
                     label="Imagen (archivo)"
@@ -9996,7 +10025,7 @@ export default function DashboardPage() {
                   <button
                     type="submit"
                     className="btn-primary"
-                    disabled={itemsSaving || !itemsFilterProjectId || !itemsTargetSubchapterId || !itemNewProveedorId}
+                    disabled={itemsSaving || !itemsFilterProjectId || !itemsTargetSubchapterId}
                   >
                     {itemsSaving ? 'Guardando...' : 'Crear ítem'}
                   </button>
@@ -10033,6 +10062,7 @@ export default function DashboardPage() {
                           <th>Imagen</th>
                           <th>Precio</th>
                           <th>Cantidad</th>
+                          <th>Cant. presupuesto</th>
                           <th>Total</th>
                           <th>Activo</th>
                           <th>Acciones</th>
@@ -10250,6 +10280,24 @@ export default function DashboardPage() {
                             <td>
                               {editingItemId === it.id ? (
                                 <input
+                                  className="form-input"
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={editingItemForm.cantidadPresupuesto}
+                                  onChange={(e) =>
+                                    setEditingItemForm((p) => ({ ...p, cantidadPresupuesto: e.target.value }))
+                                  }
+                                />
+                              ) : it.cantidadPresupuesto != null ? (
+                                Number(it.cantidadPresupuesto).toLocaleString('es-CO')
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                            <td>
+                              {editingItemId === it.id ? (
+                                <input
                                   className="form-input personal-input-readonly"
                                   type="text"
                                   readOnly
@@ -10299,6 +10347,8 @@ export default function DashboardPage() {
                                         unidad: it.unidad ?? '',
                                         precioUnitario: it.precioUnitario != null ? String(it.precioUnitario) : '',
                                         cantidad: it.cantidad != null ? String(it.cantidad) : '',
+                                        cantidadPresupuesto:
+                                          it.cantidadPresupuesto != null ? String(it.cantidadPresupuesto) : '',
                                         largo: it.largo != null ? String(it.largo) : '',
                                         ancho: it.ancho != null ? String(it.ancho) : '',
                                         altura: it.altura != null ? String(it.altura) : '',

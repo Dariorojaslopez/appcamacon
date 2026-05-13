@@ -715,6 +715,8 @@ model ItemCatalog {
   unidad        String?
   precioUnitario Float?
   cantidad      Float?
+  /// Cantidad de referencia en presupuesto (independiente de la cantidad calculada por L×A×H o manual).
+  cantidadPresupuesto Float?
   largo         Float?
   ancho         Float?
   altura        Float?

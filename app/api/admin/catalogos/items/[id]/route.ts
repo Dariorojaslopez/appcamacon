@@ -18,7 +18,8 @@ function isUnknownItemDetailArgError(error: unknown): boolean {
     msg.includes('ancho') ||
     msg.includes('altura') ||
     msg.includes('imagenUrl') ||
-    msg.includes('cantidad')
+    msg.includes('cantidad') ||
+    msg.includes('cantidadPresupuesto')
   );
 }
 
@@ -34,6 +35,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       unidad?: string | null;
       precioUnitario?: number | null;
       cantidad?: number | null;
+      cantidadPresupuesto?: number | null;
       largo?: number | null;
       ancho?: number | null;
       altura?: number | null;
@@ -89,6 +91,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const n = Number(raw);
         if (!Number.isFinite(n)) return NextResponse.json({ error: 'Cantidad inválida' }, { status: 400 });
         data.cantidad = n;
+      }
+    }
+    if (body.cantidadPresupuesto !== undefined) {
+      const raw = body.cantidadPresupuesto as unknown;
+      if (raw == null || raw === '') data.cantidadPresupuesto = null;
+      else {
+        const n = Number(raw);
+        if (!Number.isFinite(n)) return NextResponse.json({ error: 'Cantidad presupuesto inválida' }, { status: 400 });
+        data.cantidadPresupuesto = n;
       }
     }
     if (body.largo !== undefined) {
@@ -171,6 +182,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         delete fallback.imagenGeoEstado;
         delete fallback.imagenTomadaEn;
         delete fallback.cantidad;
+        delete fallback.cantidadPresupuesto;
         item = await prisma.itemCatalog.update({
           where: { id },
           data: fallback as any,

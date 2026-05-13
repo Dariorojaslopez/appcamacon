@@ -74,7 +74,8 @@ function isUnknownItemDetailArgError(error: unknown): boolean {
     msg.includes('ancho') ||
     msg.includes('altura') ||
     msg.includes('imagenUrl') ||
-    msg.includes('cantidad')
+    msg.includes('cantidad') ||
+    msg.includes('cantidadPresupuesto')
   );
 }
 
@@ -111,6 +112,7 @@ export async function GET(req: NextRequest) {
       unidad: it.unidad ?? null,
       precioUnitario: it.precioUnitario ?? null,
       cantidad: it.cantidad ?? null,
+      cantidadPresupuesto: it.cantidadPresupuesto ?? null,
       largo: it.largo ?? null,
       ancho: it.ancho ?? null,
       altura: it.altura ?? null,
@@ -147,6 +149,7 @@ export async function POST(req: NextRequest) {
       unidad?: string | null;
       precioUnitario?: number | null;
       cantidad?: number | null;
+      cantidadPresupuesto?: number | null;
       largo?: number | null;
       ancho?: number | null;
       altura?: number | null;
@@ -257,6 +260,9 @@ export async function POST(req: NextRequest) {
     const precioUnitario = rawPrecio == null || rawPrecio === '' ? null : Number(rawPrecio);
     const rawCantidad = body.cantidad as unknown;
     const cantidad = rawCantidad == null || rawCantidad === '' ? null : Number(rawCantidad);
+    const rawCantidadPresupuesto = body.cantidadPresupuesto as unknown;
+    const cantidadPresupuesto =
+      rawCantidadPresupuesto == null || rawCantidadPresupuesto === '' ? null : Number(rawCantidadPresupuesto);
     const rawLargo = body.largo as unknown;
     const largo = rawLargo == null || rawLargo === '' ? null : Number(rawLargo);
     const rawAncho = body.ancho as unknown;
@@ -281,6 +287,9 @@ export async function POST(req: NextRequest) {
     }
     if (cantidad != null && !Number.isFinite(cantidad)) {
       return NextResponse.json({ error: 'Cantidad inválida' }, { status: 400 });
+    }
+    if (cantidadPresupuesto != null && !Number.isFinite(cantidadPresupuesto)) {
+      return NextResponse.json({ error: 'Cantidad presupuesto inválida' }, { status: 400 });
     }
     if (largo != null && !Number.isFinite(largo)) return NextResponse.json({ error: 'Largo inválido' }, { status: 400 });
     if (ancho != null && !Number.isFinite(ancho)) return NextResponse.json({ error: 'Ancho inválido' }, { status: 400 });
@@ -319,6 +328,7 @@ export async function POST(req: NextRequest) {
             unidad: unidad || null,
             precioUnitario,
             cantidad,
+            cantidadPresupuesto,
             largo,
             ancho,
             altura,
