@@ -253,11 +253,15 @@ const ITEM_CATALOG_UNIT_OPTIONS: { value: string; label: string }[] = [
 ];
 
 function normalizeItemCatalogUnit(raw: string | null | undefined): string | null {
-  const u0 = String(raw ?? '')
+  let u0 = String(raw ?? '')
     .trim()
     .toLowerCase()
     .replace(/\s+/g, ' ');
   if (!u0) return null;
+  // Valores o etiquetas tipo "m² — área (l × a)" guardados en BD o pegados
+  if (/[—–]/.test(u0)) {
+    u0 = u0.split(/[—–]/)[0].trim();
+  }
   const map: Record<string, string> = {
     m3: 'm3',
     'm³': 'm3',
@@ -308,7 +312,7 @@ function computeItemCatalogCantidadFromInputs(
   manualCantidad: string,
 ): number | null {
   const kind = itemCatalogCaptureKind(rawUnidad);
-  if (kind === 'none') return null;
+  if (kind === 'none') return parseItemCatalogDim(manualCantidad);
   if (kind === 'manual') return parseItemCatalogDim(manualCantidad);
   const L = parseItemCatalogDim(largo);
   const A = parseItemCatalogDim(ancho);
@@ -371,6 +375,109 @@ function getItemCatalogUnitChangePatch(
   if (kind === 'm3') return { cantidad: '' };
   if (kind === 'm2') return { altura: '', cantidad: '' };
   return { ancho: '', altura: '', cantidad: '' };
+}
+
+function formatDimInputFromNumber(n: number): string {
+  if (!Number.isFinite(n) || n < 0) return '';
+  const r = Math.round(n * 1_000_000) / 1_000_000;
+  const s = r.toFixed(6).replace(/\.?0+$/, '');
+  return s === '' ? '0' : s;
+}
+
+/**
+ * A partir de cantidad presupuesto (Q): iguala la cantidad del ítem y, si aplica, deduce L/A/H.
+ * Cubre todas las unidades del catálogo:
+ * - m³, m²: inverso según medidas conocidas; si faltan, cubo o cuadrado de lado √[3]Q / √Q.
+ * - ml, m: longitud = Q.
+ * - und, kg, ton, l: cantidad = Q (sin dimensiones).
+ * - Sin unidad (none): cantidad en el campo manual = Q.
+ */
+function reverseFillFromCantidadPresupuesto(
+  rawUnidad: string,
+  largo: string,
+  ancho: string,
+  altura: string,
+  presupuestoStr: string,
+): { largo: string; ancho: string; altura: string; cantidad: string } | null {
+  const t = String(presupuestoStr ?? '').trim();
+  if (!t) return null;
+  const Q = Number(t.replace(',', '.'));
+  if (!Number.isFinite(Q) || Q < 0) return null;
+
+  const kind = itemCatalogCaptureKind(rawUnidad);
+  if (kind === 'manual' || kind === 'none') {
+    return { largo: '', ancho: '', altura: '', cantidad: Q === 0 ? '0' : formatDimInputFromNumber(Q) };
+  }
+  if (kind === 'length') {
+    return { largo: Q === 0 ? '' : formatDimInputFromNumber(Q), ancho: '', altura: '', cantidad: '' };
+  }
+
+  const L0 = parseItemCatalogDim(largo);
+  const A0 = parseItemCatalogDim(ancho);
+  const H0 = parseItemCatalogDim(altura);
+
+  if (kind === 'm2') {
+    if (Q === 0) return { largo: '', ancho: '', altura: '', cantidad: '' };
+    if (L0 != null && A0 != null) {
+      if (L0 > 0) return { largo, ancho: formatDimInputFromNumber(Q / L0), altura: '', cantidad: '' };
+    }
+    if (L0 != null && L0 > 0) return { largo, ancho: formatDimInputFromNumber(Q / L0), altura: '', cantidad: '' };
+    if (A0 != null && A0 > 0) return { largo: formatDimInputFromNumber(Q / A0), ancho, altura: '', cantidad: '' };
+    const s = Math.sqrt(Q);
+    return { largo: formatDimInputFromNumber(s), ancho: formatDimInputFromNumber(s), altura: '', cantidad: '' };
+  }
+
+  if (kind === 'm3') {
+    if (Q === 0) return { largo: '', ancho: '', altura: '', cantidad: '' };
+    if (L0 != null && A0 != null && H0 != null) {
+      const v = L0 * A0;
+      if (v > 0) return { largo, ancho, altura: formatDimInputFromNumber(Q / v), cantidad: '' };
+    }
+    if (L0 != null && A0 != null && L0 > 0 && A0 > 0) {
+      return { largo, ancho, altura: formatDimInputFromNumber(Q / (L0 * A0)), cantidad: '' };
+    }
+    if (L0 != null && L0 > 0) {
+      const s = Math.sqrt(Q / L0);
+      return { largo, ancho: formatDimInputFromNumber(s), altura: formatDimInputFromNumber(s), cantidad: '' };
+    }
+    if (A0 != null && A0 > 0) {
+      const s = Math.sqrt(Q / A0);
+      return { largo: formatDimInputFromNumber(s), ancho, altura: formatDimInputFromNumber(s), cantidad: '' };
+    }
+    if (H0 != null && H0 > 0) {
+      const s = Math.sqrt(Q / H0);
+      return { largo: formatDimInputFromNumber(s), ancho: formatDimInputFromNumber(s), altura, cantidad: '' };
+    }
+    const c = Math.cbrt(Q);
+    return { largo: formatDimInputFromNumber(c), ancho: formatDimInputFromNumber(c), altura: formatDimInputFromNumber(c), cantidad: '' };
+  }
+
+  return null;
+}
+
+/** Al cambiar la unidad: aplica el vaciado de campos según tipo y, si hay cantidad presupuesto, recalcula L/A/H y cantidad para todas las unidades. */
+function mergeItemCatalogUnitChangeWithPresupuesto(
+  nextUnit: string,
+  prev: { largo: string; ancho: string; altura: string; cantidad: string; cantidadPresupuesto: string },
+): { unidad: string; largo: string; ancho: string; altura: string; cantidad: string } {
+  const patch = getItemCatalogUnitChangePatch(nextUnit);
+  const base = {
+    largo: patch.largo !== undefined ? patch.largo : prev.largo,
+    ancho: patch.ancho !== undefined ? patch.ancho : prev.ancho,
+    altura: patch.altura !== undefined ? patch.altura : prev.altura,
+    cantidad: patch.cantidad !== undefined ? patch.cantidad : prev.cantidad,
+  };
+  const rev = reverseFillFromCantidadPresupuesto(
+    nextUnit,
+    base.largo,
+    base.ancho,
+    base.altura,
+    prev.cantidadPresupuesto,
+  );
+  if (rev) {
+    return { unidad: nextUnit, largo: rev.largo, ancho: rev.ancho, altura: rev.altura, cantidad: rev.cantidad };
+  }
+  return { unidad: nextUnit, ...base };
 }
 
 function formatItemCatalogCantidadDisplay(
@@ -4158,6 +4265,12 @@ export default function DashboardPage() {
           return;
         }
       }
+      const cpTrim = itemNewCantidadPresupuesto.trim();
+      const cantidadPresupuestoNum = cpTrim ? Number(cpTrim.replace(',', '.')) : null;
+      if (cantidadPresupuestoNum != null && (!Number.isFinite(cantidadPresupuestoNum) || cantidadPresupuestoNum < 0)) {
+        setItemsError('Cantidad presupuesto no válida (use un número ≥ 0).');
+        return;
+      }
       const icPayload = itemCatalogPayloadFromFormFields(
         itemNewUnidad,
         itemNewLargo,
@@ -4165,11 +4278,14 @@ export default function DashboardPage() {
         itemNewAltura,
         itemNewCantidad,
       );
-      const cpTrim = itemNewCantidadPresupuesto.trim();
-      const cantidadPresupuestoNum = cpTrim ? Number(cpTrim.replace(',', '.')) : null;
-      if (cantidadPresupuestoNum != null && (!Number.isFinite(cantidadPresupuestoNum) || cantidadPresupuestoNum < 0)) {
-        setItemsError('Cantidad presupuesto no válida (use un número ≥ 0).');
-        return;
+      let cantidadOut = icPayload.cantidad;
+      if (
+        (kindNew === 'manual' || kindNew === 'none') &&
+        cantidadOut == null &&
+        cantidadPresupuestoNum != null &&
+        Number.isFinite(cantidadPresupuestoNum)
+      ) {
+        cantidadOut = cantidadPresupuestoNum;
       }
       const codigoAuto = nextAutonumericItemCatalogCodigo(itemsAdminFlat);
       const res = await fetch('/api/admin/catalogos/items', {
@@ -4183,7 +4299,7 @@ export default function DashboardPage() {
           descripcion: itemNewDescripcion.trim(),
           unidad: icPayload.unidad,
           precioUnitario: itemNewPrecio.trim() ? Number(itemNewPrecio.replace(',', '.')) : null,
-          cantidad: icPayload.cantidad,
+          cantidad: cantidadOut,
           largo: icPayload.largo,
           ancho: icPayload.ancho,
           altura: icPayload.altura,
@@ -4241,6 +4357,12 @@ export default function DashboardPage() {
           return;
         }
       }
+      const cpEditTrim = editingItemForm.cantidadPresupuesto.trim();
+      const cantidadPresupuestoEdit = cpEditTrim ? Number(cpEditTrim.replace(',', '.')) : null;
+      if (cantidadPresupuestoEdit != null && (!Number.isFinite(cantidadPresupuestoEdit) || cantidadPresupuestoEdit < 0)) {
+        setItemsError('Cantidad presupuesto no válida (use un número ≥ 0).');
+        return;
+      }
       const icEdit = itemCatalogPayloadFromFormFields(
         editingItemForm.unidad,
         editingItemForm.largo,
@@ -4248,11 +4370,14 @@ export default function DashboardPage() {
         editingItemForm.altura,
         editingItemForm.cantidad,
       );
-      const cpEditTrim = editingItemForm.cantidadPresupuesto.trim();
-      const cantidadPresupuestoEdit = cpEditTrim ? Number(cpEditTrim.replace(',', '.')) : null;
-      if (cantidadPresupuestoEdit != null && (!Number.isFinite(cantidadPresupuestoEdit) || cantidadPresupuestoEdit < 0)) {
-        setItemsError('Cantidad presupuesto no válida (use un número ≥ 0).');
-        return;
+      let cantidadEditOut = icEdit.cantidad;
+      if (
+        (kindEd === 'manual' || kindEd === 'none') &&
+        cantidadEditOut == null &&
+        cantidadPresupuestoEdit != null &&
+        Number.isFinite(cantidadPresupuestoEdit)
+      ) {
+        cantidadEditOut = cantidadPresupuestoEdit;
       }
       const res = await fetch(`/api/admin/catalogos/items/${id}`, {
         method: 'PATCH',
@@ -4266,7 +4391,7 @@ export default function DashboardPage() {
           precioUnitario: editingItemForm.precioUnitario.trim()
             ? Number(editingItemForm.precioUnitario.replace(',', '.'))
             : null,
-          cantidad: icEdit.cantidad,
+          cantidad: cantidadEditOut,
           largo: icEdit.largo,
           ancho: icEdit.ancho,
           altura: icEdit.altura,
@@ -9861,12 +9986,18 @@ export default function DashboardPage() {
                         value={normalizeItemCatalogUnit(itemNewUnidad) ?? ''}
                         onChange={(e) => {
                           const v = e.target.value;
-                          setItemNewUnidad(v);
-                          const patch = getItemCatalogUnitChangePatch(v);
-                          if (patch.largo !== undefined) setItemNewLargo(patch.largo);
-                          if (patch.ancho !== undefined) setItemNewAncho(patch.ancho);
-                          if (patch.altura !== undefined) setItemNewAltura(patch.altura);
-                          if (patch.cantidad !== undefined) setItemNewCantidad(patch.cantidad);
+                          const merged = mergeItemCatalogUnitChangeWithPresupuesto(v, {
+                            largo: itemNewLargo,
+                            ancho: itemNewAncho,
+                            altura: itemNewAltura,
+                            cantidad: itemNewCantidad,
+                            cantidadPresupuesto: itemNewCantidadPresupuesto,
+                          });
+                          setItemNewUnidad(merged.unidad);
+                          setItemNewLargo(merged.largo);
+                          setItemNewAncho(merged.ancho);
+                          setItemNewAltura(merged.altura);
+                          setItemNewCantidad(merged.cantidad);
                         }}
                       >
                         <option value="">Seleccione unidad…</option>
@@ -9988,10 +10119,29 @@ export default function DashboardPage() {
                       min="0"
                       placeholder="Opcional · referencia de presupuesto"
                       value={itemNewCantidadPresupuesto}
-                      onChange={(e) => setItemNewCantidadPresupuesto(e.target.value)}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setItemNewCantidadPresupuesto(v);
+                        const patch = reverseFillFromCantidadPresupuesto(
+                          itemNewUnidad,
+                          itemNewLargo,
+                          itemNewAncho,
+                          itemNewAltura,
+                          v,
+                        );
+                        if (patch) {
+                          setItemNewLargo(patch.largo);
+                          setItemNewAncho(patch.ancho);
+                          setItemNewAltura(patch.altura);
+                          setItemNewCantidad(patch.cantidad);
+                        }
+                      }}
                     />
                     <p className="informe-label-hint" style={{ marginTop: '0.35rem', marginBottom: 0 }}>
-                      Valor de referencia en presupuesto; es independiente de la cantidad calculada o manual del ítem.
+                      Aplica a todas las unidades: con <strong>und</strong>, <strong>kg</strong>, <strong>ton</strong> o{' '}
+                      <strong>l</strong> la cantidad del ítem pasa a ser ese valor; con <strong>ml</strong> o <strong>m</strong>{' '}
+                      se usa como longitud (m); con <strong>m²</strong> o <strong>m³</strong> se deducen largo/ancho/alto
+                      (p. ej. m² sin medidas: cuadrado de lado √Q; con largo fijo: ancho = Q ÷ largo).
                     </p>
                   </div>
                   <RegistroFotograficoInput
@@ -10142,14 +10292,15 @@ export default function DashboardPage() {
                                   }
                                   onChange={(e) => {
                                     const v = e.target.value;
-                                    const patch = getItemCatalogUnitChangePatch(v);
                                     setEditingItemForm((p) => ({
                                       ...p,
-                                      unidad: v,
-                                      ...(patch.largo !== undefined ? { largo: patch.largo } : {}),
-                                      ...(patch.ancho !== undefined ? { ancho: patch.ancho } : {}),
-                                      ...(patch.altura !== undefined ? { altura: patch.altura } : {}),
-                                      ...(patch.cantidad !== undefined ? { cantidad: patch.cantidad } : {}),
+                                      ...mergeItemCatalogUnitChangeWithPresupuesto(v, {
+                                        largo: p.largo,
+                                        ancho: p.ancho,
+                                        altura: p.altura,
+                                        cantidad: p.cantidad,
+                                        cantidadPresupuesto: p.cantidadPresupuesto,
+                                      }),
                                     }));
                                   }}
                                 >
@@ -10259,8 +10410,6 @@ export default function DashboardPage() {
                                     value={editingItemForm.cantidad}
                                     onChange={(e) => setEditingItemForm((p) => ({ ...p, cantidad: e.target.value }))}
                                   />
-                                ) : itemCatalogCaptureKind(editingItemForm.unidad) === 'none' ? (
-                                  <span className="shell-text-muted">—</span>
                                 ) : (
                                   <input
                                     className="form-input personal-input-readonly"
@@ -10285,9 +10434,26 @@ export default function DashboardPage() {
                                   step="0.01"
                                   min="0"
                                   value={editingItemForm.cantidadPresupuesto}
-                                  onChange={(e) =>
-                                    setEditingItemForm((p) => ({ ...p, cantidadPresupuesto: e.target.value }))
-                                  }
+                                  onChange={(e) => {
+                                    const v = e.target.value;
+                                    setEditingItemForm((p) => {
+                                      const next = { ...p, cantidadPresupuesto: v };
+                                      const patch = reverseFillFromCantidadPresupuesto(
+                                        p.unidad,
+                                        p.largo,
+                                        p.ancho,
+                                        p.altura,
+                                        v,
+                                      );
+                                      if (patch) {
+                                        next.largo = patch.largo;
+                                        next.ancho = patch.ancho;
+                                        next.altura = patch.altura;
+                                        next.cantidad = patch.cantidad;
+                                      }
+                                      return next;
+                                    });
+                                  }}
                                 />
                               ) : it.cantidadPresupuesto != null ? (
                                 Number(it.cantidadPresupuesto).toLocaleString('es-CO')
