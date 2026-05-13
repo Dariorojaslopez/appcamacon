@@ -454,6 +454,13 @@ body {
   border: 1px solid rgba(248, 113, 113, 0.5);
 }
 
+/* Aviso informativo (p. ej. informe cerrado / solo lectura), sin parecer “acción exitosa” */
+.feedback-info {
+  background-color: rgba(100, 116, 139, 0.1);
+  color: #334155;
+  border: 1px solid rgba(148, 163, 184, 0.65);
+}
+
 @media (display-mode: standalone) {
   .app-body {
     padding-top: env(safe-area-inset-top);

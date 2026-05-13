@@ -51,6 +51,7 @@ import {
 } from '../../src/lib/evidenciasUrlPayload';
 import { MENU_KEYS, MENU_LABELS } from '../../src/shared/menuPermissions';
 import { FIRMA_PERM_ADMIN_KEYS, FIRMA_PERM_LABELS } from '../../src/shared/firmaPolicies';
+import { INFORME_CERRADO_MSG } from '../../src/lib/informeCerrado';
 
 /**
  * Orígenes http extras (NEXT_PUBLIC_VOICE_INSECURE_DEV_ORIGINS).
@@ -6709,7 +6710,11 @@ export default function DashboardPage() {
     }
   };
 
-  /** Persiste evidencias + firmas. `skipPhotoValidation` permite guardar solo firmas sin exigir fotos (botón Firmar). */
+  /**
+   * Persiste evidencias + firmas.
+   * `skipPhotoValidation`: en firmas parciales no exige fotos si marcó «Sí».
+   * En la firma que completa las cuatro, debe ser false para exigir evidencias y guardar todo antes del cierre.
+   */
   const persistEvidenciasApi = async (
     firmasToSend: Record<FirmaEvidenciaKey, FirmaEvidenciaState>,
     options?: { skipPhotoValidation?: boolean },
@@ -6720,6 +6725,10 @@ export default function DashboardPage() {
     }
     if (!selectedJornadaId) {
       setEvidenciasError('Seleccione una jornada.');
+      return false;
+    }
+    if (informeBloqueado) {
+      setEvidenciasError(INFORME_CERRADO_MSG);
       return false;
     }
     const date = datosGeneralesForm.fechaReporte || new Date().toISOString().slice(0, 10);
@@ -10739,9 +10748,9 @@ export default function DashboardPage() {
         )}
 
         {isInformeSection && informeBloqueado && (
-          <p className="feedback feedback-success" style={{ margin: '0 0 0.75rem' }}>
-            Este informe está cerrado (cuatro firmas completas). Solo lectura. Puede cambiar la fecha del reporte u
-            obra/jornada para trabajar en otro informe.
+          <p className="feedback feedback-info" style={{ margin: '0 0 0.75rem' }}>
+            Informe cerrado (cuatro firmas): solo lectura. No se pueden guardar cambios en datos, evidencias ni
+            firmas. Use otra fecha u obra/jornada para un informe distinto.
             {cerradoEn
               ? ` Cerrado: ${new Date(cerradoEn).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })}.`
               : ''}
@@ -13651,6 +13660,12 @@ export default function DashboardPage() {
               <p className="shell-text-muted">Cargando evidencias...</p>
             ) : (
               <fieldset disabled={informeBloqueado} style={informeFieldsetStyle}>
+                {informeBloqueado && (
+                  <p className="shell-text-muted" style={{ fontSize: '0.88rem', marginTop: 0, marginBottom: '0.65rem' }}>
+                    Las fotos y el texto de cierre deben guardarse antes de completar las cuatro firmas. Este informe
+                    ya no acepta nuevos archivos ni guardados.
+                  </p>
+                )}
                 <div style={{ marginTop: '0.75rem' }}>
                   <div className="section-title" style={{ marginTop: 0 }}>
                     ¿SE CARGÓ REGISTRO FOTOGRÁFICO?
@@ -13659,6 +13674,7 @@ export default function DashboardPage() {
                     <button
                       type="button"
                       className={`toggle-button ${!registroFotografico ? 'toggle-active' : ''}`}
+                      disabled={informeBloqueado}
                       onClick={() => setRegistroFotografico(false)}
                     >
                       NO
@@ -13666,6 +13682,7 @@ export default function DashboardPage() {
                     <button
                       type="button"
                       className={`toggle-button ${registroFotografico ? 'toggle-active' : ''}`}
+                      disabled={informeBloqueado}
                       onClick={() => setRegistroFotografico(true)}
                     >
                       SÍ
@@ -13702,6 +13719,7 @@ export default function DashboardPage() {
                               <button
                                 type="button"
                                 className="evidencias-fase-choose-btn"
+                                disabled={informeBloqueado}
                                 onClick={() => evidenciaFileInputRefs.current[key]?.click()}
                               >
                                 Elegir fotos
@@ -13709,6 +13727,7 @@ export default function DashboardPage() {
                               <button
                                 type="button"
                                 className="evidencias-fase-choose-btn evidencias-fase-camera-btn"
+                                disabled={informeBloqueado}
                                 onClick={() => evidenciaCameraInputRefs.current[key]?.click()}
                               >
                                 Tomar foto
@@ -13722,6 +13741,7 @@ export default function DashboardPage() {
                               type="file"
                               accept="image/png,image/jpeg"
                               multiple
+                              disabled={informeBloqueado}
                               style={{ display: 'none' }}
                               onChange={(e) => {
                                 void uploadEvidenciasFotos(e.target.files, key);
@@ -13735,6 +13755,7 @@ export default function DashboardPage() {
                               type="file"
                               accept="image/*"
                               capture="environment"
+                              disabled={informeBloqueado}
                               style={{ display: 'none' }}
                               onChange={(e) => {
                                 void uploadEvidenciasFotos(e.target.files, key);
@@ -13757,6 +13778,7 @@ export default function DashboardPage() {
                                     type="button"
                                     className="evidencias-fase-thumb-remove"
                                     aria-label={`Eliminar esta foto (${label})`}
+                                    disabled={informeBloqueado}
                                     onClick={() => removeEvidenciaUrl(key, slideIdx)}
                                   >
                                     <IconTrash />
@@ -13884,6 +13906,7 @@ export default function DashboardPage() {
                                           type="button"
                                           className="evidencias-fase-list-delete"
                                           aria-label={`Eliminar foto ${itemIdx + 1} de ${label}`}
+                                          disabled={informeBloqueado}
                                           onClick={() => removeEvidenciaUrl(key, itemIdx)}
                                         >
                                           <IconTrash />
@@ -13926,6 +13949,12 @@ export default function DashboardPage() {
 
                 <div style={{ marginTop: '0.75rem' }}>
                   <div className="section-title" style={{ marginTop: 0 }}>FIRMAS Y RESPONSABLES</div>
+                  {!informeBloqueado && (
+                    <p className="shell-text-muted" style={{ fontSize: '0.85rem', marginTop: '0.35rem' }}>
+                      La última firma usa <strong>Firmar y cerrar informe</strong>: en ese paso se guardan evidencias,
+                      observaciones y las cuatro firmas juntas antes de bloquear el informe.
+                    </p>
+                  )}
 
                   <div
                     style={{
@@ -14057,17 +14086,30 @@ export default function DashboardPage() {
                                       ...firmasEvidencias,
                                       [key]: { ...firmasEvidencias[key], firmado: true, firmadoEn: ts },
                                     };
+                                    const cierraInforme = FIRMAS_EVIDENCIAS_CONFIG.every(
+                                      ({ key: slot }) => nextFirmas[slot].firmado,
+                                    );
                                     const ok = await persistEvidenciasApi(nextFirmas, {
-                                      skipPhotoValidation: true,
+                                      skipPhotoValidation: !cierraInforme,
                                     });
                                     if (ok) {
                                       setFirmasEvidencias(nextFirmas);
-                                      setEvidenciasMessage('Firma guardada en la base de datos.');
-                                      setTimeout(() => setEvidenciasMessage(null), 2500);
+                                      setEvidenciasMessage(
+                                        cierraInforme
+                                          ? 'Evidencias y cierre guardados con las cuatro firmas. El informe quedó cerrado.'
+                                          : 'Firma guardada en la base de datos.',
+                                      );
+                                      setTimeout(() => setEvidenciasMessage(null), 3500);
                                     }
                                   }}
                                 >
-                                  {savingEvidencias ? 'Guardando firma…' : 'Firmar'}
+                                  {savingEvidencias
+                                    ? 'Guardando…'
+                                    : FIRMAS_EVIDENCIAS_CONFIG.every(({ key: k }) =>
+                                        k === key ? true : firmasEvidencias[k].firmado,
+                                      )
+                                      ? 'Firmar y cerrar informe'
+                                      : 'Firmar'}
                                 </button>
                               </div>
                             </>
