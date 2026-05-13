@@ -175,6 +175,10 @@ model InformeDiario {
   horaReinicio       String?   // "HH:mm"
   tipoClima          String?
   horasClima         Float?
+  /// Condición por franja del día (antes de suspensiones): códigos de TipoCondicionCatalog
+  franjaClimaMananaCodigo String?
+  franjaClimaTardeCodigo   String?
+  franjaClimaNocheCodigo   String?
 
   // Relaciones
   userId             String

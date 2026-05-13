@@ -144,6 +144,9 @@ export async function POST(req: NextRequest) {
       horaReinicio?: string;
       tipoClima?: string;
       horasClima?: number;
+      franjaClimaMananaCodigo?: string | null;
+      franjaClimaTardeCodigo?: string | null;
+      franjaClimaNocheCodigo?: string | null;
       condiciones?: string;
       actividades?: string;
       incidentes?: string;
@@ -217,6 +220,15 @@ export async function POST(req: NextRequest) {
           horaReinicio: body.horaReinicio?.trim() || null,
           tipoClima: body.tipoClima?.trim() || null,
           horasClima: typeof body.horasClima === 'number' ? body.horasClima : null,
+          ...(body.franjaClimaMananaCodigo !== undefined
+            ? { franjaClimaMananaCodigo: body.franjaClimaMananaCodigo?.trim() || null }
+            : {}),
+          ...(body.franjaClimaTardeCodigo !== undefined
+            ? { franjaClimaTardeCodigo: body.franjaClimaTardeCodigo?.trim() || null }
+            : {}),
+          ...(body.franjaClimaNocheCodigo !== undefined
+            ? { franjaClimaNocheCodigo: body.franjaClimaNocheCodigo?.trim() || null }
+            : {}),
           ...(frentePatchOk
             ? {
                 frenteObra: frentePatchOk.frenteObra,
@@ -320,6 +332,9 @@ export async function POST(req: NextRequest) {
         horaReinicio: body.horaReinicio?.trim() || null,
         tipoClima: body.tipoClima?.trim() || null,
         horasClima: typeof body.horasClima === 'number' ? body.horasClima : null,
+        franjaClimaMananaCodigo: body.franjaClimaMananaCodigo?.trim() || null,
+        franjaClimaTardeCodigo: body.franjaClimaTardeCodigo?.trim() || null,
+        franjaClimaNocheCodigo: body.franjaClimaNocheCodigo?.trim() || null,
         frenteObra: frenteObraFinal,
         frenteObraCatalogoId: frenteObraCatalogoFinal,
         contratista: contratistaFinal,

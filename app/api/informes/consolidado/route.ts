@@ -233,8 +233,20 @@ export async function GET(req: NextRequest) {
               .join('\n\n')
           : null;
 
+      const franjasClimaDia =
+        inf.franjaClimaMananaCodigo || inf.franjaClimaTardeCodigo || inf.franjaClimaNocheCodigo
+          ? [
+              inf.franjaClimaMananaCodigo ? `  · Mañana: ${inf.franjaClimaMananaCodigo}` : null,
+              inf.franjaClimaTardeCodigo ? `  · Tarde: ${inf.franjaClimaTardeCodigo}` : null,
+              inf.franjaClimaNocheCodigo ? `  · Noche: ${inf.franjaClimaNocheCodigo}` : null,
+            ]
+              .filter(Boolean)
+              .join('\n')
+          : null;
+
       const jornadaCondiciones = joinBlocks(
         [
+          franjasClimaDia ? `Condición climática por franja (día):\n${franjasClimaDia}` : null,
           climaBitacora ? `Clima (bitácora / registro diario):\n${climaBitacora}` : null,
           inf.condiciones ? `Condiciones de obra: ${inf.condiciones}` : null,
           inf.actividades ? `Actividades (texto libre del informe): ${inf.actividades}` : null,

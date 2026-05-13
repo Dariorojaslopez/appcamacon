@@ -896,6 +896,9 @@ const DATOS_GENERALES_CAMPOS_VACIOS = {
   cargoCatalogoId: '',
   horaEntrada: '',
   horaSalida: '',
+  franjaClimaManana: '',
+  franjaClimaTarde: '',
+  franjaClimaNoche: '',
 } as const;
 
 /** Respaldo si aún no hay catálogo en BD o falla la carga (InformeDiario / suspensión tipoClima). */
@@ -1427,6 +1430,9 @@ export default function DashboardPage() {
     cargoCatalogoId: '',
     horaEntrada: '',
     horaSalida: '',
+    franjaClimaManana: '',
+    franjaClimaTarde: '',
+    franjaClimaNoche: '',
   });
   const [suspensionesRows, setSuspensionesRows] = useState<SuspensionRow[]>([]);
   const [suspensionDraft, setSuspensionDraft] = useState({
@@ -1459,6 +1465,7 @@ export default function DashboardPage() {
   const [jornadaMessage, setJornadaMessage] = useState<string | null>(null);
   const [jornadaError, setJornadaError] = useState<string | null>(null);
   const [jornadaRangoAlert, setJornadaRangoAlert] = useState<string | null>(null);
+  const [savingFranjasClima, setSavingFranjasClima] = useState(false);
   useEffect(() => {
     if (!jornadaRangoAlert) return;
     const onKey = (e: KeyboardEvent) => {
@@ -2439,6 +2446,13 @@ export default function DashboardPage() {
             ...prev,
             informeNo: data.informeNo ?? '',
             centroTrabajo: data.centroTrabajo ?? '',
+            ...(data.existing && data.fields
+              ? {
+                  franjaClimaManana: data.fields.franjaClimaManana ?? '',
+                  franjaClimaTarde: data.fields.franjaClimaTarde ?? '',
+                  franjaClimaNoche: data.fields.franjaClimaNoche ?? '',
+                }
+              : {}),
           }));
         }
       })
@@ -2545,6 +2559,9 @@ export default function DashboardPage() {
       encargadoReporteCatalogoId: '',
       cargo: '',
       cargoCatalogoId: '',
+      franjaClimaManana: '',
+      franjaClimaTarde: '',
+      franjaClimaNoche: '',
     }));
   }, [selectedObraId]);
 
@@ -5088,6 +5105,9 @@ export default function DashboardPage() {
           cargo: datosGeneralesForm.cargo || undefined,
           horaEntrada: datosGeneralesForm.horaEntrada || undefined,
           horaSalida: datosGeneralesForm.horaSalida || undefined,
+          franjaClimaMananaCodigo: datosGeneralesForm.franjaClimaManana.trim() || null,
+          franjaClimaTardeCodigo: datosGeneralesForm.franjaClimaTarde.trim() || null,
+          franjaClimaNocheCodigo: datosGeneralesForm.franjaClimaNoche.trim() || null,
         }),
       });
       const data = await res.json();
@@ -5118,6 +5138,47 @@ export default function DashboardPage() {
       return false;
     }
     return true;
+  };
+
+  const guardarFranjasClimaDia = async () => {
+    setJornadaError(null);
+    setJornadaMessage(null);
+    if (!selectedObraId || !selectedJornadaId) {
+      setJornadaError('Seleccione obra y jornada.');
+      return;
+    }
+    if (!datosGeneralesForm.informeNo?.trim()) {
+      setJornadaError('Guarde primero el informe en «Datos generales» (fecha y datos de cabecera) antes de registrar la condición por franja.');
+      return;
+    }
+    const date = datosGeneralesForm.fechaReporte || new Date().toISOString().slice(0, 10);
+    setSavingFranjasClima(true);
+    try {
+      const res = await fetch('/api/informes/franjas-clima', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          projectId: selectedObraId,
+          date,
+          jornadaId: selectedJornadaId,
+          franjaClimaMananaCodigo: datosGeneralesForm.franjaClimaManana.trim() || null,
+          franjaClimaTardeCodigo: datosGeneralesForm.franjaClimaTarde.trim() || null,
+          franjaClimaNocheCodigo: datosGeneralesForm.franjaClimaNoche.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setJornadaError(typeof data?.error === 'string' ? data.error : 'No se pudo guardar.');
+        return;
+      }
+      setJornadaMessage('Condición por franja guardada.');
+      setTimeout(() => setJornadaMessage(null), 3500);
+    } catch {
+      setJornadaError('Error de conexión.');
+    } finally {
+      setSavingFranjasClima(false);
+    }
   };
 
   const agregarSuspension = async () => {
@@ -10925,6 +10986,84 @@ export default function DashboardPage() {
 
             <div className="auth-form">
               <fieldset disabled={informeBloqueado} style={informeFieldsetStyle}>
+                <div className="section-divider">
+                  <h2 className="section-title">Condición climática por franja</h2>
+                </div>
+                <p className="shell-text-muted" style={{ marginBottom: '0.85rem', fontSize: '0.88rem' }}>
+                  Indique el tipo de condición para <strong>mañana</strong>, <strong>tarde</strong> y <strong>noche</strong>{' '}
+                  de este informe (obra · fecha · jornada). Los tipos se configuran en{' '}
+                  <strong>Configuración general → Tipos de condición</strong>. Guarde aquí antes de las suspensiones.
+                </p>
+                <div className="users-table-wrap" style={{ marginBottom: '1rem' }}>
+                  <table className="users-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '28%' }}>Franja del día</th>
+                        <th>Tipo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>
+                          <strong>Mañana</strong>
+                        </td>
+                        <td>
+                          <InformeSearchableSelect
+                            id="franja-clima-manana"
+                            value={datosGeneralesForm.franjaClimaManana}
+                            disabled={informeBloqueado}
+                            emptyOptionLabel="Seleccione…"
+                            searchPlaceholder="Buscar tipo…"
+                            options={opcionesTipoCondicionSelect}
+                            onChange={(v) => setDatosGeneralesForm((f) => ({ ...f, franjaClimaManana: v }))}
+                          />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          <strong>Tarde</strong>
+                        </td>
+                        <td>
+                          <InformeSearchableSelect
+                            id="franja-clima-tarde"
+                            value={datosGeneralesForm.franjaClimaTarde}
+                            disabled={informeBloqueado}
+                            emptyOptionLabel="Seleccione…"
+                            searchPlaceholder="Buscar tipo…"
+                            options={opcionesTipoCondicionSelect}
+                            onChange={(v) => setDatosGeneralesForm((f) => ({ ...f, franjaClimaTarde: v }))}
+                          />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          <strong>Noche</strong>
+                        </td>
+                        <td>
+                          <InformeSearchableSelect
+                            id="franja-clima-noche"
+                            value={datosGeneralesForm.franjaClimaNoche}
+                            disabled={informeBloqueado}
+                            emptyOptionLabel="Seleccione…"
+                            searchPlaceholder="Buscar tipo…"
+                            options={opcionesTipoCondicionSelect}
+                            onChange={(v) => setDatosGeneralesForm((f) => ({ ...f, franjaClimaNoche: v }))}
+                          />
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  style={{ marginBottom: '1.25rem' }}
+                  disabled={informeBloqueado || savingFranjasClima || !selectedObraId || !selectedJornadaId}
+                  onClick={() => void guardarFranjasClimaDia()}
+                >
+                  {savingFranjasClima ? 'Guardando…' : 'Guardar condición por franja'}
+                </button>
+
                 {editingSuspensionId && (
                   <>
                     <div className="section-divider">

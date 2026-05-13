@@ -65,6 +65,9 @@ export async function GET(req: NextRequest) {
         horaReinicio: true,
         tipoClima: true,
         horasClima: true,
+        franjaClimaMananaCodigo: true,
+        franjaClimaTardeCodigo: true,
+        franjaClimaNocheCodigo: true,
         informeCerrado: true,
         cerradoEn: true,
       },
@@ -95,6 +98,9 @@ export async function GET(req: NextRequest) {
           horaReinicio: existing.horaReinicio ?? '',
           tipoClima: existing.tipoClima ?? '',
           horasClima: existing.horasClima ?? 0,
+          franjaClimaManana: existing.franjaClimaMananaCodigo ?? '',
+          franjaClimaTarde: existing.franjaClimaTardeCodigo ?? '',
+          franjaClimaNoche: existing.franjaClimaNocheCodigo ?? '',
         },
       });
     }
