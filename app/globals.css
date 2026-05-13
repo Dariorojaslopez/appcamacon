@@ -2654,7 +2654,7 @@ ul.informe-searchable-list {
 }
 
 .consolidado-export-table {
-  min-width: 2400px;
+  min-width: 2600px;
 }
 
 .consolidado-export-cell {
@@ -2664,6 +2664,23 @@ ul.informe-searchable-list {
   font-size: 0.8rem;
   line-height: 1.45;
   word-break: break-word;
+}
+
+.consolidado-export-cell--estado {
+  max-width: 14rem;
+}
+
+.consolidado-estado {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.consolidado-estado--abierto {
+  color: #166534;
+}
+
+.consolidado-estado--cerrado {
+  color: #9a3412;
 }
 
 .consolidado-export-link {

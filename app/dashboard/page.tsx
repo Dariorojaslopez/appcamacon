@@ -151,6 +151,8 @@ function csvEscapeCell(value: string): string {
 
 type ConsolidadoExportRow = {
   informeId: string;
+  informeCerrado: boolean;
+  cerradoEn: string | null;
   obraCodigo: string;
   obraNombre: string;
   fecha: string;
@@ -164,7 +166,8 @@ type ConsolidadoExportRow = {
   evidencias: string;
 };
 
-const CONSOLIDADO_SIETE_COLUMNAS = [
+const CONSOLIDADO_OCHO_COLUMNAS = [
+  'Estado',
   'Datos generales',
   'Jornada y condiciones',
   'Personal en obra',
@@ -173,6 +176,21 @@ const CONSOLIDADO_SIETE_COLUMNAS = [
   'Calidad y afectaciones',
   'Evidencias y cierre',
 ] as const;
+
+function labelEstadoInformeExport(row: ConsolidadoExportRow): string {
+  if (!row.informeCerrado) return 'Abierto';
+  if (row.cerradoEn) {
+    try {
+      const d = new Date(row.cerradoEn);
+      if (!Number.isNaN(d.getTime())) {
+        return `Cerrado (${d.toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })})`;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return 'Cerrado';
+}
 
 function consolidadoColumnaDatosGenerales(row: ConsolidadoExportRow): string {
   return [
@@ -186,10 +204,11 @@ function consolidadoColumnaDatosGenerales(row: ConsolidadoExportRow): string {
 
 function buildConsolidadoCsv(rows: ConsolidadoExportRow[]): string {
   const lines: string[] = [];
-  lines.push(CONSOLIDADO_SIETE_COLUMNAS.map(csvEscapeCell).join(','));
+  lines.push(CONSOLIDADO_OCHO_COLUMNAS.map(csvEscapeCell).join(','));
   for (const row of rows) {
     lines.push(
       [
+        labelEstadoInformeExport(row),
         consolidadoColumnaDatosGenerales(row),
         row.jornadaCondiciones,
         row.personal,
@@ -1716,6 +1735,7 @@ export default function DashboardPage() {
   const [consolidadoRows, setConsolidadoRows] = useState<ConsolidadoExportRow[]>([]);
   const [consolidadoTruncated, setConsolidadoTruncated] = useState(false);
   const [loadingConsolidado, setLoadingConsolidado] = useState(false);
+  const [exportConsolidadoExceling, setExportConsolidadoExceling] = useState(false);
   const [consolidadoError, setConsolidadoError] = useState<string | null>(null);
   const [exportBusquedaHecha, setExportBusquedaHecha] = useState(false);
   const [uploadingEvidencia, setUploadingEvidencia] = useState(false);
@@ -5638,6 +5658,10 @@ export default function DashboardPage() {
       setEquiposError('Seleccione una jornada.');
       return;
     }
+    if (informeBloqueado) {
+      setEquiposError(INFORME_CERRADO_MSG);
+      return;
+    }
     const date = datosGeneralesForm.fechaReporte || new Date().toISOString().slice(0, 10);
     setSavingEquipos(true);
     setEquiposMessage(null);
@@ -5809,6 +5833,10 @@ export default function DashboardPage() {
       setIngresoError('Seleccione una jornada.');
       return;
     }
+    if (informeBloqueado) {
+      setIngresoError(INFORME_CERRADO_MSG);
+      return;
+    }
     const date = datosGeneralesForm.fechaReporte || new Date().toISOString().slice(0, 10);
     setSavingIngreso(true);
     setIngresoMessage(null);
@@ -5947,6 +5975,10 @@ export default function DashboardPage() {
     }
     if (!selectedJornadaId) {
       setEntregaError('Seleccione una jornada.');
+      return;
+    }
+    if (informeBloqueado) {
+      setEntregaError(INFORME_CERRADO_MSG);
       return;
     }
     const date = datosGeneralesForm.fechaReporte || new Date().toISOString().slice(0, 10);
@@ -11685,6 +11717,12 @@ export default function DashboardPage() {
 
             {equiposTab === 'maquinaria' && (
               <fieldset disabled={informeBloqueado} style={informeFieldsetStyle}>
+                {informeBloqueado && (
+                  <p className="shell-text-muted" style={{ fontSize: '0.88rem', marginBottom: '0.75rem' }}>
+                    No se pueden añadir, editar ni guardar equipos mientras el informe esté cerrado (cuatro firmas en
+                    Evidencias y cierre). Use otra fecha u obra/jornada para un informe abierto.
+                  </p>
+                )}
                 {equiposMessage && <p className="feedback feedback-success">{equiposMessage}</p>}
                 {equiposError && <p className="feedback feedback-error">{equiposError}</p>}
 
@@ -12051,6 +12089,11 @@ export default function DashboardPage() {
 
             {equiposTab === 'ingreso' && (
               <fieldset disabled={informeBloqueado} style={informeFieldsetStyle}>
+                {informeBloqueado && (
+                  <p className="shell-text-muted" style={{ fontSize: '0.88rem', marginBottom: '0.75rem' }}>
+                    No se pueden guardar ingresos de material con el informe cerrado. Use otra fecha u obra/jornada.
+                  </p>
+                )}
                 {ingresoMessage && <p className="feedback feedback-success">{ingresoMessage}</p>}
                 {ingresoError && <p className="feedback feedback-error">{ingresoError}</p>}
 
@@ -12330,6 +12373,11 @@ export default function DashboardPage() {
 
             {equiposTab === 'entregado' && (
               <fieldset disabled={informeBloqueado} style={informeFieldsetStyle}>
+                {informeBloqueado && (
+                  <p className="shell-text-muted" style={{ fontSize: '0.88rem', marginBottom: '0.75rem' }}>
+                    No se pueden guardar entregas con el informe cerrado. Use otra fecha u obra/jornada.
+                  </p>
+                )}
                 {entregaMessage && <p className="feedback feedback-success">{entregaMessage}</p>}
                 {entregaError && <p className="feedback feedback-error">{entregaError}</p>}
 
@@ -14191,10 +14239,10 @@ export default function DashboardPage() {
           <section className="shell-card shell-card-wide">
             <h1 className="shell-title">Informe diario – Exportar</h1>
             <p className="shell-text-muted" style={{ marginBottom: '1rem' }}>
-              Filtra por obra, jornada y rango de fechas. Cada fila es un informe. La tabla y el CSV tienen{' '}
-              <strong>siete columnas</strong>, alineadas con las secciones del formulario: en «Datos generales» se
-              incluye también obra, fecha y jornada. Las URLs (fotos, Drive, archivos) aparecen como enlaces en la
-              tabla; en el CSV quedan como texto para abrirlas desde Excel u otro programa.
+              Filtra por obra, jornada y rango de fechas. Cada fila es un informe. La primera columna es el{' '}
+              <strong>estado</strong> (abierto o cerrado por las cuatro firmas). La tabla, el CSV y el Excel tienen{' '}
+              <strong>ocho columnas</strong>, alineadas con las secciones del formulario; en «Datos generales» se incluye
+              obra, fecha y jornada. Las URLs aparecen como enlaces en la tabla; en CSV y Excel quedan como texto.
             </p>
 
             <div
@@ -14263,11 +14311,11 @@ export default function DashboardPage() {
                   onChange={(e) => setExportDateTo(e.target.value)}
                 />
               </div>
-              <div className="informe-field" style={{ gridColumn: '1 / -1' }}>
+              <div className="informe-field" style={{ gridColumn: '1 / -1', display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
                 <button
                   type="button"
                   className="btn-primary"
-                  disabled={loadingConsolidado || !exportDateFrom || !exportDateTo}
+                  disabled={loadingConsolidado || exportConsolidadoExceling || !exportDateFrom || !exportDateTo}
                   onClick={async () => {
                     setConsolidadoError(null);
                     if (exportDateFrom > exportDateTo) {
@@ -14295,9 +14343,14 @@ export default function DashboardPage() {
                         );
                         return;
                       }
-                      const rows = Array.isArray((data as { rows?: unknown }).rows)
-                        ? (data as { rows: typeof consolidadoRows }).rows
+                      const raw = Array.isArray((data as { rows?: unknown }).rows)
+                        ? (data as { rows: ConsolidadoExportRow[] }).rows
                         : [];
+                      const rows: ConsolidadoExportRow[] = raw.map((r) => ({
+                        ...r,
+                        informeCerrado: Boolean(r.informeCerrado),
+                        cerradoEn: typeof r.cerradoEn === 'string' ? r.cerradoEn : null,
+                      }));
                       setConsolidadoRows(rows);
                       setConsolidadoTruncated(Boolean((data as { truncated?: boolean }).truncated));
                       setExportBusquedaHecha(true);
@@ -14309,6 +14362,61 @@ export default function DashboardPage() {
                   }}
                 >
                   {loadingConsolidado ? 'Consultando…' : 'Consultar'}
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={
+                    loadingConsolidado ||
+                    exportConsolidadoExceling ||
+                    !exportDateFrom ||
+                    !exportDateTo ||
+                    exportDateFrom > exportDateTo
+                  }
+                  onClick={async () => {
+                    setConsolidadoError(null);
+                    if (exportDateFrom > exportDateTo) {
+                      setConsolidadoError('La fecha desde no puede ser posterior a la fecha hasta.');
+                      return;
+                    }
+                    setExportConsolidadoExceling(true);
+                    try {
+                      const q = new URLSearchParams({
+                        dateFrom: exportDateFrom,
+                        dateTo: exportDateTo,
+                        format: 'xlsx',
+                      });
+                      if (exportObraId !== 'all') q.set('projectId', exportObraId);
+                      if (exportJornadaId !== 'all') q.set('jornadaId', exportJornadaId);
+                      const res = await fetch(`/api/informes/consolidado?${q}`, { credentials: 'include' });
+                      if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        setConsolidadoError(
+                          typeof (err as { error?: string }).error === 'string'
+                            ? (err as { error: string }).error
+                            : 'No se pudo generar el Excel.',
+                        );
+                        return;
+                      }
+                      const blob = await res.blob();
+                      const cd = res.headers.get('Content-Disposition');
+                      const m = cd && /filename="([^"]+)"/.exec(cd);
+                      const name =
+                        m?.[1] ?? `informes_diarios_${exportDateFrom}_${exportDateTo}.xlsx`;
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = name;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    } catch {
+                      setConsolidadoError('Error de conexión.');
+                    } finally {
+                      setExportConsolidadoExceling(false);
+                    }
+                  }}
+                >
+                  {exportConsolidadoExceling ? 'Generando Excel…' : 'Descargar Excel (.xlsx)'}
                 </button>
               </div>
             </div>
@@ -14339,14 +14447,14 @@ export default function DashboardPage() {
                       URL.revokeObjectURL(url);
                     }}
                   >
-                    Descargar CSV (7 columnas)
+                    Descargar CSV (8 columnas)
                   </button>
                 </div>
                 <div className="users-table-wrap">
                   <table className="users-table consolidado-export-table">
                     <thead>
                       <tr>
-                        {CONSOLIDADO_SIETE_COLUMNAS.map((titulo) => (
+                        {CONSOLIDADO_OCHO_COLUMNAS.map((titulo) => (
                           <th key={titulo}>{titulo}</th>
                         ))}
                       </tr>
@@ -14354,6 +14462,15 @@ export default function DashboardPage() {
                     <tbody>
                       {consolidadoRows.map((row) => (
                         <tr key={row.informeId}>
+                          <td className="consolidado-export-cell consolidado-export-cell--estado">
+                            <span
+                              className={
+                                row.informeCerrado ? 'consolidado-estado consolidado-estado--cerrado' : 'consolidado-estado consolidado-estado--abierto'
+                              }
+                            >
+                              {labelEstadoInformeExport(row)}
+                            </span>
+                          </td>
                           <td className="consolidado-export-cell">
                             {renderPreformattedWithUrls(consolidadoColumnaDatosGenerales(row))}
                           </td>

@@ -7,6 +7,7 @@ import {
   parseEvidenciasStored,
   type EvidenciaItem,
 } from '../../../../src/lib/evidenciasUrlPayload';
+import { buildConsolidadoExportWorkbookBuffer } from '../../../../src/lib/consolidadoExportExcel';
 
 const MAX_ROWS = 600;
 
@@ -218,7 +219,6 @@ export async function GET(req: NextRequest) {
           inf.horaEntrada || inf.horaSalida
             ? `Horario obra: ${inf.horaEntrada ?? '—'} – ${inf.horaSalida ?? '—'}`
             : null,
-          `Informe cerrado: ${fmtSiNo(inf.informeCerrado)}`,
         ],
         '\n',
       );
@@ -546,6 +546,8 @@ export async function GET(req: NextRequest) {
 
       return {
         informeId: inf.id,
+        informeCerrado: Boolean(inf.informeCerrado),
+        cerradoEn: inf.cerradoEn ? inf.cerradoEn.toISOString() : null,
         obraCodigo,
         obraNombre,
         fecha,
@@ -559,6 +561,20 @@ export async function GET(req: NextRequest) {
         evidencias: evidenciasTxt || '—',
       };
     });
+
+    const format = searchParams.get('format')?.trim().toLowerCase();
+    if (format === 'xlsx') {
+      const buf = await buildConsolidadoExportWorkbookBuffer(rows);
+      const safeFrom = dateFrom.replace(/[^\d-]/g, '') || 'desde';
+      const safeTo = dateTo.replace(/[^\d-]/g, '') || 'hasta';
+      return new NextResponse(new Uint8Array(buf), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Content-Disposition': `attachment; filename="informes_diarios_${safeFrom}_${safeTo}.xlsx"`,
+        },
+      });
+    }
 
     return NextResponse.json({
       rows,
