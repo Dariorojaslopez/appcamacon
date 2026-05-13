@@ -11037,13 +11037,8 @@ export default function DashboardPage() {
                 <div className="section-divider">
                   <h2 className="section-title">Condición climática por franja</h2>
                 </div>
-                <p className="shell-text-muted" style={{ marginBottom: '0.85rem', fontSize: '0.88rem' }}>
-                  Indique el tipo de condición para <strong>mañana</strong>, <strong>tarde</strong> y <strong>noche</strong>{' '}
-                  de este informe (obra · fecha · jornada). Los tipos se configuran en{' '}
-                  <strong>Configuración general → Tipos de condición</strong>. Guarde aquí antes de las suspensiones.
-                </p>
-                <div className="users-table-wrap" style={{ marginBottom: '1rem' }}>
-                  <table className="users-table">
+                <div className="informe-franja-clima-wrap">
+                  <table className="users-table informe-franja-clima-table">
                     <thead>
                       <tr>
                         <th style={{ width: '28%' }}>Franja del día</th>
