@@ -6828,12 +6828,12 @@ export default function DashboardPage() {
     const list = Array.from(files);
     const valid = list.filter((f) => {
       const okType = ['image/jpeg', 'image/jpg', 'image/png'].includes(f.type);
-      const okSize = f.size <= 5 * 1024 * 1024;
+      const okSize = f.size <= 10 * 1024 * 1024;
       return okType && okSize;
     });
 
     if (valid.length !== list.length) {
-      setEvidenciasError('Revisa formatos (JPG/PNG) y tamaño máximo (5MB).');
+      setEvidenciasError('Revisa formatos (JPG/PNG) y tamaño máximo (10MB).');
     }
 
     if (valid.length === 0) return;
@@ -7725,7 +7725,7 @@ export default function DashboardPage() {
                       )}
                     </div>
                     <p className="shell-text-muted" style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
-                      JPG, PNG, WEBP o GIF. Máximo 2 MB. Se sube automáticamente al crear la obra.
+                      JPG, PNG, WEBP o GIF. Máximo 4 MB. Se sube automáticamente al crear la obra.
                     </p>
                   </div>
                   <button type="submit" className="btn-primary" disabled={creatingObra}>
@@ -7792,14 +7792,14 @@ export default function DashboardPage() {
                       </tbody>
                     </table>
                     {obrasList.length === 0 && (
-                      <p className="shell-text-muted" style={{ padding: '1rem' }}>No hay obras. Crea una arriba.</p>
+                      <p className="shell-text-muted shell-empty-hint">No hay obras. Crea una arriba.</p>
                     )}
                   </div>
                 )}
 
                 {editObra && (
-                  <div role="dialog" aria-modal="true" aria-labelledby="edit-obra-title" style={{ marginTop: '1.5rem', padding: '1.25rem', background: '#f9fafb', borderRadius: 12, border: '1px solid #e5e7eb' }}>
-                    <h3 id="edit-obra-title" className="shell-title" style={{ marginBottom: '0.75rem' }}>Editar obra</h3>
+                  <div role="dialog" aria-modal="true" aria-labelledby="edit-obra-title" className="shell-dialog-panel">
+                    <h3 id="edit-obra-title" className="shell-title shell-title--dialog">Editar obra</h3>
                     <form onSubmit={saveEditObra}>
                       <div className="form-field">
                         <label className="form-label">Consecutivo / Código</label>
@@ -7864,7 +7864,7 @@ export default function DashboardPage() {
                               alt="Logo actual"
                               width={120}
                               height={120}
-                              style={{ objectFit: 'contain', borderRadius: 8, border: '1px solid #e5e7eb' }}
+                              className="shell-media-frame"
                             />
                           </div>
                         ) : (
@@ -7902,7 +7902,7 @@ export default function DashboardPage() {
                           )}
                         </div>
                         <p className="shell-text-muted" style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
-                          Elija archivo para reemplazar. Máx. 2 MB.
+                          Elija archivo para reemplazar. Máx. 4 MB.
                         </p>
                         {editObraForm.logoUrl ? (
                         <button
@@ -8013,7 +8013,7 @@ export default function DashboardPage() {
 
                 <h2 className="shell-title" style={{ fontSize: '1.1rem' }}>Listado</h2>
                 {jornadasAdmin.length === 0 ? (
-                  <p className="shell-text-muted" style={{ padding: '1rem' }}>No hay jornadas. Crea una arriba.</p>
+                  <p className="shell-text-muted shell-empty-hint">No hay jornadas. Crea una arriba.</p>
                 ) : (
                   <div className="users-table-wrap">
                     <table className="users-table">
@@ -8202,7 +8202,7 @@ export default function DashboardPage() {
 
                 <h2 className="shell-title" style={{ fontSize: '1.1rem' }}>Listado</h2>
                 {tiposCondicionAdmin.length === 0 ? (
-                  <p className="shell-text-muted" style={{ padding: '1rem' }}>No hay tipos. Cree uno arriba.</p>
+                  <p className="shell-text-muted shell-empty-hint">No hay tipos. Cree uno arriba.</p>
                 ) : (
                   <div className="users-table-wrap">
                     <table className="users-table">
@@ -8379,11 +8379,11 @@ export default function DashboardPage() {
 
                 <h2 className="shell-title" style={{ fontSize: '1.1rem' }}>Listado</h2>
                 {!frentesObraFilterProjectId ? (
-                  <p className="shell-text-muted" style={{ padding: '1rem' }}>
+                  <p className="shell-text-muted shell-empty-hint">
                     Seleccione una obra para ver o crear frentes.
                   </p>
                 ) : frentesObraAdmin.length === 0 ? (
-                  <p className="shell-text-muted" style={{ padding: '1rem' }}>
+                  <p className="shell-text-muted shell-empty-hint">
                     No hay frentes para esta obra. Cree uno arriba.
                   </p>
                 ) : (
@@ -8564,11 +8564,11 @@ export default function DashboardPage() {
 
                 <h2 className="shell-title" style={{ fontSize: '1.1rem' }}>Listado</h2>
                 {!contratistasFilterProjectId ? (
-                  <p className="shell-text-muted" style={{ padding: '1rem' }}>
+                  <p className="shell-text-muted shell-empty-hint">
                     Seleccione una obra para ver o crear contratistas.
                   </p>
                 ) : contratistasAdmin.length === 0 ? (
-                  <p className="shell-text-muted" style={{ padding: '1rem' }}>
+                  <p className="shell-text-muted shell-empty-hint">
                     No hay contratistas para esta obra. Cree uno arriba.
                   </p>
                 ) : (
@@ -8724,11 +8724,11 @@ export default function DashboardPage() {
 
                 <h2 className="shell-title" style={{ fontSize: '1.1rem' }}>Listado</h2>
                 {!encargadosFilterProjectId ? (
-                  <p className="shell-text-muted" style={{ padding: '1rem' }}>
+                  <p className="shell-text-muted shell-empty-hint">
                     Seleccione una obra para ver o crear encargados.
                   </p>
                 ) : encargadosAdmin.length === 0 ? (
-                  <p className="shell-text-muted" style={{ padding: '1rem' }}>
+                  <p className="shell-text-muted shell-empty-hint">
                     No hay encargados para esta obra. Cree uno arriba.
                   </p>
                 ) : (
@@ -8871,11 +8871,11 @@ export default function DashboardPage() {
 
                 <h2 className="shell-title" style={{ fontSize: '1.1rem' }}>Listado</h2>
                 {!cargosFilterProjectId ? (
-                  <p className="shell-text-muted" style={{ padding: '1rem' }}>
+                  <p className="shell-text-muted shell-empty-hint">
                     Seleccione una obra para ver o crear cargos.
                   </p>
                 ) : cargosAdmin.length === 0 ? (
-                  <p className="shell-text-muted" style={{ padding: '1rem' }}>
+                  <p className="shell-text-muted shell-empty-hint">
                     No hay cargos para esta obra. Cree uno arriba.
                   </p>
                 ) : (
@@ -9121,11 +9121,11 @@ export default function DashboardPage() {
 
                 <h2 className="shell-title" style={{ fontSize: '1.1rem' }}>Listado</h2>
                 {!proveedoresFilterProjectId ? (
-                  <p className="shell-text-muted" style={{ padding: '1rem' }}>
+                  <p className="shell-text-muted shell-empty-hint">
                     Seleccione una obra para ver o crear proveedores.
                   </p>
                 ) : proveedoresAdmin.length === 0 ? (
-                  <p className="shell-text-muted" style={{ padding: '1rem' }}>
+                  <p className="shell-text-muted shell-empty-hint">
                     No hay proveedores para esta obra. Cree uno arriba.
                   </p>
                 ) : (
@@ -9963,15 +9963,15 @@ export default function DashboardPage() {
 
                 <h2 className="shell-title" style={{ fontSize: '1.1rem' }}>Listado</h2>
                 {!itemsFilterProjectId ? (
-                  <p className="shell-text-muted" style={{ padding: '1rem' }}>
+                  <p className="shell-text-muted shell-empty-hint">
                     Seleccione una obra para ver o crear ítems.
                   </p>
                 ) : itemsBudgetChapters.length === 0 ? (
-                  <p className="shell-text-muted" style={{ padding: '1rem' }}>
+                  <p className="shell-text-muted shell-empty-hint">
                     No se pudo cargar la jerarquía de presupuesto. Compruebe la base de datos (migración Prisma).
                   </p>
                 ) : itemsAdminFlat.length === 0 ? (
-                  <p className="shell-text-muted" style={{ padding: '1rem' }}>
+                  <p className="shell-text-muted shell-empty-hint">
                     Aún no hay ítems en ningún subcapítulo. Cree un ítem arriba y asígnelo al subcapítulo correspondiente.
                   </p>
                 ) : null}
@@ -10449,13 +10449,13 @@ export default function DashboardPage() {
                       </tbody>
                     </table>
                     {usersList.length === 0 && (
-                      <p className="shell-text-muted" style={{ padding: '1rem' }}>No hay usuarios para mostrar.</p>
+                      <p className="shell-text-muted shell-empty-hint">No hay usuarios para mostrar.</p>
                     )}
                   </div>
                 )}
                 {editUser && (
-                  <div role="dialog" aria-modal="true" aria-labelledby="edit-user-title" style={{ marginTop: '1.5rem', padding: '1.25rem', background: '#f9fafb', borderRadius: 12, border: '1px solid #e5e7eb' }}>
-                    <h3 id="edit-user-title" className="shell-title" style={{ marginBottom: '0.75rem' }}>Editar usuario</h3>
+                  <div role="dialog" aria-modal="true" aria-labelledby="edit-user-title" className="shell-dialog-panel">
+                    <h3 id="edit-user-title" className="shell-title shell-title--dialog">Editar usuario</h3>
                     <form onSubmit={saveEditUser}>
                       <div className="form-field">
                         <label className="form-label">Identificación</label>
@@ -13240,7 +13240,7 @@ export default function DashboardPage() {
                     </div>
 
                     {ensayosRows.length === 0 && (
-                      <p className="shell-text-muted" style={{ padding: '1rem' }}>
+                      <p className="shell-text-muted shell-empty-hint">
                         No hay ensayos registrados. Usa “Agregar ensayo”.
                       </p>
                     )}
@@ -13469,7 +13469,7 @@ export default function DashboardPage() {
                     </table>
 
                     {danosRows.length === 0 && (
-                      <p className="shell-text-muted" style={{ padding: '1rem' }}>
+                      <p className="shell-text-muted shell-empty-hint">
                         No hay daños registrados. Usa “Registrar daño”.
                       </p>
                     )}
@@ -13674,7 +13674,7 @@ export default function DashboardPage() {
                     </table>
 
                     {noConformidadesRows.length === 0 && (
-                      <p className="shell-text-muted" style={{ padding: '1rem' }}>
+                      <p className="shell-text-muted shell-empty-hint">
                         No hay no conformidades. Usa “Agregar no conformidad”.
                       </p>
                     )}
@@ -13744,7 +13744,7 @@ export default function DashboardPage() {
                     <div className="section-title" style={{ marginTop: 0 }}>CARGA DE FOTOGRAFÍAS</div>
                     <p className="shell-text-muted" style={{ fontSize: '0.85rem', marginTop: '0.35rem' }}>
                       Tres bloques independientes (antes, durante, después). Pulsa <strong>Elegir fotos</strong> en cada
-                      fase. JPG, PNG · máx. 5 MB por archivo.
+                      fase. JPG, PNG · máx. 10 MB por archivo.
                     </p>
                     <div className="evidencias-fases-grid">
                       {EVIDENCIA_FASES.map(({ key, label }) => {
@@ -13780,7 +13780,7 @@ export default function DashboardPage() {
                                 Tomar foto
                               </button>
                             </div>
-                            <p className="evidencias-fase-hint">Puedes agregar varias fotos por categoría. JPG, PNG · máx. 5 MB por archivo</p>
+                            <p className="evidencias-fase-hint">Puedes agregar varias fotos por categoría. JPG, PNG · máx. 10 MB por archivo</p>
                             <input
                               ref={(el) => {
                                 evidenciaFileInputRefs.current[key] = el;
@@ -14019,15 +14019,10 @@ export default function DashboardPage() {
                       return (
                         <div
                           key={key}
-                          style={{
-                            padding: '1rem',
-                            borderRadius: 12,
-                            border: '1px solid rgba(209, 213, 219, 0.95)',
-                            background: '#f9fafb',
-                            opacity: mostrarAvisoRol ? 0.92 : 1,
-                          }}
+                          className="firma-slot-card"
+                          style={{ opacity: mostrarAvisoRol ? 0.92 : 1 }}
                         >
-                          <div style={{ fontWeight: 700, color: '#111827', marginBottom: '0.65rem' }}>{label}</div>
+                          <div className="firma-slot-title">{label}</div>
                           {mostrarAvisoRol && (
                             <p className="shell-text-muted" style={{ fontSize: '0.8rem', marginBottom: '0.65rem' }}>
                               Tu rol no puede registrar firmas en esta fila. Solo usuarios autorizados ven el código y

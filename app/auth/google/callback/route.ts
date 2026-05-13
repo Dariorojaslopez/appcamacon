@@ -31,7 +31,7 @@ function htmlPage(title: string, body: string, status = 200): NextResponse {
     p { line-height: 1.55; color: #374151; }
     textarea { width: 100%; min-height: 110px; padding: 12px; border-radius: 10px; border: 1px solid #d1d5db; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
     code { background: #f3f4f6; padding: 2px 6px; border-radius: 6px; }
-    .warning { color: #92400e; background: #fffbeb; border: 1px solid #fde68a; padding: 10px 12px; border-radius: 10px; }
+    .warning { color: #111827; background: rgba(237, 213, 1, 0.18); border: 1px solid rgba(17, 20, 133, 0.35); padding: 10px 12px; border-radius: 10px; }
   </style>
 </head>
 <body><main>${body}</main></body>

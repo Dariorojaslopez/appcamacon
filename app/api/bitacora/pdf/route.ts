@@ -67,14 +67,14 @@ export async function GET(req: NextRequest) {
   <title>Bitácora Digital de Obra - ${esc(informe.project.name)}</title>
   <style>
     body { font-family: Arial, sans-serif; color: #111827; margin: 28px; }
-    header { display: flex; justify-content: space-between; gap: 24px; border-bottom: 3px solid #f59e0b; padding-bottom: 16px; }
+    header { display: flex; justify-content: space-between; gap: 24px; border-bottom: 3px solid #edd501; padding-bottom: 16px; }
     h1 { margin: 0; font-size: 22px; text-transform: uppercase; }
     h2 { margin-top: 26px; font-size: 16px; border-bottom: 1px solid #d1d5db; padding-bottom: 6px; }
     .meta { font-size: 12px; line-height: 1.6; }
     .qr { text-align: right; font-size: 11px; max-width: 190px; }
-    .timeline { margin-top: 18px; border-left: 3px solid #f59e0b; padding-left: 18px; }
+    .timeline { margin-top: 18px; border-left: 3px solid #edd501; padding-left: 18px; }
     .event { margin: 0 0 14px; padding: 12px; border: 1px solid #e5e7eb; border-radius: 10px; page-break-inside: avoid; }
-    .event strong { color: #92400e; }
+    .event strong { color: #111485; }
     .muted { color: #6b7280; font-size: 12px; }
     .photos img { width: 110px; height: 80px; object-fit: cover; border: 1px solid #d1d5db; border-radius: 8px; margin: 6px 6px 0 0; }
     .hash { font-family: monospace; word-break: break-all; background: #f3f4f6; padding: 8px; border-radius: 8px; }

@@ -10,7 +10,7 @@ import {
 } from '../../../../src/lib/googleDriveUpload';
 import { uploadEvidenciaToOneDrive } from '../../../../src/lib/onedriveGraphUpload';
 
-const MAX_BYTES = 5 * 1024 * 1024; // 5MB
+const MAX_BYTES = 10 * 1024 * 1024; // 10MB
 
 /** Carpeta destino por defecto (puede sobrescribirse con ONEDRIVE_FOLDER_SHARE_URL). */
 const DEFAULT_ONEDRIVE_FOLDER_SHARE_URL =
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Archivo vacío' }, { status: 400 });
     }
     if (blob.size > MAX_BYTES) {
-      return NextResponse.json({ error: 'El archivo excede 5MB' }, { status: 400 });
+      return NextResponse.json({ error: 'El archivo excede 10MB' }, { status: 400 });
     }
 
     const mime = blob.type || '';

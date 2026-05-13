@@ -10,7 +10,7 @@ import {
 } from '../../../../src/lib/googleDriveUpload';
 import { uploadEvidenciaToOneDrive } from '../../../../src/lib/onedriveGraphUpload';
 
-const MAX_BYTES = 2 * 1024 * 1024; // 2 MB
+const MAX_BYTES = 4 * 1024 * 1024; // 4 MB
 
 const DEFAULT_ONEDRIVE_FOLDER_SHARE_URL =
   'https://1drv.ms/f/c/607528d0aacd0fd0/IgDxIqdQArk9QLHfJYGLaYYlATP9KVwdHtQVHrBzaMojIB4?e=lWh18E';
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Archivo vacío' }, { status: 400 });
     }
     if (blob.size > MAX_BYTES) {
-      return NextResponse.json({ error: 'El logo no debe superar 2MB' }, { status: 400 });
+      return NextResponse.json({ error: 'El logo no debe superar 4MB' }, { status: 400 });
     }
 
     const mime = blob.type || '';
