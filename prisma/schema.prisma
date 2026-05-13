@@ -117,6 +117,19 @@ model JornadaCatalog {
   @@index([isActive, orden])
 }
 
+/// Tipos de condición climática / ambiente (combo en suspensiones y cabecera informe). Configurables en administración.
+model TipoCondicionCatalog {
+  id        String   @id @default(cuid())
+  codigo    String   @unique // Valor guardado en InformeDiario.tipoClima / InformeSuspension.tipoClima
+  nombre    String
+  orden     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, orden])
+}
+
 model InformeDiario {
   id                 String    @id @default(cuid())
   date               DateTime

@@ -37,7 +37,7 @@ import {
   IconExport,
   IconLogout,
 } from './icons';
-import { InformeSearchableSelect } from './InformeSearchableSelect';
+import { InformeSearchableSelect, type InformeSearchableOption } from './InformeSearchableSelect';
 import {
   EVIDENCIA_FASES,
   emptyEvidenciaUrlsPorFase,
@@ -898,21 +898,23 @@ const DATOS_GENERALES_CAMPOS_VACIOS = {
   horaSalida: '',
 } as const;
 
-/** Valores enviados a la API (InformeDiario.tipoClima). */
-const CLIMA_INFORME_OPTIONS = [
+/** Respaldo si aún no hay catálogo en BD o falla la carga (InformeDiario / suspensión tipoClima). */
+const CLIMA_INFORME_OPTIONS_FALLBACK: InformeSearchableOption[] = [
   { value: 'SOLEADO', label: 'Soleado' },
   { value: 'NUBLADO', label: 'Nublado' },
   { value: 'LLUVIA', label: 'Lluvia' },
   { value: 'TORMENTA', label: 'Tormenta' },
   { value: 'VIENTO', label: 'Viento' },
   { value: 'OTRO', label: 'Otro' },
-] as const;
+];
 
-function climaInformeLabel(value: string): string {
+function resolveClimaCondicionLabel(value: string, options: InformeSearchableOption[]): string {
   const v = (value ?? '').trim();
   if (!v) return '—';
-  const hit = CLIMA_INFORME_OPTIONS.find((o) => o.value === v);
-  return hit?.label ?? v;
+  const hit = options.find((o) => o.value === v);
+  if (hit) return hit.label;
+  const fb = CLIMA_INFORME_OPTIONS_FALLBACK.find((o) => o.value === v);
+  return fb?.label ?? v;
 }
 
 type SuspensionRow = {
@@ -1088,6 +1090,7 @@ export default function DashboardPage() {
   const [settingsSubSection, setSettingsSubSection] = useState<
     | 'obras'
     | 'jornadas'
+    | 'tiposCondicion'
     | 'frentesObra'
     | 'contratistas'
     | 'encargados'
@@ -1325,6 +1328,47 @@ export default function DashboardPage() {
     orden: 0,
     isActive: true,
   });
+
+  const [tiposCondicionInformeOptions, setTiposCondicionInformeOptions] = useState<InformeSearchableOption[]>([]);
+  const [tiposCondicionAdmin, setTiposCondicionAdmin] = useState<
+    { id: string; codigo: string; nombre: string; orden: number; isActive: boolean }[]
+  >([]);
+  const [tipoCondicionNew, setTipoCondicionNew] = useState({ nombre: '', codigo: '', orden: 0 });
+  const [tiposCondicionAdminSaving, setTiposCondicionAdminSaving] = useState(false);
+  const [tiposCondicionAdminError, setTiposCondicionAdminError] = useState<string | null>(null);
+  const [tiposCondicionAdminMessage, setTiposCondicionAdminMessage] = useState<string | null>(null);
+  const [editingTipoCondicionId, setEditingTipoCondicionId] = useState<string | null>(null);
+  const [editingTipoCondicionForm, setEditingTipoCondicionForm] = useState({
+    nombre: '',
+    orden: 0,
+    isActive: true,
+  });
+
+  const refetchTiposCondicionInformeOptions = useCallback(async () => {
+    try {
+      const res = await fetch('/api/catalogos/tipos-condicion', { credentials: 'include' });
+      const data = await res.json();
+      if (!res.ok) return;
+      const items = Array.isArray(data.items) ? data.items : [];
+      const mapped: InformeSearchableOption[] = items.map((x: { value: string; label: string }) => ({
+        value: x.value,
+        label: x.label,
+      }));
+      setTiposCondicionInformeOptions(mapped.length > 0 ? mapped : [...CLIMA_INFORME_OPTIONS_FALLBACK]);
+    } catch {
+      setTiposCondicionInformeOptions([...CLIMA_INFORME_OPTIONS_FALLBACK]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeSection !== 'jornada' && activeSection !== 'settings' && !isInformeSection) return;
+    void refetchTiposCondicionInformeOptions();
+  }, [activeSection, isInformeSection, refetchTiposCondicionInformeOptions]);
+
+  const opcionesTipoCondicionSelect = useMemo(
+    () => (tiposCondicionInformeOptions.length > 0 ? tiposCondicionInformeOptions : CLIMA_INFORME_OPTIONS_FALLBACK),
+    [tiposCondicionInformeOptions],
+  );
 
   const [selectedObraId, setSelectedObraIdState] = useState<string>(() => {
     if (typeof window === 'undefined') return '';
@@ -1952,6 +1996,25 @@ export default function DashboardPage() {
           setJornadasAdmin([]);
           setJornadasAdminError('Error al cargar jornadas.');
         }
+        return;
+      }
+
+      if (settingsSubSection === 'tiposCondicion') {
+        setTiposCondicionAdminError(null);
+        try {
+          const res = await fetch('/api/admin/catalogos/tipos-condicion', { credentials: 'include' });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data?.error ?? 'Error');
+          setTiposCondicionAdmin(
+            Array.isArray(data.items)
+              ? (data.items as { id: string; codigo: string; nombre: string; orden: number; isActive: boolean }[])
+              : [],
+          );
+        } catch {
+          setTiposCondicionAdmin([]);
+          setTiposCondicionAdminError('Error al cargar tipos de condición.');
+        }
+        return;
       }
 
       if (settingsSubSection === 'proveedores') {
@@ -4394,6 +4457,80 @@ export default function DashboardPage() {
       setJornadasAdminError('Error de conexión.');
     } finally {
       setJornadasAdminSaving(false);
+    }
+  };
+
+  const reloadTiposCondicionAdmin = async () => {
+    try {
+      const res = await fetch('/api/admin/catalogos/tipos-condicion', { credentials: 'include' });
+      const data = await res.json();
+      if (res.ok && Array.isArray(data.items)) setTiposCondicionAdmin(data.items);
+    } catch {
+      // ignore
+    }
+  };
+
+  const createTipoCondicionAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTiposCondicionAdminSaving(true);
+    setTiposCondicionAdminError(null);
+    setTiposCondicionAdminMessage(null);
+    try {
+      const res = await fetch('/api/admin/catalogos/tipos-condicion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          nombre: tipoCondicionNew.nombre.trim(),
+          codigo: tipoCondicionNew.codigo.trim() || undefined,
+          orden: tipoCondicionNew.orden,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setTiposCondicionAdminError(data.error ?? 'No se pudo crear');
+        return;
+      }
+      await reloadTiposCondicionAdmin();
+      await refetchTiposCondicionInformeOptions();
+      setTipoCondicionNew({ nombre: '', codigo: '', orden: 0 });
+      setTiposCondicionAdminMessage('Tipo de condición creado.');
+      setTimeout(() => setTiposCondicionAdminMessage(null), 3000);
+    } catch {
+      setTiposCondicionAdminError('Error de conexión.');
+    } finally {
+      setTiposCondicionAdminSaving(false);
+    }
+  };
+
+  const saveEditTipoCondicionAdmin = async (id: string) => {
+    setTiposCondicionAdminSaving(true);
+    setTiposCondicionAdminError(null);
+    try {
+      const res = await fetch(`/api/admin/catalogos/tipos-condicion/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          nombre: editingTipoCondicionForm.nombre.trim(),
+          orden: editingTipoCondicionForm.orden,
+          isActive: editingTipoCondicionForm.isActive,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setTiposCondicionAdminError(data.error ?? 'No se pudo guardar');
+        return;
+      }
+      await reloadTiposCondicionAdmin();
+      await refetchTiposCondicionInformeOptions();
+      setEditingTipoCondicionId(null);
+      setTiposCondicionAdminMessage('Tipo de condición actualizado.');
+      setTimeout(() => setTiposCondicionAdminMessage(null), 3000);
+    } catch {
+      setTiposCondicionAdminError('Error de conexión.');
+    } finally {
+      setTiposCondicionAdminSaving(false);
     }
   };
 
@@ -7306,6 +7443,14 @@ export default function DashboardPage() {
               </button>
               <button
                 type="button"
+                className={`users-tab ${settingsSubSection === 'tiposCondicion' ? 'users-tab-active' : ''}`}
+                onClick={() => setSettingsSubSection('tiposCondicion')}
+              >
+                <IconAlert />
+                Tipos de condición
+              </button>
+              <button
+                type="button"
                 className={`users-tab ${settingsSubSection === 'frentesObra' ? 'users-tab-active' : ''}`}
                 onClick={() => setSettingsSubSection('frentesObra')}
               >
@@ -7852,6 +7997,173 @@ export default function DashboardPage() {
                                           horaFin: normalizarHoraHHmm(j.horaFin),
                                           orden: j.orden,
                                           isActive: j.isActive,
+                                        });
+                                      }}
+                                    >
+                                      <IconEdit /> Editar
+                                    </button>
+                                  </div>
+                                </td>
+                              </>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
+
+            {settingsSubSection === 'tiposCondicion' && (
+              <>
+                <h2 className="shell-title" style={{ fontSize: '1.1rem', marginTop: '0.5rem' }}>
+                  Tipos de condición (clima / ambiente)
+                </h2>
+                <p className="shell-text-muted" style={{ marginBottom: '1rem' }}>
+                  Definen las opciones del combo <strong>Tipo</strong> en <strong>Jornada y condiciones</strong>{' '}
+                  (suspensiones). El <strong>código</strong> es el valor guardado en el informe; si lo deja vacío al
+                  crear, se genera a partir del nombre.
+                </p>
+                {tiposCondicionAdminMessage && <p className="feedback feedback-success">{tiposCondicionAdminMessage}</p>}
+                {tiposCondicionAdminError && <p className="feedback feedback-error">{tiposCondicionAdminError}</p>}
+
+                <form className="auth-form" onSubmit={createTipoCondicionAdmin} style={{ marginBottom: '1.5rem' }}>
+                  <div className="form-row-2">
+                    <div className="form-field">
+                      <label className="form-label">Nombre (visible en el informe) *</label>
+                      <input
+                        className="form-input"
+                        type="text"
+                        required
+                        placeholder="Ej. Niebla"
+                        value={tipoCondicionNew.nombre}
+                        onChange={(e) => setTipoCondicionNew((p) => ({ ...p, nombre: e.target.value }))}
+                      />
+                    </div>
+                    <div className="form-field">
+                      <label className="form-label">Código (opcional)</label>
+                      <input
+                        className="form-input"
+                        type="text"
+                        placeholder="Ej. NIEBLA — vacío = automático"
+                        value={tipoCondicionNew.codigo}
+                        onChange={(e) =>
+                          setTipoCondicionNew((p) => ({ ...p, codigo: e.target.value.toUpperCase() }))
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="form-field">
+                    <label className="form-label">Orden</label>
+                    <input
+                      className="form-input"
+                      type="number"
+                      value={tipoCondicionNew.orden}
+                      onChange={(e) =>
+                        setTipoCondicionNew((p) => ({ ...p, orden: Number(e.target.value) || 0 }))
+                      }
+                    />
+                  </div>
+                  <button type="submit" className="btn-primary" disabled={tiposCondicionAdminSaving} style={{ marginTop: '0.75rem' }}>
+                    {tiposCondicionAdminSaving ? 'Guardando...' : 'Crear tipo'}
+                  </button>
+                </form>
+
+                <h2 className="shell-title" style={{ fontSize: '1.1rem' }}>Listado</h2>
+                {tiposCondicionAdmin.length === 0 ? (
+                  <p className="shell-text-muted" style={{ padding: '1rem' }}>No hay tipos. Cree uno arriba.</p>
+                ) : (
+                  <div className="users-table-wrap">
+                    <table className="users-table">
+                      <thead>
+                        <tr>
+                          <th>Código</th>
+                          <th>Nombre</th>
+                          <th>Orden</th>
+                          <th>Activo</th>
+                          <th>Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tiposCondicionAdmin.map((t) => (
+                          <tr key={t.id}>
+                            {editingTipoCondicionId === t.id ? (
+                              <>
+                                <td>
+                                  <code>{t.codigo}</code>
+                                </td>
+                                <td>
+                                  <input
+                                    className="form-input"
+                                    value={editingTipoCondicionForm.nombre}
+                                    onChange={(e) =>
+                                      setEditingTipoCondicionForm((f) => ({ ...f, nombre: e.target.value }))
+                                    }
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    className="form-input"
+                                    type="number"
+                                    value={editingTipoCondicionForm.orden}
+                                    onChange={(e) =>
+                                      setEditingTipoCondicionForm((f) => ({
+                                        ...f,
+                                        orden: Number(e.target.value) || 0,
+                                      }))
+                                    }
+                                  />
+                                </td>
+                                <td>
+                                  <label className="perms-check-label">
+                                    <input
+                                      type="checkbox"
+                                      checked={editingTipoCondicionForm.isActive}
+                                      onChange={(e) =>
+                                        setEditingTipoCondicionForm((f) => ({ ...f, isActive: e.target.checked }))
+                                      }
+                                    />
+                                    <span className="perms-check-box" />
+                                  </label>
+                                </td>
+                                <td>
+                                  <div className="users-table-actions">
+                                    <button
+                                      type="button"
+                                      disabled={tiposCondicionAdminSaving}
+                                      onClick={() => void saveEditTipoCondicionAdmin(t.id)}
+                                    >
+                                      {tiposCondicionAdminSaving ? 'Guardando...' : 'Guardar'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn-cancel"
+                                      onClick={() => setEditingTipoCondicionId(null)}
+                                    >
+                                      Cancelar
+                                    </button>
+                                  </div>
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td>
+                                  <code>{t.codigo}</code>
+                                </td>
+                                <td>{t.nombre}</td>
+                                <td>{t.orden}</td>
+                                <td>{t.isActive ? 'Sí' : 'No'}</td>
+                                <td>
+                                  <div className="users-table-actions">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingTipoCondicionId(t.id);
+                                        setEditingTipoCondicionForm({
+                                          nombre: t.nombre,
+                                          orden: t.orden,
+                                          isActive: t.isActive,
                                         });
                                       }}
                                     >
@@ -10681,7 +10993,7 @@ export default function DashboardPage() {
                           disabled={informeBloqueado}
                           emptyOptionLabel="Seleccione…"
                           searchPlaceholder="Buscar tipo…"
-                          options={[...CLIMA_INFORME_OPTIONS]}
+                          options={opcionesTipoCondicionSelect}
                           onChange={(v) => setEditSuspensionDraft((p) => ({ ...p, tipoClima: v }))}
                         />
                       </div>
@@ -10802,7 +11114,7 @@ export default function DashboardPage() {
                           disabled={informeBloqueado}
                           emptyOptionLabel="Seleccione…"
                           searchPlaceholder="Buscar tipo…"
-                          options={[...CLIMA_INFORME_OPTIONS]}
+                          options={opcionesTipoCondicionSelect}
                           onChange={(v) => setSuspensionDraft((p) => ({ ...p, tipoClima: v }))}
                         />
                       </div>
@@ -10883,7 +11195,7 @@ export default function DashboardPage() {
                             <td className="suspensiones-td-motivo">{row.motivoSuspension}</td>
                             <td>{row.horaSuspension}</td>
                             <td>{row.horaReinicio}</td>
-                            <td>{climaInformeLabel(row.tipoClima)}</td>
+                            <td>{resolveClimaCondicionLabel(row.tipoClima, opcionesTipoCondicionSelect)}</td>
                             <td>{row.horasClima}</td>
                             <td>
                               {row.imagenUrl ? (
