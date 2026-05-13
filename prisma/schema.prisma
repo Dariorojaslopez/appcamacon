@@ -18,7 +18,8 @@ model User {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  informes  InformeDiario[]
+  informes              InformeDiario[]
+  registrosBitacoraObra RegistroBitacoraObra[]
 }
 
 model Project {
@@ -41,6 +42,7 @@ model Project {
   informes           InformeDiario[]
   bitacoraEventos    BitacoraEvento[]
   bitacoraClimas     BitacoraClima[]
+  registrosBitacoraObra RegistroBitacoraObra[]
   frentesObraCatalog FrenteObraCatalog[]
   contratistasCatalog ContratistaCatalog[]
   encargadosCatalog EncargadoReporteCatalog[]
@@ -574,6 +576,33 @@ model BitacoraClima {
   @@unique([informeId])
   @@index([projectId, fecha])
   @@map("bitacora_clima")
+}
+
+/// Registro manual de bitácora por obra (contratista, interventoría, IDU): observaciones, foto y firma cada uno.
+model RegistroBitacoraObra {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User    @relation(fields: [userId], references: [id])
+
+  contratistaObservaciones String  @default("")
+  contratistaFotoUrl       String?
+  contratistaFirmaUrl     String?
+
+  interventoriaObservaciones String  @default("")
+  interventoriaFotoUrl       String?
+  interventoriaFirmaUrl      String?
+
+  iduObservaciones String  @default("")
+  iduFotoUrl       String?
+  iduFirmaUrl      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId, createdAt])
+  @@map("registro_bitacora_obra")
 }
 
 model ContratistaCatalog {

@@ -3425,3 +3425,43 @@ ul.informe-searchable-list {
   }
 }
 
+/* Registro de bitácora (contratista / interventoría / IDU) */
+.registro-bitacora-shell .shell-text {
+  max-width: 46rem;
+}
+
+.registro-bitacora-slot {
+  margin-top: 0.25rem;
+}
+
+.registro-bitacora-textarea {
+  border-radius: 12px;
+  min-height: 6rem;
+  resize: vertical;
+}
+
+.registro-bitacora-foto-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.signature-pad-wrap {
+  border: 1px solid var(--camacon-border-medium);
+  border-radius: 10px;
+  background: #fff;
+  padding: 0.35rem;
+  max-width: calc(340px + 0.7rem);
+  touch-action: none;
+}
+
+.signature-pad-canvas {
+  display: block;
+  width: 100%;
+  max-width: 340px;
+  height: 120px;
+  cursor: crosshair;
+  border-radius: 6px;
+  touch-action: none;
+}

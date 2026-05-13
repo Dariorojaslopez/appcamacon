@@ -53,6 +53,7 @@ async function main() {
     'tabulacion',
     'informeExportar',
     'bitacora',
+    'registroBitacora',
     'settings',
     'users',
   ];
@@ -62,6 +63,18 @@ async function main() {
       where: { role_menuKey: { role: 'SUPER_ADMIN', menuKey } },
       update: {},
       create: { role: 'SUPER_ADMIN', menuKey },
+    });
+  }
+
+  const rolesConBitacora = await prisma.roleMenuPermission.findMany({
+    where: { menuKey: 'bitacora' },
+    select: { role: true },
+  });
+  for (const { role } of rolesConBitacora) {
+    await prisma.roleMenuPermission.upsert({
+      where: { role_menuKey: { role, menuKey: 'registroBitacora' } },
+      update: {},
+      create: { role, menuKey: 'registroBitacora' },
     });
   }
 

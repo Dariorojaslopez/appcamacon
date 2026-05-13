@@ -28,6 +28,7 @@ import {
   IconEdit,
   IconTrash,
   IconShield,
+  IconJournal,
   IconUserPlus,
   IconBuilding,
   IconMic,
@@ -38,6 +39,7 @@ import {
   IconLogout,
 } from './icons';
 import { InformeSearchableSelect, type InformeSearchableOption } from './InformeSearchableSelect';
+import { RegistroBitacoraSection } from './RegistroBitacoraSection';
 import {
   EVIDENCIA_FASES,
   emptyEvidenciaUrlsPorFase,
@@ -1045,6 +1047,7 @@ export default function DashboardPage() {
     | 'tabulacion'
     | 'informeExportar'
     | 'bitacora'
+    | 'registroBitacora'
   >('home');
   const isInformeSection = useMemo(
     () =>
@@ -2317,7 +2320,8 @@ export default function DashboardPage() {
       activeSection === 'evidencias' ||
       activeSection === 'tabulacion' ||
       activeSection === 'informeExportar' ||
-      activeSection === 'bitacora'
+      activeSection === 'bitacora' ||
+      activeSection === 'registroBitacora'
     ) {
       setLoadingObrasForInforme(true);
       (async () => {
@@ -6918,6 +6922,11 @@ export default function DashboardPage() {
     </div>
   );
 
+  const registroBitacoraObraOptions: InformeSearchableOption[] = useMemo(
+    () => obrasForInforme.map((o) => ({ value: o.id, label: `${o.code} — ${o.name}` })),
+    [obrasForInforme],
+  );
+
   const bitacoraMetricCards = bitacoraMetrics
     ? [
         ['Personal total', bitacoraMetrics.personalTotal ?? 0],
@@ -7059,6 +7068,16 @@ export default function DashboardPage() {
               <span>Bitácora Digital</span>
             </button>
           )}
+          {canSee('registroBitacora') && (
+            <button
+              type="button"
+              className={`topbar-link ${activeSection === 'registroBitacora' ? 'topbar-link-active' : ''}`}
+              onClick={() => setActiveSection('registroBitacora')}
+            >
+              <IconJournal />
+              <span>Registro de bitácora</span>
+            </button>
+          )}
           {canSee('settings') && (
             <button
               type="button"
@@ -7168,6 +7187,21 @@ export default function DashboardPage() {
               >
                 <IconShield />
                 <span>Bitácora Digital</span>
+                <IconChevronRight />
+              </button>
+            )}
+
+            {canSee('registroBitacora') && (
+              <button
+                type="button"
+                className={`nav-item ${activeSection === 'registroBitacora' ? 'nav-item-active' : ''}`}
+                onClick={() => {
+                  setActiveSection('registroBitacora');
+                  setMenuOpen(false);
+                }}
+              >
+                <IconJournal />
+                <span>Registro de bitácora</span>
                 <IconChevronRight />
               </button>
             )}
@@ -7549,6 +7583,13 @@ export default function DashboardPage() {
               </>
             )}
           </section>
+        )}
+
+        {activeSection === 'registroBitacora' && canSee('registroBitacora') && (
+          <RegistroBitacoraSection
+            obraOptions={registroBitacoraObraOptions}
+            loadingObras={loadingObrasForInforme}
+          />
         )}
 
         {activeSection === 'settings' && (
