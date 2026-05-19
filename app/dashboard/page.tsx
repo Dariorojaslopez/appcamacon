@@ -240,6 +240,26 @@ function formatItemCatalogSubtotal(
   return (p * c).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+/** Cantidad mostrada / usada en total: prioriza cantidadPresupuesto (campo «Cantidad» en UI). */
+function itemCatalogEffectiveCantidad(
+  cantidadPresupuesto: number | null | undefined,
+  cantidad: number | null | undefined,
+): number | null {
+  if (cantidadPresupuesto != null && Number.isFinite(Number(cantidadPresupuesto))) {
+    return Number(cantidadPresupuesto);
+  }
+  if (cantidad != null && Number.isFinite(Number(cantidad))) return Number(cantidad);
+  return null;
+}
+
+function parseItemCatalogCantidadField(s: string): { value: number | null; invalid: boolean } {
+  const t = String(s ?? '').trim();
+  if (!t) return { value: null, invalid: false };
+  const n = Number(t.replace(',', '.'));
+  if (!Number.isFinite(n) || n < 0) return { value: null, invalid: true };
+  return { value: n, invalid: false };
+}
+
 /** Unidades del catálogo de ítems: captura y cálculo de cantidad según tabla operativa. */
 const ITEM_CATALOG_UNIT_OPTIONS: { value: string; label: string }[] = [
   { value: 'm3', label: 'm³ — Volumen (L × A × H)' },
@@ -1373,13 +1393,10 @@ export default function DashboardPage() {
     orden: 0,
     isActive: true,
   });
+  const [itemNewCodigo, setItemNewCodigo] = useState('');
   const [itemNewDescripcion, setItemNewDescripcion] = useState('');
   const [itemNewUnidad, setItemNewUnidad] = useState('');
   const [itemNewPrecio, setItemNewPrecio] = useState('');
-  const [itemNewCantidad, setItemNewCantidad] = useState('');
-  const [itemNewLargo, setItemNewLargo] = useState('');
-  const [itemNewAncho, setItemNewAncho] = useState('');
-  const [itemNewAltura, setItemNewAltura] = useState('');
   const [itemNewCantidadPresupuesto, setItemNewCantidadPresupuesto] = useState('');
   const [itemNewImagenUrl, setItemNewImagenUrl] = useState('');
   const [itemNewFotoGeo, setItemNewFotoGeo] = useState<FotoGeoFields>(emptyFotoGeoFields);
@@ -1405,6 +1422,21 @@ export default function DashboardPage() {
 
   const itemsAdminFlat = useMemo(() => flattenItemCatalogTree(itemsBudgetChapters), [itemsBudgetChapters]);
   const budgetSubchaptersFlat = useMemo(() => flattenBudgetSubchapters(itemsBudgetChapters), [itemsBudgetChapters]);
+
+  useEffect(() => {
+    if (!itemsFilterProjectId) {
+      setItemNewCodigo('');
+      return;
+    }
+    setItemNewCodigo(nextAutonumericItemCatalogCodigo(itemsAdminFlat));
+  }, [itemsFilterProjectId]);
+
+  useEffect(() => {
+    if (!itemsFilterProjectId) return;
+    setItemNewCodigo((prev) =>
+      prev.trim() ? prev : nextAutonumericItemCatalogCodigo(itemsAdminFlat),
+    );
+  }, [itemsAdminFlat, itemsFilterProjectId]);
 
   const subchapterPickerOptions = useMemo(() => {
     const opts: { id: string; label: string }[] = [];
@@ -4250,44 +4282,19 @@ export default function DashboardPage() {
         setItemsError('Seleccione una unidad de medida.');
         return;
       }
-      const kindNew = itemCatalogCaptureKind(itemNewUnidad.trim());
-      if (kindNew !== 'none' && kindNew !== 'manual') {
-        if (
-          computeItemCatalogCantidadFromInputs(
-            itemNewUnidad,
-            itemNewLargo,
-            itemNewAncho,
-            itemNewAltura,
-            itemNewCantidad,
-          ) == null
-        ) {
-          setItemsError('Ingrese las medidas necesarias para calcular la cantidad.');
-          return;
-        }
-      }
-      const cpTrim = itemNewCantidadPresupuesto.trim();
-      const cantidadPresupuestoNum = cpTrim ? Number(cpTrim.replace(',', '.')) : null;
-      if (cantidadPresupuestoNum != null && (!Number.isFinite(cantidadPresupuestoNum) || cantidadPresupuestoNum < 0)) {
-        setItemsError('Cantidad presupuesto no válida (use un número ≥ 0).');
+      const parsedCantidad = parseItemCatalogCantidadField(itemNewCantidadPresupuesto);
+      if (parsedCantidad.invalid) {
+        setItemsError('Cantidad no válida (use un número ≥ 0).');
         return;
       }
-      const icPayload = itemCatalogPayloadFromFormFields(
-        itemNewUnidad,
-        itemNewLargo,
-        itemNewAncho,
-        itemNewAltura,
-        itemNewCantidad,
-      );
-      let cantidadOut = icPayload.cantidad;
-      if (
-        (kindNew === 'manual' || kindNew === 'none') &&
-        cantidadOut == null &&
-        cantidadPresupuestoNum != null &&
-        Number.isFinite(cantidadPresupuestoNum)
-      ) {
-        cantidadOut = cantidadPresupuestoNum;
+      const cantidadPresupuestoNum = parsedCantidad.value;
+      const cantidadOut = cantidadPresupuestoNum;
+      const codigo =
+        itemNewCodigo.trim() || nextAutonumericItemCatalogCodigo(itemsAdminFlat);
+      if (!codigo) {
+        setItemsError('Indique el código del ítem.');
+        return;
       }
-      const codigoAuto = nextAutonumericItemCatalogCodigo(itemsAdminFlat);
       const res = await fetch('/api/admin/catalogos/items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -4295,14 +4302,14 @@ export default function DashboardPage() {
         body: JSON.stringify({
           projectId: itemsFilterProjectId,
           subchapterId: itemsTargetSubchapterId,
-          codigo: codigoAuto,
+          codigo,
           descripcion: itemNewDescripcion.trim(),
-          unidad: icPayload.unidad,
+          unidad: itemNewUnidad.trim() || null,
           precioUnitario: itemNewPrecio.trim() ? Number(itemNewPrecio.replace(',', '.')) : null,
           cantidad: cantidadOut,
-          largo: icPayload.largo,
-          ancho: icPayload.ancho,
-          altura: icPayload.altura,
+          largo: null,
+          ancho: null,
+          altura: null,
           imagenUrl: itemNewImagenUrl.trim() || null,
           ...fotoGeoPayload(itemNewFotoGeo),
           proveedorId: itemNewProveedorId.trim() || null,
@@ -4319,11 +4326,8 @@ export default function DashboardPage() {
       setItemNewDescripcion('');
       setItemNewUnidad('');
       setItemNewPrecio('');
-      setItemNewCantidad('');
-      setItemNewLargo('');
-      setItemNewAncho('');
-      setItemNewAltura('');
       setItemNewCantidadPresupuesto('');
+      setItemNewCodigo(nextAutonumericItemCatalogCodigo([...itemsAdminFlat, { codigo }]));
       setItemNewImagenUrl('');
       setItemNewFotoGeo(emptyFotoGeoFields());
       setItemNewProveedorId(itemProveedorOptions[0]?.id ?? '');
@@ -4342,43 +4346,13 @@ export default function DashboardPage() {
         setItemsError('Seleccione una unidad de medida.');
         return;
       }
-      const kindEd = itemCatalogCaptureKind(editingItemForm.unidad.trim());
-      if (kindEd !== 'none' && kindEd !== 'manual') {
-        if (
-          computeItemCatalogCantidadFromInputs(
-            editingItemForm.unidad,
-            editingItemForm.largo,
-            editingItemForm.ancho,
-            editingItemForm.altura,
-            editingItemForm.cantidad,
-          ) == null
-        ) {
-          setItemsError('Ingrese las medidas necesarias para calcular la cantidad.');
-          return;
-        }
-      }
-      const cpEditTrim = editingItemForm.cantidadPresupuesto.trim();
-      const cantidadPresupuestoEdit = cpEditTrim ? Number(cpEditTrim.replace(',', '.')) : null;
-      if (cantidadPresupuestoEdit != null && (!Number.isFinite(cantidadPresupuestoEdit) || cantidadPresupuestoEdit < 0)) {
-        setItemsError('Cantidad presupuesto no válida (use un número ≥ 0).');
+      const parsedCantidadEdit = parseItemCatalogCantidadField(editingItemForm.cantidadPresupuesto);
+      if (parsedCantidadEdit.invalid) {
+        setItemsError('Cantidad no válida (use un número ≥ 0).');
         return;
       }
-      const icEdit = itemCatalogPayloadFromFormFields(
-        editingItemForm.unidad,
-        editingItemForm.largo,
-        editingItemForm.ancho,
-        editingItemForm.altura,
-        editingItemForm.cantidad,
-      );
-      let cantidadEditOut = icEdit.cantidad;
-      if (
-        (kindEd === 'manual' || kindEd === 'none') &&
-        cantidadEditOut == null &&
-        cantidadPresupuestoEdit != null &&
-        Number.isFinite(cantidadPresupuestoEdit)
-      ) {
-        cantidadEditOut = cantidadPresupuestoEdit;
-      }
+      const cantidadPresupuestoEdit = parsedCantidadEdit.value;
+      const cantidadEditOut = cantidadPresupuestoEdit;
       const res = await fetch(`/api/admin/catalogos/items/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -4387,14 +4361,11 @@ export default function DashboardPage() {
           subchapterId: editingItemForm.subchapterId.trim() || undefined,
           codigo: editingItemForm.codigo.trim(),
           descripcion: editingItemForm.descripcion.trim(),
-          unidad: icEdit.unidad,
+          unidad: editingItemForm.unidad.trim() || null,
           precioUnitario: editingItemForm.precioUnitario.trim()
             ? Number(editingItemForm.precioUnitario.replace(',', '.'))
             : null,
           cantidad: cantidadEditOut,
-          largo: icEdit.largo,
-          ancho: icEdit.ancho,
-          altura: icEdit.altura,
           imagenUrl: editingItemForm.imagenUrl.trim() || null,
           ...fotoGeoPayload(editingItemForm),
           proveedorId: editingItemForm.proveedorId.trim() || null,
@@ -9965,17 +9936,23 @@ export default function DashboardPage() {
                       <label className="form-label" htmlFor="item-new-codigo">Código</label>
                       <input
                         id="item-new-codigo"
-                        className="form-input personal-input-readonly"
+                        className="form-input"
                         type="text"
-                        readOnly
-                        aria-readonly="true"
-                        value={
+                        value={itemNewCodigo}
+                        onChange={(e) => setItemNewCodigo(e.target.value)}
+                        placeholder={
                           itemsFilterProjectId
                             ? nextAutonumericItemCatalogCodigo(itemsAdminFlat)
-                            : '—'
+                            : ''
                         }
-                        title="Se asigna automáticamente al crear el ítem (siguiente número disponible en esta obra)."
+                        title="Editable. Si lo deja vacío al guardar, se usa el siguiente número disponible en la obra."
                       />
+                      {itemsFilterProjectId ? (
+                        <p className="informe-label-hint" style={{ marginTop: '0.35rem', marginBottom: 0 }}>
+                          Siguiente autonumérico sugerido:{' '}
+                          <strong>{nextAutonumericItemCatalogCodigo(itemsAdminFlat)}</strong>
+                        </p>
+                      ) : null}
                     </div>
                     <div className="form-field" style={{ marginBottom: 0 }}>
                       <label className="form-label" htmlFor="item-new-unidad">Unidad</label>
@@ -9984,21 +9961,7 @@ export default function DashboardPage() {
                         className="form-input"
                         required
                         value={normalizeItemCatalogUnit(itemNewUnidad) ?? ''}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          const merged = mergeItemCatalogUnitChangeWithPresupuesto(v, {
-                            largo: itemNewLargo,
-                            ancho: itemNewAncho,
-                            altura: itemNewAltura,
-                            cantidad: itemNewCantidad,
-                            cantidadPresupuesto: itemNewCantidadPresupuesto,
-                          });
-                          setItemNewUnidad(merged.unidad);
-                          setItemNewLargo(merged.largo);
-                          setItemNewAncho(merged.ancho);
-                          setItemNewAltura(merged.altura);
-                          setItemNewCantidad(merged.cantidad);
-                        }}
+                        onChange={(e) => setItemNewUnidad(e.target.value)}
                       >
                         <option value="">Seleccione unidad…</option>
                         {ITEM_CATALOG_UNIT_OPTIONS.map((o) => (
@@ -10013,78 +9976,18 @@ export default function DashboardPage() {
                       <input className="form-input" type="number" step="0.01" value={itemNewPrecio} onChange={(e) => setItemNewPrecio(e.target.value)} />
                     </div>
                   </div>
-                  {itemCatalogCaptureKind(itemNewUnidad) === 'm3' ? (
-                    <div className="form-row-inline">
-                      <div className="form-field" style={{ marginBottom: 0 }}>
-                        <label className="form-label">Largo (m)</label>
-                        <input className="form-input" type="number" step="0.01" value={itemNewLargo} onChange={(e) => setItemNewLargo(e.target.value)} />
-                      </div>
-                      <div className="form-field" style={{ marginBottom: 0 }}>
-                        <label className="form-label">Ancho (m)</label>
-                        <input className="form-input" type="number" step="0.01" value={itemNewAncho} onChange={(e) => setItemNewAncho(e.target.value)} />
-                      </div>
-                      <div className="form-field" style={{ marginBottom: 0 }}>
-                        <label className="form-label">Alto (m)</label>
-                        <input className="form-input" type="number" step="0.01" value={itemNewAltura} onChange={(e) => setItemNewAltura(e.target.value)} />
-                      </div>
-                    </div>
-                  ) : null}
-                  {itemCatalogCaptureKind(itemNewUnidad) === 'm2' ? (
-                    <div className="form-row-inline">
-                      <div className="form-field" style={{ marginBottom: 0 }}>
-                        <label className="form-label">Largo (m)</label>
-                        <input className="form-input" type="number" step="0.01" value={itemNewLargo} onChange={(e) => setItemNewLargo(e.target.value)} />
-                      </div>
-                      <div className="form-field" style={{ marginBottom: 0 }}>
-                        <label className="form-label">Ancho (m)</label>
-                        <input className="form-input" type="number" step="0.01" value={itemNewAncho} onChange={(e) => setItemNewAncho(e.target.value)} />
-                      </div>
-                    </div>
-                  ) : null}
-                  {itemCatalogCaptureKind(itemNewUnidad) === 'length' ? (
-                    <div className="form-row-inline">
-                      <div className="form-field" style={{ marginBottom: 0 }}>
-                        <label className="form-label">Largo (m)</label>
-                        <input className="form-input" type="number" step="0.01" value={itemNewLargo} onChange={(e) => setItemNewLargo(e.target.value)} />
-                      </div>
-                    </div>
-                  ) : null}
-                  {itemCatalogCaptureKind(itemNewUnidad) === 'manual' ? (
-                    <p className="shell-text-muted" style={{ marginTop: 0, marginBottom: '0.5rem' }}>
-                      Cantidad manual (und, kg, ton o litros). Las medidas L/A/H no aplican para esta unidad.
-                    </p>
-                  ) : null}
                   <div className="form-row-inline">
                     <div className="form-field" style={{ marginBottom: 0 }}>
-                      <label className="form-label">
-                        {itemCatalogCaptureKind(itemNewUnidad) === 'manual'
-                          ? 'Cantidad'
-                          : itemCatalogCaptureKind(itemNewUnidad) === 'none'
-                            ? 'Cantidad'
-                            : 'Cantidad (calculada)'}
-                      </label>
-                      {itemCatalogCaptureKind(itemNewUnidad) === 'manual' ? (
-                        <input
-                          className="form-input"
-                          type="number"
-                          step="0.01"
-                          value={itemNewCantidad}
-                          onChange={(e) => setItemNewCantidad(e.target.value)}
-                        />
-                      ) : (
-                        <input
-                          className="form-input personal-input-readonly"
-                          type="text"
-                          readOnly
-                          value={formatItemCatalogCantidadDisplay(
-                            itemNewUnidad,
-                            itemNewLargo,
-                            itemNewAncho,
-                            itemNewAltura,
-                            itemNewCantidad,
-                          )}
-                        />
-                      )}
+                      <label className="form-label" htmlFor="item-new-cantidad">Cantidad</label>
+                      <input
+                        id="item-new-cantidad"
+                        className="form-input"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={itemNewCantidadPresupuesto}
+                        onChange={(e) => setItemNewCantidadPresupuesto(e.target.value)}
+                      />
                     </div>
                     <div className="form-field" style={{ marginBottom: 0 }}>
                       <label className="form-label">Total (cantidad × precio)</label>
@@ -10095,54 +9998,11 @@ export default function DashboardPage() {
                         value={
                           formatItemCatalogSubtotal(
                             itemNewPrecio.trim() ? Number(itemNewPrecio.replace(',', '.')) : null,
-                            computeItemCatalogCantidadFromInputs(
-                              itemNewUnidad,
-                              itemNewLargo,
-                              itemNewAncho,
-                              itemNewAltura,
-                              itemNewCantidad,
-                            ),
+                            parseItemCatalogCantidadField(itemNewCantidadPresupuesto).value,
                           ) ?? '—'
                         }
                       />
                     </div>
-                  </div>
-                  <div className="form-field" style={{ marginBottom: '0.75rem' }}>
-                    <label className="form-label" htmlFor="item-new-cantidad-presupuesto">
-                      Cantidad presupuesto
-                    </label>
-                    <input
-                      id="item-new-cantidad-presupuesto"
-                      className="form-input"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="Opcional · referencia de presupuesto"
-                      value={itemNewCantidadPresupuesto}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setItemNewCantidadPresupuesto(v);
-                        const patch = reverseFillFromCantidadPresupuesto(
-                          itemNewUnidad,
-                          itemNewLargo,
-                          itemNewAncho,
-                          itemNewAltura,
-                          v,
-                        );
-                        if (patch) {
-                          setItemNewLargo(patch.largo);
-                          setItemNewAncho(patch.ancho);
-                          setItemNewAltura(patch.altura);
-                          setItemNewCantidad(patch.cantidad);
-                        }
-                      }}
-                    />
-                    <p className="informe-label-hint" style={{ marginTop: '0.35rem', marginBottom: 0 }}>
-                      Aplica a todas las unidades: con <strong>und</strong>, <strong>kg</strong>, <strong>ton</strong> o{' '}
-                      <strong>l</strong> la cantidad del ítem pasa a ser ese valor; con <strong>ml</strong> o <strong>m</strong>{' '}
-                      se usa como longitud (m); con <strong>m²</strong> o <strong>m³</strong> se deducen largo/ancho/alto
-                      (p. ej. m² sin medidas: cuadrado de lado √Q; con largo fijo: ancho = Q ÷ largo).
-                    </p>
                   </div>
                   <RegistroFotograficoInput
                     idBase="item-new-imagen"
@@ -10206,13 +10066,9 @@ export default function DashboardPage() {
                           <th>Código</th>
                           <th>Descripción</th>
                           <th>Unidad</th>
-                          <th>Largo</th>
-                          <th>Ancho</th>
-                          <th>Altura</th>
                           <th>Imagen</th>
                           <th>Precio</th>
                           <th>Cantidad</th>
-                          <th>Cant. presupuesto</th>
                           <th>Total</th>
                           <th>Activo</th>
                           <th>Acciones</th>
@@ -10290,19 +10146,7 @@ export default function DashboardPage() {
                                     normalizeItemCatalogUnit(editingItemForm.unidad) ??
                                     (editingItemForm.unidad.trim() ? editingItemForm.unidad.trim() : '')
                                   }
-                                  onChange={(e) => {
-                                    const v = e.target.value;
-                                    setEditingItemForm((p) => ({
-                                      ...p,
-                                      ...mergeItemCatalogUnitChangeWithPresupuesto(v, {
-                                        largo: p.largo,
-                                        ancho: p.ancho,
-                                        altura: p.altura,
-                                        cantidad: p.cantidad,
-                                        cantidadPresupuesto: p.cantidadPresupuesto,
-                                      }),
-                                    }));
-                                  }}
+                                  onChange={(e) => setEditingItemForm((p) => ({ ...p, unidad: e.target.value }))}
                                 >
                                   <option value="">— Unidad —</option>
                                   {normalizeItemCatalogUnit(editingItemForm.unidad) == null &&
@@ -10320,48 +10164,6 @@ export default function DashboardPage() {
                               ) : (
                                 it.unidad ?? '—'
                               )}
-                            </td>
-                            <td>
-                              {editingItemId === it.id ? (
-                                <input
-                                  className="form-input"
-                                  type="number"
-                                  step="0.01"
-                                  disabled={
-                                    itemCatalogCaptureKind(editingItemForm.unidad) === 'manual' ||
-                                    itemCatalogCaptureKind(editingItemForm.unidad) === 'none'
-                                  }
-                                  value={editingItemForm.largo}
-                                  onChange={(e) => setEditingItemForm((p) => ({ ...p, largo: e.target.value }))}
-                                />
-                              ) : (it.largo != null ? Number(it.largo).toLocaleString('es-CO') : '—')}
-                            </td>
-                            <td>
-                              {editingItemId === it.id ? (
-                                <input
-                                  className="form-input"
-                                  type="number"
-                                  step="0.01"
-                                  disabled={
-                                    itemCatalogCaptureKind(editingItemForm.unidad) !== 'm3' &&
-                                    itemCatalogCaptureKind(editingItemForm.unidad) !== 'm2'
-                                  }
-                                  value={editingItemForm.ancho}
-                                  onChange={(e) => setEditingItemForm((p) => ({ ...p, ancho: e.target.value }))}
-                                />
-                              ) : (it.ancho != null ? Number(it.ancho).toLocaleString('es-CO') : '—')}
-                            </td>
-                            <td>
-                              {editingItemId === it.id ? (
-                                <input
-                                  className="form-input"
-                                  type="number"
-                                  step="0.01"
-                                  disabled={itemCatalogCaptureKind(editingItemForm.unidad) !== 'm3'}
-                                  value={editingItemForm.altura}
-                                  onChange={(e) => setEditingItemForm((p) => ({ ...p, altura: e.target.value }))}
-                                />
-                              ) : (it.altura != null ? Number(it.altura).toLocaleString('es-CO') : '—')}
                             </td>
                             <td>
                               {editingItemId === it.id ? (
@@ -10402,64 +10204,20 @@ export default function DashboardPage() {
                             </td>
                             <td>
                               {editingItemId === it.id ? (
-                                itemCatalogCaptureKind(editingItemForm.unidad) === 'manual' ? (
-                                  <input
-                                    className="form-input"
-                                    type="number"
-                                    step="0.01"
-                                    value={editingItemForm.cantidad}
-                                    onChange={(e) => setEditingItemForm((p) => ({ ...p, cantidad: e.target.value }))}
-                                  />
-                                ) : (
-                                  <input
-                                    className="form-input personal-input-readonly"
-                                    type="text"
-                                    readOnly
-                                    value={formatItemCatalogCantidadDisplay(
-                                      editingItemForm.unidad,
-                                      editingItemForm.largo,
-                                      editingItemForm.ancho,
-                                      editingItemForm.altura,
-                                      editingItemForm.cantidad,
-                                    )}
-                                  />
-                                )
-                              ) : (it.cantidad != null ? Number(it.cantidad).toLocaleString('es-CO') : '—')}
-                            </td>
-                            <td>
-                              {editingItemId === it.id ? (
                                 <input
                                   className="form-input"
                                   type="number"
                                   step="0.01"
                                   min="0"
                                   value={editingItemForm.cantidadPresupuesto}
-                                  onChange={(e) => {
-                                    const v = e.target.value;
-                                    setEditingItemForm((p) => {
-                                      const next = { ...p, cantidadPresupuesto: v };
-                                      const patch = reverseFillFromCantidadPresupuesto(
-                                        p.unidad,
-                                        p.largo,
-                                        p.ancho,
-                                        p.altura,
-                                        v,
-                                      );
-                                      if (patch) {
-                                        next.largo = patch.largo;
-                                        next.ancho = patch.ancho;
-                                        next.altura = patch.altura;
-                                        next.cantidad = patch.cantidad;
-                                      }
-                                      return next;
-                                    });
-                                  }}
+                                  onChange={(e) =>
+                                    setEditingItemForm((p) => ({ ...p, cantidadPresupuesto: e.target.value }))
+                                  }
                                 />
-                              ) : it.cantidadPresupuesto != null ? (
-                                Number(it.cantidadPresupuesto).toLocaleString('es-CO')
-                              ) : (
-                                '—'
-                              )}
+                              ) : (() => {
+                                const q = itemCatalogEffectiveCantidad(it.cantidadPresupuesto, it.cantidad);
+                                return q != null ? q.toLocaleString('es-CO') : '—';
+                              })()}
                             </td>
                             <td>
                               {editingItemId === it.id ? (
@@ -10472,18 +10230,15 @@ export default function DashboardPage() {
                                       editingItemForm.precioUnitario.trim()
                                         ? Number(editingItemForm.precioUnitario.replace(',', '.'))
                                         : null,
-                                      computeItemCatalogCantidadFromInputs(
-                                        editingItemForm.unidad,
-                                        editingItemForm.largo,
-                                        editingItemForm.ancho,
-                                        editingItemForm.altura,
-                                        editingItemForm.cantidad,
-                                      ),
+                                      parseItemCatalogCantidadField(editingItemForm.cantidadPresupuesto).value,
                                     ) ?? '—'
                                   }
                                 />
                               ) : (
-                                formatItemCatalogSubtotal(it.precioUnitario, it.cantidad) ?? '—'
+                                formatItemCatalogSubtotal(
+                                  it.precioUnitario,
+                                  itemCatalogEffectiveCantidad(it.cantidadPresupuesto, it.cantidad),
+                                ) ?? '—'
                               )}
                             </td>
                             <td>
@@ -10514,7 +10269,11 @@ export default function DashboardPage() {
                                         precioUnitario: it.precioUnitario != null ? String(it.precioUnitario) : '',
                                         cantidad: it.cantidad != null ? String(it.cantidad) : '',
                                         cantidadPresupuesto:
-                                          it.cantidadPresupuesto != null ? String(it.cantidadPresupuesto) : '',
+                                          it.cantidadPresupuesto != null
+                                            ? String(it.cantidadPresupuesto)
+                                            : it.cantidad != null
+                                              ? String(it.cantidad)
+                                              : '',
                                         largo: it.largo != null ? String(it.largo) : '',
                                         ancho: it.ancho != null ? String(it.ancho) : '',
                                         altura: it.altura != null ? String(it.altura) : '',

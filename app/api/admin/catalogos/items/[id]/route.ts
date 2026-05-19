@@ -98,7 +98,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (raw == null || raw === '') data.cantidadPresupuesto = null;
       else {
         const n = Number(raw);
-        if (!Number.isFinite(n)) return NextResponse.json({ error: 'Cantidad presupuesto inválida' }, { status: 400 });
+        if (!Number.isFinite(n)) return NextResponse.json({ error: 'Cantidad inválida' }, { status: 400 });
         data.cantidadPresupuesto = n;
       }
     }

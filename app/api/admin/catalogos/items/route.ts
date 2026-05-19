@@ -289,8 +289,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Cantidad inválida' }, { status: 400 });
     }
     if (cantidadPresupuesto != null && !Number.isFinite(cantidadPresupuesto)) {
-      return NextResponse.json({ error: 'Cantidad presupuesto inválida' }, { status: 400 });
+      return NextResponse.json({ error: 'Cantidad inválida' }, { status: 400 });
     }
+    const cantidadPersistida =
+      cantidad != null && Number.isFinite(cantidad) ? cantidad : cantidadPresupuesto;
     if (largo != null && !Number.isFinite(largo)) return NextResponse.json({ error: 'Largo inválido' }, { status: 400 });
     if (ancho != null && !Number.isFinite(ancho)) return NextResponse.json({ error: 'Ancho inválido' }, { status: 400 });
     if (altura != null && !Number.isFinite(altura)) return NextResponse.json({ error: 'Altura inválida' }, { status: 400 });
@@ -327,7 +329,7 @@ export async function POST(req: NextRequest) {
             descripcion,
             unidad: unidad || null,
             precioUnitario,
-            cantidad,
+            cantidad: cantidadPersistida,
             cantidadPresupuesto,
             largo,
             ancho,
