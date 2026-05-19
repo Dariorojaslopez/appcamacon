@@ -1445,7 +1445,9 @@ export default function DashboardPage() {
   const [itemsFilterProjectId, setItemsFilterProjectId] = useState('');
   const [itemProveedorOptions, setItemProveedorOptions] = useState<ProveedorCatalogAdmin[]>([]);
   const [itemsSaving, setItemsSaving] = useState(false);
+  const [itemsExcelImporting, setItemsExcelImporting] = useState(false);
   const [itemsError, setItemsError] = useState<string | null>(null);
+  const itemsExcelInputRef = useRef<HTMLInputElement | null>(null);
   const [editingBudgetChapterId, setEditingBudgetChapterId] = useState<string | null>(null);
   const [editingBudgetChapterForm, setEditingBudgetChapterForm] = useState({
     codigo: '',
@@ -4399,6 +4401,86 @@ export default function DashboardPage() {
       setItemsError('Error de conexión.');
     } finally {
       setItemsSaving(false);
+    }
+  };
+
+  const downloadItemCatalogPlantilla = async () => {
+    if (!itemsFilterProjectId) {
+      setItemsError('Seleccione una obra antes de descargar la plantilla.');
+      return;
+    }
+    setItemsError(null);
+    try {
+      const res = await fetch(
+        `/api/admin/catalogos/items/plantilla?projectId=${encodeURIComponent(itemsFilterProjectId)}`,
+        { credentials: 'include' },
+      );
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setItemsError(data.error ?? 'No se pudo descargar la plantilla.');
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'plantilla_items_contractuales.xlsx';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setItemsError('Error de conexión al descargar la plantilla.');
+    }
+  };
+
+  const importItemCatalogExcel = async (file: File | null) => {
+    if (!file) return;
+    if (!itemsFilterProjectId) {
+      setItemsError('Seleccione una obra antes de importar.');
+      return;
+    }
+    setItemsExcelImporting(true);
+    setItemsError(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('projectId', itemsFilterProjectId);
+      const res = await fetch('/api/admin/catalogos/items/importar-excel', {
+        method: 'POST',
+        body: fd,
+        credentials: 'include',
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        message?: string;
+        created?: number;
+        updated?: number;
+        errors?: Array<{ fila: number; mensaje: string }>;
+      };
+      if (!res.ok) {
+        const errLines = (data.errors ?? [])
+          .slice(0, 8)
+          .map((e) => `Fila ${e.fila}: ${e.mensaje}`)
+          .join(' | ');
+        setItemsError(
+          [data.error ?? data.message ?? 'No se pudo importar el Excel.', errLines].filter(Boolean).join(' '),
+        );
+        return;
+      }
+      await reloadItemsBudgetTree();
+      const errLines = (data.errors ?? [])
+        .slice(0, 6)
+        .map((e) => `Fila ${e.fila}: ${e.mensaje}`)
+        .join(' · ');
+      setItemsError(
+        [data.message ?? `Importados: ${data.created ?? 0} nuevos, ${data.updated ?? 0} actualizados.`, errLines]
+          .filter(Boolean)
+          .join(' '),
+      );
+    } catch {
+      setItemsError('Error de conexión al importar Excel.');
+    } finally {
+      setItemsExcelImporting(false);
+      if (itemsExcelInputRef.current) itemsExcelInputRef.current.value = '';
     }
   };
 
@@ -9980,6 +10062,47 @@ export default function DashboardPage() {
 
                 {settingsSubSection === 'items' ? (
                   <>
+                <section
+                  className="item-catalog-excel-panel shell-card"
+                  style={{ marginBottom: '1.25rem', padding: '1rem' }}
+                  aria-labelledby="item-excel-import-title"
+                >
+                  <h3 id="item-excel-import-title" className="shell-title" style={{ fontSize: '1rem', marginTop: 0 }}>
+                    Cargar ítems desde Excel
+                  </h3>
+                  <p className="shell-text-muted" style={{ marginTop: 0, marginBottom: '0.75rem' }}>
+                    Sin columna de imagen. Descargue la plantilla, complétela y súbala. El autonumérico se asigna al
+                    importar. Use la hoja <strong>Catálogo obra</strong> para ver capítulos, subcapítulos y NIT de
+                    proveedores.
+                  </p>
+                  <div className="item-catalog-excel-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      disabled={!itemsFilterProjectId || itemsExcelImporting}
+                      onClick={() => void downloadItemCatalogPlantilla()}
+                    >
+                      <IconExport /> Descargar plantilla (.xlsx)
+                    </button>
+                    <input
+                      ref={itemsExcelInputRef}
+                      className="sr-only"
+                      type="file"
+                      accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                      disabled={!itemsFilterProjectId || itemsExcelImporting}
+                      onChange={(e) => void importItemCatalogExcel(e.target.files?.[0] ?? null)}
+                    />
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      disabled={!itemsFilterProjectId || itemsExcelImporting}
+                      onClick={() => itemsExcelInputRef.current?.click()}
+                    >
+                      {itemsExcelImporting ? 'Importando…' : 'Subir Excel completado'}
+                    </button>
+                  </div>
+                </section>
+
                 <form className="auth-form item-catalog-create-form" onSubmit={createItemCatalog} style={{ marginBottom: '1.5rem' }}>
                   <h3 className="shell-title" style={{ fontSize: '1rem' }}>Crear ítem manual</h3>
                   <div className="form-field" style={{ marginBottom: '0.75rem' }}>
