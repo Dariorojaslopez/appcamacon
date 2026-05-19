@@ -1,24 +1,31 @@
 import prisma from '../../lib/prisma';
 import {
+  REGISTRO_BITACORA_CONFIGURED_MARKER,
   REGISTRO_BITACORA_SLOT_KEYS,
   type RegistroBitacoraSlotKey,
   defaultRegistroBitacoraSlotsForRole,
   isRegistroBitacoraSlotKey,
 } from '../../shared/registroBitacoraPermissions';
 
-async function slotRowsForRole(role: string) {
+async function bitacoraPermissionStateForRole(role: string): Promise<{
+  configured: boolean;
+  slots: RegistroBitacoraSlotKey[];
+}> {
   try {
     const rows = await prisma.roleRegistroBitacoraPermission.findMany({ where: { role } });
-    return rows.map((r) => r.slotKey).filter(isRegistroBitacoraSlotKey);
+    const configured = rows.some((r) => r.slotKey === REGISTRO_BITACORA_CONFIGURED_MARKER);
+    const slots = rows.map((r) => r.slotKey).filter(isRegistroBitacoraSlotKey);
+    return { configured, slots };
   } catch {
-    return [];
+    return { configured: false, slots: [] };
   }
 }
 
 export async function dbRegistroBitacoraSlotsForRole(role: string): Promise<RegistroBitacoraSlotKey[]> {
-  const rows = await slotRowsForRole(role);
-  if (rows.length === 0) return defaultRegistroBitacoraSlotsForRole(role);
-  return rows;
+  const { configured, slots } = await bitacoraPermissionStateForRole(role);
+  if (configured) return slots;
+  if (slots.length > 0) return slots;
+  return defaultRegistroBitacoraSlotsForRole(role);
 }
 
 export async function dbPuedeEditarRegistroBitacoraSlot(

@@ -11016,9 +11016,10 @@ export default function DashboardPage() {
                 </h2>
                 <p className="shell-text">
                   Indica qué sección puede ver y editar cada rol en{' '}
-                  <strong>Registro de bitácora</strong>. El super administrador suele tener las tres
-                  (Contratista, Interventor, IDU). Si un rol no tiene filas aquí, se aplican los valores
-                  por defecto del sistema (por ejemplo CONTRATISTA solo ve Contratista).
+                  <strong>Registro de bitácora</strong>. Si desmarca todas las casillas, ese rol no verá
+                  ninguna sección. Los roles CONTRATISTA, INTERVENTOR e IDU, si nunca se configuraron aquí,
+                  usan por defecto solo su sección. El acceso al menú &quot;Registro de bitácora&quot; se controla
+                  en la tabla de permisos de menú de arriba.
                 </p>
                 {loadingPermissions ? (
                   <p className="shell-text-muted">Cargando permisos de bitácora...</p>

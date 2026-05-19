@@ -8,6 +8,7 @@ import {
   FIRMA_SLOT_KEYS,
 } from '../../../../../src/shared/firmaPolicies';
 import {
+  REGISTRO_BITACORA_CONFIGURED_MARKER,
   REGISTRO_BITACORA_SLOT_KEYS,
   isRegistroBitacoraSlotKey,
 } from '../../../../../src/shared/registroBitacoraPermissions';
@@ -166,10 +167,15 @@ export async function PUT(req: NextRequest) {
         (k: string) => typeof k === 'string' && isRegistroBitacoraSlotKey(k),
       );
       await prisma.roleRegistroBitacoraPermission.deleteMany({ where: { role } });
-      if (validBitacora.length > 0) {
+      const toCreate = validBitacora.map((slotKey) => ({ role, slotKey }));
+      if (toCreate.length > 0) {
         await prisma.roleRegistroBitacoraPermission.createMany({
-          data: validBitacora.map((slotKey) => ({ role, slotKey })),
+          data: toCreate,
           skipDuplicates: true,
+        });
+      } else {
+        await prisma.roleRegistroBitacoraPermission.create({
+          data: { role, slotKey: REGISTRO_BITACORA_CONFIGURED_MARKER },
         });
       }
     }

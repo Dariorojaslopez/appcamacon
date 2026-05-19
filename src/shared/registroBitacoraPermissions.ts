@@ -10,8 +10,10 @@ export const REGISTRO_BITACORA_SLOT_LABELS: Record<RegistroBitacoraSlotKey, stri
   idu: 'IDU',
 };
 
+/** Marca en BD que el rol ya fue configurado (aunque no tenga ninguna sección). */
+export const REGISTRO_BITACORA_CONFIGURED_MARKER = '__configured__';
+
 const DEFAULT_SLOTS_BY_ROLE: Partial<Record<string, readonly RegistroBitacoraSlotKey[]>> = {
-  SUPER_ADMIN: REGISTRO_BITACORA_SLOT_KEYS,
   CONTRATISTA: ['contratista'],
   INTERVENTOR: ['interventor'],
   IDU: ['idu'],
