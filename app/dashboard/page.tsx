@@ -13001,7 +13001,8 @@ export default function DashboardPage() {
                     const ancho = item?.ancho != null ? Number(item.ancho) : row.ancho;
                     const altura = item?.altura != null ? Number(item.altura) : row.altura;
                     const registroFotoStored = String(row.imagenUrl ?? '').trim();
-                    const registroFotoSrc = storedMediaImgSrc(registroFotoStored) ?? registroFotoStored || null;
+                    const registroFotoSrc =
+                      (storedMediaImgSrc(registroFotoStored) ?? registroFotoStored) || null;
                     const catalogoFotoStored = String(item?.imagenUrl ?? '').trim();
                     const catalogoFotoSrc =
                       catalogoFotoStored && catalogoFotoStored !== registroFotoStored
