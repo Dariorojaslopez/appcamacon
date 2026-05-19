@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessToken } from '../../../../../../src/infrastructure/auth/tokens';
 import prisma from '../../../../../../src/lib/prisma';
-import {
-  buildItemCatalogTemplateBuffer,
-  type ItemCatalogCatalogoObra,
-} from '../../../../../../src/lib/itemCatalogExcel';
+import { buildItemCatalogTemplateBuffer } from '../../../../../../src/lib/itemCatalogExcel';
 
 async function ensureAdmin(req: NextRequest) {
   const authCookie = req.cookies.get('access_token')?.value;
@@ -20,54 +17,38 @@ export async function GET(req: NextRequest) {
     if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const projectId = req.nextUrl.searchParams.get('projectId')?.trim() || '';
-    let catalogo: ItemCatalogCatalogoObra | undefined;
+    const subchapterId = req.nextUrl.searchParams.get('subchapterId')?.trim() || '';
 
-    if (projectId) {
-      const project = await prisma.project.findFirst({
-        where: { id: projectId, isActive: true },
-        select: { code: true, name: true },
-      });
-      if (!project) {
-        return NextResponse.json({ error: 'Obra no encontrada' }, { status: 400 });
-      }
-
-      const chapters = await prisma.budgetChapter.findMany({
-        where: { projectId },
-        orderBy: [{ orden: 'asc' }, { codigo: 'asc' }],
-        include: {
-          subchapters: { orderBy: [{ orden: 'asc' }, { nombre: 'asc' }] },
-        },
-      });
-
-      const proveedores = await prisma.proveedorCatalog.findMany({
-        where: { projectId, isActive: true },
-        orderBy: { nombreRazonSocial: 'asc' },
-        select: { nitDocumento: true, nombreComercial: true, nombreRazonSocial: true },
-      });
-
-      catalogo = {
-        obraLabel: `${project.code} — ${project.name}`,
-        capitulos: chapters.map((ch) => ({
-          codigo: ch.codigo,
-          nombre: ch.nombre,
-          subcapitulos: ch.subchapters.map((s) => ({ nombre: s.nombre })),
-        })),
-        proveedores: proveedores.map((p) => ({
-          nit: p.nitDocumento ?? '',
-          nombre: p.nombreComercial || p.nombreRazonSocial || '',
-        })),
-      };
+    if (!projectId) {
+      return NextResponse.json({ error: 'Seleccione una obra' }, { status: 400 });
+    }
+    if (!subchapterId) {
+      return NextResponse.json({ error: 'Seleccione capítulo / subcapítulo en el formulario' }, { status: 400 });
     }
 
-    const buffer = await buildItemCatalogTemplateBuffer(catalogo);
-    const suffix = projectId && catalogo ? '_con_catalogo_obra' : '';
-    const filename = `plantilla_items_contractuales${suffix}.xlsx`;
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, isActive: true },
+      select: { code: true, name: true },
+    });
+    if (!project) {
+      return NextResponse.json({ error: 'Obra no encontrada' }, { status: 400 });
+    }
+
+    const sub = await prisma.budgetSubchapter.findFirst({
+      where: { id: subchapterId, chapter: { projectId } },
+      include: { chapter: { select: { codigo: true, nombre: true } } },
+    });
+    if (!sub) {
+      return NextResponse.json({ error: 'Subcapítulo no válido para esta obra' }, { status: 400 });
+    }
+
+    const buffer = await buildItemCatalogTemplateBuffer();
 
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Disposition': 'attachment; filename="plantilla_items_contractuales.xlsx"',
         'Cache-Control': 'no-store',
       },
     });

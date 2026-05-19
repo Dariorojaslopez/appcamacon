@@ -17,24 +17,22 @@ async function nextItemCatalogConsecutivo(projectId: string): Promise<number> {
 
 export async function importItemCatalogExcelRows(
   projectId: string,
+  subchapterId: string,
   rows: ItemCatalogExcelRow[],
 ): Promise<ItemCatalogImportResult> {
   const result: ItemCatalogImportResult = { created: 0, updated: 0, errors: [] };
 
-  const chapters = await prisma.budgetChapter.findMany({
-    where: { projectId },
-    include: { subchapters: true },
+  const sub = await prisma.budgetSubchapter.findFirst({
+    where: { id: subchapterId, chapter: { projectId } },
+    select: { id: true },
   });
-
-  const chapterByCodigo = new Map(chapters.map((c) => [c.codigo.trim().toLowerCase(), c]));
-
-  const proveedores = await prisma.proveedorCatalog.findMany({
-    where: { projectId, isActive: true },
-    select: { id: true, nitDocumento: true },
-  });
-  const proveedorByNit = new Map(
-    proveedores.map((p) => [String(p.nitDocumento ?? '').trim().replace(/\D/g, ''), p.id]),
-  );
+  if (!sub) {
+    return {
+      created: 0,
+      updated: 0,
+      errors: [{ fila: 0, mensaje: 'Subcapítulo no válido para esta obra.' }],
+    };
+  }
 
   let nextConsecutivo = await nextItemCatalogConsecutivo(projectId);
   const maxOrdenRow = await prisma.itemCatalog.aggregate({
@@ -44,38 +42,6 @@ export async function importItemCatalogExcelRows(
   let nextOrden = (maxOrdenRow._max.orden ?? -1) + 1;
 
   for (const row of rows) {
-    const ch = chapterByCodigo.get(row.codigoCapitulo.trim().toLowerCase());
-    if (!ch) {
-      result.errors.push({
-        fila: row.rowNumber,
-        mensaje: `Capítulo "${row.codigoCapitulo}" no existe en esta obra.`,
-      });
-      continue;
-    }
-
-    const subNombreNorm = row.nombreSubcapitulo.trim().toLowerCase();
-    const sub = ch.subchapters.find((s) => s.nombre.trim().toLowerCase() === subNombreNorm);
-    if (!sub) {
-      result.errors.push({
-        fila: row.rowNumber,
-        mensaje: `Subcapítulo "${row.nombreSubcapitulo}" no existe en el capítulo ${row.codigoCapitulo}.`,
-      });
-      continue;
-    }
-
-    let proveedorId: string | null = null;
-    if (row.nitProveedor) {
-      const nitKey = row.nitProveedor.replace(/\D/g, '');
-      proveedorId = proveedorByNit.get(nitKey) ?? null;
-      if (!proveedorId) {
-        result.errors.push({
-          fila: row.rowNumber,
-          mensaje: `Proveedor con NIT "${row.nitProveedor}" no encontrado en esta obra.`,
-        });
-        continue;
-      }
-    }
-
     const cantidadPersistida = row.cantidad;
 
     try {
@@ -94,7 +60,6 @@ export async function importItemCatalogExcelRows(
             precioUnitario: row.precioUnitario,
             cantidad: cantidadPersistida,
             cantidadPresupuesto: cantidadPersistida,
-            proveedorId,
             isActive: true,
           },
         });
@@ -111,7 +76,7 @@ export async function importItemCatalogExcelRows(
             precioUnitario: row.precioUnitario,
             cantidad: cantidadPersistida,
             cantidadPresupuesto: cantidadPersistida,
-            proveedorId,
+            proveedorId: null,
             orden: nextOrden++,
             isActive: true,
           },

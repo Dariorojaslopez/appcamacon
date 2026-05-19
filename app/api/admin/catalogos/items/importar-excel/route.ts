@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessToken } from '../../../../../../src/infrastructure/auth/tokens';
 import prisma from '../../../../../../src/lib/prisma';
 import { parseItemCatalogExcelBuffer } from '../../../../../../src/lib/itemCatalogExcel';
+import { assertSubchapterBelongsToProject } from '../../../../../../src/lib/budgetHierarchy';
 import { importItemCatalogExcelRows } from '../../../../../../src/lib/itemCatalogImport';
 
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -22,9 +23,16 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get('file');
     const projectId = String(formData.get('projectId') ?? '').trim();
+    const subchapterId = String(formData.get('subchapterId') ?? '').trim();
 
     if (!projectId) {
       return NextResponse.json({ error: 'Seleccione una obra (projectId).' }, { status: 400 });
+    }
+    if (!subchapterId) {
+      return NextResponse.json(
+        { error: 'Seleccione capítulo / subcapítulo en el formulario antes de importar.' },
+        { status: 400 },
+      );
     }
 
     const project = await prisma.project.findFirst({
@@ -33,6 +41,11 @@ export async function POST(req: NextRequest) {
     });
     if (!project) {
       return NextResponse.json({ error: 'Obra no encontrada o inactiva' }, { status: 400 });
+    }
+
+    const subOk = await assertSubchapterBelongsToProject(prisma, projectId, subchapterId);
+    if (!subOk) {
+      return NextResponse.json({ error: 'Subcapítulo no válido para esta obra' }, { status: 400 });
     }
 
     if (!file || typeof file === 'string') {
@@ -65,13 +78,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const imported = await importItemCatalogExcelRows(projectId, parsed.rows);
+    const imported = await importItemCatalogExcelRows(projectId, subchapterId, parsed.rows);
     const allErrors = [...parsed.errors, ...imported.errors];
 
     console.info(
       '[items/importar-excel]',
       JSON.stringify({
         projectId,
+        subchapterId,
         filasLeidas: parsed.rows.length,
         creados: imported.created,
         actualizados: imported.updated,

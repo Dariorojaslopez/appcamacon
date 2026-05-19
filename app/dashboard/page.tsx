@@ -4378,7 +4378,7 @@ export default function DashboardPage() {
           altura: null,
           imagenUrl: itemNewImagenUrl.trim() || null,
           ...fotoGeoPayload(itemNewFotoGeo),
-          proveedorId: itemNewProveedorId.trim() || null,
+          proveedorId: null,
           cantidadPresupuesto: cantidadPresupuestoNum,
         }),
       });
@@ -4396,7 +4396,6 @@ export default function DashboardPage() {
       setItemNewCodigo('');
       setItemNewImagenUrl('');
       setItemNewFotoGeo(emptyFotoGeoFields());
-      setItemNewProveedorId(itemProveedorOptions[0]?.id ?? '');
     } catch {
       setItemsError('Error de conexión.');
     } finally {
@@ -4409,10 +4408,14 @@ export default function DashboardPage() {
       setItemsError('Seleccione una obra antes de descargar la plantilla.');
       return;
     }
+    if (!itemsTargetSubchapterId) {
+      setItemsError('Seleccione capítulo / subcapítulo antes de descargar la plantilla.');
+      return;
+    }
     setItemsError(null);
     try {
       const res = await fetch(
-        `/api/admin/catalogos/items/plantilla?projectId=${encodeURIComponent(itemsFilterProjectId)}`,
+        `/api/admin/catalogos/items/plantilla?projectId=${encodeURIComponent(itemsFilterProjectId)}&subchapterId=${encodeURIComponent(itemsTargetSubchapterId)}`,
         { credentials: 'include' },
       );
       if (!res.ok) {
@@ -4438,12 +4441,17 @@ export default function DashboardPage() {
       setItemsError('Seleccione una obra antes de importar.');
       return;
     }
+    if (!itemsTargetSubchapterId) {
+      setItemsError('Seleccione capítulo / subcapítulo antes de importar el Excel.');
+      return;
+    }
     setItemsExcelImporting(true);
     setItemsError(null);
     try {
       const fd = new FormData();
       fd.append('file', file);
       fd.append('projectId', itemsFilterProjectId);
+      fd.append('subchapterId', itemsTargetSubchapterId);
       const res = await fetch('/api/admin/catalogos/items/importar-excel', {
         method: 'POST',
         body: fd,
@@ -10062,47 +10070,6 @@ export default function DashboardPage() {
 
                 {settingsSubSection === 'items' ? (
                   <>
-                <section
-                  className="item-catalog-excel-panel shell-card"
-                  style={{ marginBottom: '1.25rem', padding: '1rem' }}
-                  aria-labelledby="item-excel-import-title"
-                >
-                  <h3 id="item-excel-import-title" className="shell-title" style={{ fontSize: '1rem', marginTop: 0 }}>
-                    Cargar ítems desde Excel
-                  </h3>
-                  <p className="shell-text-muted" style={{ marginTop: 0, marginBottom: '0.75rem' }}>
-                    Sin columna de imagen. Descargue la plantilla, complétela y súbala. El autonumérico se asigna al
-                    importar. Use la hoja <strong>Catálogo obra</strong> para ver capítulos, subcapítulos y NIT de
-                    proveedores.
-                  </p>
-                  <div className="item-catalog-excel-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      disabled={!itemsFilterProjectId || itemsExcelImporting}
-                      onClick={() => void downloadItemCatalogPlantilla()}
-                    >
-                      <IconExport /> Descargar plantilla (.xlsx)
-                    </button>
-                    <input
-                      ref={itemsExcelInputRef}
-                      className="sr-only"
-                      type="file"
-                      accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                      disabled={!itemsFilterProjectId || itemsExcelImporting}
-                      onChange={(e) => void importItemCatalogExcel(e.target.files?.[0] ?? null)}
-                    />
-                    <button
-                      type="button"
-                      className="btn-primary"
-                      disabled={!itemsFilterProjectId || itemsExcelImporting}
-                      onClick={() => itemsExcelInputRef.current?.click()}
-                    >
-                      {itemsExcelImporting ? 'Importando…' : 'Subir Excel completado'}
-                    </button>
-                  </div>
-                </section>
-
                 <form className="auth-form item-catalog-create-form" onSubmit={createItemCatalog} style={{ marginBottom: '1.5rem' }}>
                   <h3 className="shell-title" style={{ fontSize: '1rem' }}>Crear ítem manual</h3>
                   <div className="form-field" style={{ marginBottom: '0.75rem' }}>
@@ -10129,28 +10096,6 @@ export default function DashboardPage() {
                     </select>
                     <p className="shell-text-muted" style={{ marginTop: '0.35rem', marginBottom: 0 }}>
                       El ítem quedará asociado al subcapítulo seleccionado aquí.
-                    </p>
-                  </div>
-                  <div className="form-field" style={{ marginBottom: '0.75rem' }}>
-                    <label className="form-label" htmlFor="item-new-proveedor">
-                      Proveedor (opcional)
-                    </label>
-                    <select
-                      id="item-new-proveedor"
-                      className="form-input"
-                      value={itemNewProveedorId}
-                      onChange={(e) => setItemNewProveedorId(e.target.value)}
-                      disabled={itemsSaving}
-                    >
-                      <option value="">— Sin proveedor —</option>
-                      {itemProveedorOptions.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {(p.nombreComercial || p.nombreRazonSocial)} · {p.nitDocumento}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="informe-label-hint" style={{ marginTop: '0.35rem', marginBottom: 0 }}>
-                      Puede crear el ítem sin proveedor y asignarlo después.
                     </p>
                   </div>
                   <div className="item-catalog-form-grid item-catalog-form-grid--4">
@@ -10269,6 +10214,47 @@ export default function DashboardPage() {
                     <label className="form-label">Descripción</label>
                     <input className="form-input" type="text" required value={itemNewDescripcion} onChange={(e) => setItemNewDescripcion(e.target.value)} />
                   </div>
+
+                  <section
+                    className="item-catalog-excel-panel"
+                    style={{ marginTop: '1rem', marginBottom: '1rem', padding: '1rem', border: '1px solid var(--camacon-gris)', borderRadius: 10 }}
+                    aria-labelledby="item-excel-import-title"
+                  >
+                    <h3 id="item-excel-import-title" className="shell-title" style={{ fontSize: '0.95rem', marginTop: 0 }}>
+                      Cargar ítems desde Excel
+                    </h3>
+                    <p className="shell-text-muted" style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: '0.9rem' }}>
+                      Use el capítulo / subcapítulo seleccionado arriba. La plantilla solo lleva: código, descripción,
+                      unidad, precio y cantidad (sin imagen ni proveedor).
+                    </p>
+                    <div className="item-catalog-excel-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        disabled={!itemsFilterProjectId || !itemsTargetSubchapterId || itemsExcelImporting}
+                        onClick={() => void downloadItemCatalogPlantilla()}
+                      >
+                        <IconExport /> Descargar plantilla (.xlsx)
+                      </button>
+                      <input
+                        ref={itemsExcelInputRef}
+                        className="sr-only"
+                        type="file"
+                        accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        disabled={!itemsFilterProjectId || !itemsTargetSubchapterId || itemsExcelImporting}
+                        onChange={(e) => void importItemCatalogExcel(e.target.files?.[0] ?? null)}
+                      />
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        disabled={!itemsFilterProjectId || !itemsTargetSubchapterId || itemsExcelImporting}
+                        onClick={() => itemsExcelInputRef.current?.click()}
+                      >
+                        {itemsExcelImporting ? 'Importando…' : 'Subir Excel completado'}
+                      </button>
+                    </div>
+                  </section>
+
                   <button
                     type="submit"
                     className="btn-primary"

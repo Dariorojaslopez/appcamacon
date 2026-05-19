@@ -1,10 +1,7 @@
 import ExcelJS from 'exceljs';
-import { ITEM_CATALOG_UNIT_VALUES, itemCatalogUnitLabel, normalizeItemCatalogUnit } from './itemCatalogUnits';
+import { ITEM_CATALOG_UNIT_VALUES, normalizeItemCatalogUnit } from './itemCatalogUnits';
 
 export const ITEM_CATALOG_EXCEL_HEADERS = [
-  'codigo_capitulo',
-  'nombre_subcapitulo',
-  'nit_proveedor',
   'codigo_item',
   'descripcion',
   'unidad',
@@ -13,9 +10,6 @@ export const ITEM_CATALOG_EXCEL_HEADERS = [
 ] as const;
 
 const HEADER_LABELS: Record<(typeof ITEM_CATALOG_EXCEL_HEADERS)[number], string> = {
-  codigo_capitulo: 'Código capítulo',
-  nombre_subcapitulo: 'Nombre subcapítulo',
-  nit_proveedor: 'NIT proveedor (opcional)',
   codigo_item: 'Código ítem',
   descripcion: 'Descripción',
   unidad: 'Unidad',
@@ -25,24 +19,11 @@ const HEADER_LABELS: Record<(typeof ITEM_CATALOG_EXCEL_HEADERS)[number], string>
 
 export type ItemCatalogExcelRow = {
   rowNumber: number;
-  codigoCapitulo: string;
-  nombreSubcapitulo: string;
-  nitProveedor: string | null;
   codigo: string;
   descripcion: string;
   unidad: string;
   precioUnitario: number | null;
   cantidad: number | null;
-};
-
-export type ItemCatalogCatalogoObra = {
-  obraLabel: string;
-  capitulos: Array<{
-    codigo: string;
-    nombre: string;
-    subcapitulos: Array<{ nombre: string }>;
-  }>;
-  proveedores: Array<{ nit: string; nombre: string }>;
 };
 
 function parseNumberCell(raw: unknown): number | null {
@@ -77,14 +58,6 @@ function normalizeHeaderKey(h: string): string {
 }
 
 const HEADER_ALIASES: Record<string, (typeof ITEM_CATALOG_EXCEL_HEADERS)[number]> = {
-  codigo_capitulo: 'codigo_capitulo',
-  codigo_cap: 'codigo_capitulo',
-  capitulo: 'codigo_capitulo',
-  nombre_subcapitulo: 'nombre_subcapitulo',
-  subcapitulo: 'nombre_subcapitulo',
-  nit_proveedor: 'nit_proveedor',
-  nit: 'nit_proveedor',
-  proveedor_nit: 'nit_proveedor',
   codigo_item: 'codigo_item',
   codigo: 'codigo_item',
   codigo_del_item: 'codigo_item',
@@ -103,8 +76,6 @@ function findHeaderMap(row: ExcelJS.Row): Map<(typeof ITEM_CATALOG_EXCEL_HEADERS
     if (field) map.set(field, col);
   });
   const required: (typeof ITEM_CATALOG_EXCEL_HEADERS)[number][] = [
-    'codigo_capitulo',
-    'nombre_subcapitulo',
     'codigo_item',
     'descripcion',
     'unidad',
@@ -113,7 +84,8 @@ function findHeaderMap(row: ExcelJS.Row): Map<(typeof ITEM_CATALOG_EXCEL_HEADERS
   return map;
 }
 
-export async function buildItemCatalogTemplateBuffer(catalogo?: ItemCatalogCatalogoObra): Promise<Buffer> {
+/** Plantilla .xlsx con una sola hoja (Items). */
+export async function buildItemCatalogTemplateBuffer(): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Informe Diario Camacon';
   wb.created = new Date();
@@ -133,9 +105,6 @@ export async function buildItemCatalogTemplateBuffer(catalogo?: ItemCatalogCatal
   };
 
   ws.addRow({
-    codigo_capitulo: '1000',
-    nombre_subcapitulo: 'subcapítulo 1',
-    nit_proveedor: '',
     codigo_item: '1.01.001',
     descripcion: 'Ejemplo: excavación manual',
     unidad: 'm3',
@@ -145,52 +114,6 @@ export async function buildItemCatalogTemplateBuffer(catalogo?: ItemCatalogCatal
 
   for (let i = 0; i < 20; i++) {
     ws.addRow({});
-  }
-
-  const unidades = wb.addWorksheet('Unidades');
-  unidades.addRow(['Unidad', 'Descripción']);
-  unidades.getRow(1).font = { bold: true };
-  for (const u of ITEM_CATALOG_UNIT_VALUES) {
-    unidades.addRow([u, itemCatalogUnitLabel(u)]);
-  }
-
-  const inst = wb.addWorksheet('Instrucciones');
-  inst.getColumn(1).width = 90;
-  const lines = [
-    'Plantilla — Ítems contractuales (sin imagen)',
-    '',
-    '1. No modifique los nombres de la fila 1 en la hoja Items.',
-    '2. Código capítulo y nombre subcapítulo deben existir en la obra (hoja Catálogo obra si descargó con obra seleccionada).',
-    '3. El autonumérico se asigna solo al importar; no incluya columna de autonum.',
-    '4. Unidades permitidas: ' + ITEM_CATALOG_UNIT_VALUES.join(', '),
-    '5. Si el código ítem ya existe en la obra, se actualiza descripción, unidad, precio y cantidad.',
-    '6. Las imágenes se cargan después, una por ítem, desde el formulario.',
-  ];
-  lines.forEach((t, i) => {
-    inst.getCell(i + 1, 1).value = t;
-  });
-
-  if (catalogo) {
-    const cat = wb.addWorksheet('Catalogo obra');
-    cat.addRow([`Obra: ${catalogo.obraLabel}`]);
-    cat.addRow([]);
-    cat.addRow(['Código capítulo', 'Nombre capítulo', 'Subcapítulo']);
-    cat.getRow(3).font = { bold: true };
-    for (const ch of catalogo.capitulos) {
-      for (const sub of ch.subcapitulos) {
-        cat.addRow([ch.codigo, ch.nombre, sub.nombre]);
-      }
-      if (ch.subcapitulos.length === 0) {
-        cat.addRow([ch.codigo, ch.nombre, '(sin subcapítulos)']);
-      }
-    }
-    cat.addRow([]);
-    cat.addRow(['NIT proveedor', 'Nombre']);
-    cat.getRow(cat.rowCount).font = { bold: true };
-    for (const p of catalogo.proveedores) {
-      cat.addRow([p.nit, p.nombre]);
-    }
-    cat.columns = [{ width: 16 }, { width: 28 }, { width: 28 }, { width: 18 }, { width: 36 }];
   }
 
   const buf = await wb.xlsx.writeBuffer();
@@ -234,7 +157,7 @@ export async function parseItemCatalogExcelBuffer(buffer: Buffer): Promise<Parse
         {
           fila: 1,
           mensaje:
-            'No se encontró la fila de encabezados. Use la plantilla: Código capítulo, Nombre subcapítulo, Código ítem, Descripción, Unidad…',
+            'No se encontró la fila de encabezados. Use la plantilla: Código ítem, Descripción, Unidad, Precio unitario, Cantidad.',
         },
       ],
     };
@@ -250,25 +173,14 @@ export async function parseItemCatalogExcelBuffer(buffer: Buffer): Promise<Parse
       return col != null ? cellText(row.getCell(col).value) : '';
     };
 
-    const codigoCapitulo = get('codigo_capitulo');
-    const nombreSubcapitulo = get('nombre_subcapitulo');
     const codigo = get('codigo_item');
     const descripcion = get('descripcion');
     const unidadRaw = get('unidad');
-    const nitProveedor = get('nit_proveedor') || null;
 
-    if (!codigoCapitulo && !nombreSubcapitulo && !codigo && !descripcion && !unidadRaw) {
+    if (!codigo && !descripcion && !unidadRaw) {
       continue;
     }
 
-    if (!codigoCapitulo) {
-      errors.push({ fila: r, mensaje: 'Falta código capítulo.' });
-      continue;
-    }
-    if (!nombreSubcapitulo) {
-      errors.push({ fila: r, mensaje: 'Falta nombre subcapítulo.' });
-      continue;
-    }
     if (!codigo) {
       errors.push({ fila: r, mensaje: 'Falta código ítem.' });
       continue;
@@ -304,9 +216,6 @@ export async function parseItemCatalogExcelBuffer(buffer: Buffer): Promise<Parse
 
     rows.push({
       rowNumber: r,
-      codigoCapitulo,
-      nombreSubcapitulo,
-      nitProveedor: nitProveedor || null,
       codigo,
       descripcion,
       unidad,
