@@ -3320,6 +3320,30 @@ ul.informe-searchable-list {
   color: #374151;
 }
 
+.actividad-detalle-field-span {
+  grid-column: 1 / -1;
+}
+
+.actividad-detalle-foto .registro-foto-preview-img,
+.actividad-detalle-foto-img {
+  max-width: 100%;
+  max-height: 280px;
+  width: auto;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid var(--camacon-gris);
+  object-fit: contain;
+}
+
+.actividad-detalle-sin-foto {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.actividad-detalle-observacion {
+  resize: none;
+}
+
 .actividades-mobile-card {
   border: 1px solid var(--camacon-gris);
   border-radius: 12px;

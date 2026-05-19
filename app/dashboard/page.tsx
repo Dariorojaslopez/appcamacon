@@ -13000,7 +13000,13 @@ export default function DashboardPage() {
                     const largo = item?.largo != null ? Number(item.largo) : row.largo;
                     const ancho = item?.ancho != null ? Number(item.ancho) : row.ancho;
                     const altura = item?.altura != null ? Number(item.altura) : row.altura;
-                    const imagenUrl = String(item?.imagenUrl ?? row.imagenUrl ?? '').trim();
+                    const registroFotoStored = String(row.imagenUrl ?? '').trim();
+                    const registroFotoSrc = storedMediaImgSrc(registroFotoStored) ?? registroFotoStored || null;
+                    const catalogoFotoStored = String(item?.imagenUrl ?? '').trim();
+                    const catalogoFotoSrc =
+                      catalogoFotoStored && catalogoFotoStored !== registroFotoStored
+                        ? storedMediaImgSrc(catalogoFotoStored) ?? catalogoFotoStored
+                        : null;
                     const precioCat = item?.precioUnitario != null ? Number(item.precioUnitario) : NaN;
                     const cantidadCat = item?.cantidad != null ? Number(item.cantidad) : NaN;
                     const subtotalCat = formatItemCatalogSubtotal(precioCat, cantidadCat);
@@ -13032,6 +13038,73 @@ export default function DashboardPage() {
                             readOnly
                           />
                         </label>
+                        <label className="actividad-detalle-field actividad-detalle-field-span">
+                          <span>Ítem contractual</span>
+                          <input
+                            className="personal-input personal-input-readonly"
+                            type="text"
+                            value={row.itemContractual.trim() || '—'}
+                            readOnly
+                          />
+                        </label>
+                        <label className="actividad-detalle-field actividad-detalle-field-span">
+                          <span>Descripción</span>
+                          <input
+                            className="personal-input personal-input-readonly"
+                            type="text"
+                            value={row.descripcion.trim() || '—'}
+                            readOnly
+                          />
+                        </label>
+                        {row.observacion.trim() ? (
+                          <label className="actividad-detalle-field actividad-detalle-field-span">
+                            <span>Observación</span>
+                            <textarea
+                              className="personal-input personal-input-readonly actividad-detalle-observacion"
+                              value={row.observacion.trim()}
+                              readOnly
+                              rows={2}
+                            />
+                          </label>
+                        ) : null}
+                        {Number(row.cantidadTotal) > 0 ? (
+                          <label className="actividad-detalle-field">
+                            <span>Cantidad (actividad)</span>
+                            <input
+                              className="personal-input personal-input-readonly"
+                              type="text"
+                              readOnly
+                              value={`${Number(row.cantidadTotal).toLocaleString('es-CO', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}${unidad ? ` ${unidad}` : ''}`}
+                            />
+                          </label>
+                        ) : null}
+                        {registroFotoSrc ? (
+                          <div className="actividad-detalle-field actividad-detalle-field-span actividad-detalle-foto">
+                            <span>Registro fotográfico</span>
+                            <img
+                              src={registroFotoSrc}
+                              alt="Registro fotográfico de la actividad"
+                              className="registro-foto-preview-img actividad-detalle-foto-img"
+                            />
+                          </div>
+                        ) : (
+                          <p className="actividad-detalle-sin-foto shell-text-muted">
+                            Esta actividad no tiene registro fotográfico.
+                          </p>
+                        )}
+                        {catalogoFotoSrc ? (
+                          <div className="actividad-detalle-field actividad-detalle-field-span actividad-detalle-foto">
+                            <span>Imagen del ítem (catálogo)</span>
+                            <img
+                              src={catalogoFotoSrc}
+                              alt="Imagen del ítem contractual"
+                              className="registro-foto-preview-img actividad-detalle-foto-img"
+                            />
+                          </div>
+                        ) : null}
                         {unidad ? (
                           <label className="actividad-detalle-field">
                             <span>Unidad de medida</span>
@@ -13094,16 +13167,6 @@ export default function DashboardPage() {
                             <span>Subtotal (cantidad × precio)</span>
                             <input className="personal-input personal-input-readonly" type="text" readOnly value={subtotalCat} />
                           </label>
-                        ) : null}
-                        {imagenUrl ? <img src={imagenUrl} alt="Imagen de ítem contractual" className="calidad-mobile-thumb" /> : null}
-                        {!unidad &&
-                        largo <= 0 &&
-                        ancho <= 0 &&
-                        altura <= 0 &&
-                        !imagenUrl &&
-                        !(Number.isFinite(precioCat) && precioCat > 0) &&
-                        !(Number.isFinite(cantidadCat) && cantidadCat > 0) ? (
-                          <p className="shell-text-muted">Este ítem no tiene detalles configurados.</p>
                         ) : null}
                       </div>
                     );
