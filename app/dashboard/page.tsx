@@ -54,6 +54,7 @@ import {
 import { MENU_KEYS, MENU_LABELS } from '../../src/shared/menuPermissions';
 import { FIRMA_PERM_ADMIN_KEYS, FIRMA_PERM_LABELS } from '../../src/shared/firmaPolicies';
 import { INFORME_CERRADO_MSG } from '../../src/lib/informeCerrado';
+import { normalizeObraCarpetaInput, obraCarpetaInputFromDb } from '../../src/lib/obraCarpetaNube';
 
 /**
  * Orígenes http extras (NEXT_PUBLIC_VOICE_INSECURE_DEV_ORIGINS).
@@ -1320,7 +1321,7 @@ export default function DashboardPage() {
     name: '',
     startDate: '',
     endDate: '',
-    evidenciasGoogleDriveFolderId: '',
+    evidenciasCarpetaShareUrl: '',
   });
   const [creatingObra, setCreatingObra] = useState(false);
   const [obraMessage, setObraMessage] = useState<string | null>(null);
@@ -1340,7 +1341,7 @@ export default function DashboardPage() {
     name: '',
     startDate: '',
     endDate: '',
-    evidenciasGoogleDriveFolderId: '',
+    evidenciasCarpetaShareUrl: '',
     logoUrl: null as string | null,
   });
   const [savingObra, setSavingObra] = useState(false);
@@ -3567,6 +3568,7 @@ export default function DashboardPage() {
     setObraMessage(null);
     setObraError(null);
     try {
+      const carpeta = normalizeObraCarpetaInput(obraForm.evidenciasCarpetaShareUrl);
       const res = await fetch('/api/admin/obras', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -3575,7 +3577,7 @@ export default function DashboardPage() {
           name: obraForm.name.trim(),
           startDate: obraForm.startDate || undefined,
           endDate: obraForm.endDate || undefined,
-          evidenciasGoogleDriveFolderId: obraForm.evidenciasGoogleDriveFolderId.trim() || null,
+          ...carpeta,
         }),
       });
       const data = await res.json();
@@ -3612,7 +3614,7 @@ export default function DashboardPage() {
       setObrasList((prev) => [...prev, nuevaObra]);
       if (obraCreateLogoInputRef.current) obraCreateLogoInputRef.current.value = '';
       setObraCreateLogoPickLabel(null);
-      setObraForm({ name: '', startDate: '', endDate: '', evidenciasGoogleDriveFolderId: '' });
+      setObraForm({ name: '', startDate: '', endDate: '', evidenciasCarpetaShareUrl: '' });
       setObraMessage('Obra creada. El consecutivo y código se asignaron automáticamente.');
       setTimeout(() => setObraMessage(null), 4000);
     } catch {
@@ -3638,8 +3640,10 @@ export default function DashboardPage() {
       name: o.name,
       startDate: o.startDate ? o.startDate.slice(0, 10) : '',
       endDate: o.endDate ? o.endDate.slice(0, 10) : '',
-      evidenciasGoogleDriveFolderId:
-        (o.evidenciasGoogleDriveFolderId ?? o.evidenciasOnedriveShareUrl) ?? '',
+      evidenciasCarpetaShareUrl: obraCarpetaInputFromDb(
+        o.evidenciasOnedriveShareUrl,
+        o.evidenciasGoogleDriveFolderId,
+      ),
       logoUrl: o.logoUrl ?? null,
     });
     setObraEditLogoPickLabel(null);
@@ -3667,6 +3671,7 @@ export default function DashboardPage() {
       }
       if (obraEditLogoInputRef.current) obraEditLogoInputRef.current.value = '';
 
+      const carpetaEdit = normalizeObraCarpetaInput(editObraForm.evidenciasCarpetaShareUrl);
       const res = await fetch(`/api/admin/obras/${editObra.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -3675,7 +3680,7 @@ export default function DashboardPage() {
           name: editObraForm.name.trim(),
           startDate: editObraForm.startDate || null,
           endDate: editObraForm.endDate || null,
-          evidenciasGoogleDriveFolderId: editObraForm.evidenciasGoogleDriveFolderId.trim() || null,
+          ...carpetaEdit,
           logoUrl: nextLogoUrl,
         }),
       });
@@ -7873,18 +7878,21 @@ export default function DashboardPage() {
                   </div>
                   <div className="form-field">
                     <label className="form-label" htmlFor="obra-carpeta-nube">
-                      Carpeta de imágenes en la nube (opcional)
+                      Carpeta SharePoint / OneDrive (opcional)
                     </label>
                     <textarea
                       id="obra-carpeta-nube"
                       className="form-input"
                       rows={2}
-                      placeholder="ID de carpeta o enlace (p. ej. carpeta de Google Drive)"
-                      value={obraForm.evidenciasGoogleDriveFolderId}
+                      placeholder="Enlace para compartir la carpeta (SharePoint o OneDrive). Ej.: https://…sharepoint.com/… o https://1drv.ms/f/…"
+                      value={obraForm.evidenciasCarpetaShareUrl}
                       onChange={(e) =>
-                        setObraForm({ ...obraForm, evidenciasGoogleDriveFolderId: e.target.value })
+                        setObraForm({ ...obraForm, evidenciasCarpetaShareUrl: e.target.value })
                       }
                     />
+                    <p className="informe-label-hint" style={{ marginTop: '0.35rem', marginBottom: 0 }}>
+                      Pegue el enlace <strong>Compartir</strong> de la carpeta (SharePoint o OneDrive). Las fotos se suben ahí si el servidor tiene OneDrive activo.
+                    </p>
                   </div>
                   <div className="form-field">
                     <label className="form-label" htmlFor="obra-logo-file">
@@ -8037,14 +8045,14 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       <div className="form-field">
-                        <label className="form-label">Carpeta de imágenes en la nube (opcional)</label>
+                        <label className="form-label">Carpeta SharePoint / OneDrive (opcional)</label>
                         <textarea
                           className="form-input"
                           rows={2}
-                          placeholder="Vacío = carpeta por defecto del servidor"
-                          value={editObraForm.evidenciasGoogleDriveFolderId}
+                          placeholder="https://…sharepoint.com/… o https://1drv.ms/f/…"
+                          value={editObraForm.evidenciasCarpetaShareUrl}
                           onChange={(e) =>
-                            setEditObraForm({ ...editObraForm, evidenciasGoogleDriveFolderId: e.target.value })
+                            setEditObraForm({ ...editObraForm, evidenciasCarpetaShareUrl: e.target.value })
                           }
                         />
                       </div>
