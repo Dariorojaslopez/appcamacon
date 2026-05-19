@@ -6,6 +6,8 @@ import {
   prismaIndicaTablaRegistroBitacoraDesactualizada,
 } from '../../../src/lib/prismaRegistroBitacoraSchema';
 import { fechaRegistroEnRangoObra, parseYmdUtc, toYmdUtc } from '../../../src/lib/registroBitacoraFecha';
+import { dbRegistroBitacoraSlotsForRole } from '../../../src/infrastructure/auth/registroBitacoraPermissionsResolver';
+import type { RegistroBitacoraSlotKey } from '../../../src/shared/registroBitacoraPermissions';
 
 type SlotPayload = {
   observaciones?: unknown;
@@ -124,30 +126,51 @@ export async function POST(req: NextRequest) {
     const rango = fechaRegistroEnRangoObra(fecha, project.startDate, project.endDate);
     if (rango.ok === false) return NextResponse.json({ error: rango.error }, { status: 400 });
 
+    const allowedSlots = await dbRegistroBitacoraSlotsForRole(payload.role);
+    if (allowedSlots.length === 0) {
+      return NextResponse.json(
+        { error: 'Su rol no tiene permiso para editar ninguna sección del registro de bitácora.' },
+        { status: 403 },
+      );
+    }
+
+    const can = (slot: RegistroBitacoraSlotKey) => allowedSlots.includes(slot);
     const c = body.contratista ?? {};
     const i = body.interventoria ?? {};
     const d = body.idu ?? {};
 
-    const dataSlots = {
-      contratistaObservaciones: asString(c.observaciones),
-      contratistaFotoUrl: asOptionalUrl(c.fotoUrl),
-      contratistaFirmaUrl: asOptionalUrl(c.firmaUrl),
-      interventoriaObservaciones: asString(i.observaciones),
-      interventoriaFotoUrl: asOptionalUrl(i.fotoUrl),
-      interventoriaFirmaUrl: asOptionalUrl(i.firmaUrl),
-      iduObservaciones: asString(d.observaciones),
-      iduFotoUrl: asOptionalUrl(d.fotoUrl),
-      iduFirmaUrl: asOptionalUrl(d.firmaUrl),
-      franjaClimaMananaCodigo: null,
-      franjaClimaTardeCodigo: null,
-      franjaClimaNocheCodigo: null,
-    };
-
     const { row, created } = await prisma.$transaction(async (tx) => {
       const existing = await tx.registroBitacoraObra.findUnique({
         where: { projectId_fecha: { projectId, fecha } },
-        select: { id: true },
       });
+
+      const dataSlots = {
+        contratistaObservaciones: can('contratista')
+          ? asString(c.observaciones)
+          : (existing?.contratistaObservaciones ?? ''),
+        contratistaFotoUrl: can('contratista')
+          ? asOptionalUrl(c.fotoUrl)
+          : (existing?.contratistaFotoUrl ?? null),
+        contratistaFirmaUrl: can('contratista')
+          ? asOptionalUrl(c.firmaUrl)
+          : (existing?.contratistaFirmaUrl ?? null),
+        interventoriaObservaciones: can('interventor')
+          ? asString(i.observaciones)
+          : (existing?.interventoriaObservaciones ?? ''),
+        interventoriaFotoUrl: can('interventor')
+          ? asOptionalUrl(i.fotoUrl)
+          : (existing?.interventoriaFotoUrl ?? null),
+        interventoriaFirmaUrl: can('interventor')
+          ? asOptionalUrl(i.firmaUrl)
+          : (existing?.interventoriaFirmaUrl ?? null),
+        iduObservaciones: can('idu') ? asString(d.observaciones) : (existing?.iduObservaciones ?? ''),
+        iduFotoUrl: can('idu') ? asOptionalUrl(d.fotoUrl) : (existing?.iduFotoUrl ?? null),
+        iduFirmaUrl: can('idu') ? asOptionalUrl(d.firmaUrl) : (existing?.iduFirmaUrl ?? null),
+        franjaClimaMananaCodigo: existing?.franjaClimaMananaCodigo ?? null,
+        franjaClimaTardeCodigo: existing?.franjaClimaTardeCodigo ?? null,
+        franjaClimaNocheCodigo: existing?.franjaClimaNocheCodigo ?? null,
+      };
+
       if (existing) {
         const updated = await tx.registroBitacoraObra.update({
           where: { id: existing.id },

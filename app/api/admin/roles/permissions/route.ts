@@ -7,6 +7,10 @@ import {
   FIRMA_PERM_TOKEN,
   FIRMA_SLOT_KEYS,
 } from '../../../../../src/shared/firmaPolicies';
+import {
+  REGISTRO_BITACORA_SLOT_KEYS,
+  isRegistroBitacoraSlotKey,
+} from '../../../../../src/shared/registroBitacoraPermissions';
 
 export async function GET(req: NextRequest) {
   const accessToken = req.cookies.get('access_token')?.value;
@@ -42,6 +46,15 @@ export async function GET(req: NextRequest) {
         firmaErr,
       );
     }
+    let allBitacora: { role: string; slotKey: string }[] = [];
+    try {
+      allBitacora = await prisma.roleRegistroBitacoraPermission.findMany();
+    } catch (bitacoraErr) {
+      console.warn(
+        '[permisos] RoleRegistroBitacoraPermission no disponible. Ejecuta: npx prisma migrate deploy',
+        bitacoraErr,
+      );
+    }
     const byRole: Record<string, string[]> = {};
     for (const r of roleLabels) {
       byRole[r.role] = all.filter((p) => p.role === r.role).map((p) => p.menuKey);
@@ -50,6 +63,13 @@ export async function GET(req: NextRequest) {
     for (const r of roleLabels) {
       byRoleFirma[r.role] = allFirma.filter((p) => p.role === r.role).map((p) => p.permKey);
     }
+    const byRoleBitacora: Record<string, string[]> = {};
+    for (const r of roleLabels) {
+      byRoleBitacora[r.role] = allBitacora
+        .filter((p) => p.role === r.role)
+        .map((p) => p.slotKey)
+        .filter(isRegistroBitacoraSlotKey);
+    }
 
     return NextResponse.json({
       roles: roleLabels.map((r) => ({
@@ -57,9 +77,11 @@ export async function GET(req: NextRequest) {
         label: r.label,
         menuKeys: byRole[r.role] ?? [],
         firmaPermKeys: byRoleFirma[r.role] ?? [],
+        registroBitacoraSlotKeys: byRoleBitacora[r.role] ?? [],
       })),
       menuKeys: [...MENU_KEYS],
       firmaPermKeysCatalog: [...FIRMA_PERM_ADMIN_KEYS],
+      registroBitacoraSlotKeysCatalog: [...REGISTRO_BITACORA_SLOT_KEYS],
     });
   } catch (error: unknown) {
     console.error('GET /api/admin/roles/permissions:', error);
@@ -84,10 +106,11 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { role, menuKeys, firmaPermKeys } = body as {
+    const { role, menuKeys, firmaPermKeys, registroBitacoraSlotKeys } = body as {
       role?: string;
       menuKeys?: string[];
       firmaPermKeys?: string[];
+      registroBitacoraSlotKeys?: string[];
     };
     if (!role || !Array.isArray(menuKeys)) {
       return NextResponse.json(
@@ -135,10 +158,29 @@ export async function PUT(req: NextRequest) {
 
     const firmaSaved = await prisma.roleFirmaPermission.findMany({ where: { role } });
 
+    if (registroBitacoraSlotKeys !== undefined) {
+      if (!Array.isArray(registroBitacoraSlotKeys)) {
+        return NextResponse.json({ error: 'registroBitacoraSlotKeys debe ser un array' }, { status: 400 });
+      }
+      const validBitacora = registroBitacoraSlotKeys.filter(
+        (k: string) => typeof k === 'string' && isRegistroBitacoraSlotKey(k),
+      );
+      await prisma.roleRegistroBitacoraPermission.deleteMany({ where: { role } });
+      if (validBitacora.length > 0) {
+        await prisma.roleRegistroBitacoraPermission.createMany({
+          data: validBitacora.map((slotKey) => ({ role, slotKey })),
+          skipDuplicates: true,
+        });
+      }
+    }
+
+    const bitacoraSaved = await prisma.roleRegistroBitacoraPermission.findMany({ where: { role } });
+
     return NextResponse.json({
       role,
       menuKeys: validKeys,
       firmaPermKeys: firmaSaved.map((r) => r.permKey),
+      registroBitacoraSlotKeys: bitacoraSaved.map((r) => r.slotKey).filter(isRegistroBitacoraSlotKey),
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Error al guardar permisos';

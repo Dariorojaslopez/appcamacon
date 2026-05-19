@@ -757,6 +757,14 @@ model RoleFirmaPermission {
   @@id([role, permKey])
 }
 
+// Secciones visibles/editables en Registro de bitácora: contratista | interventor | idu
+model RoleRegistroBitacoraPermission {
+  role    String
+  slotKey String
+
+  @@id([role, slotKey])
+}
+
 model RoleLabel {
   role  String @id
   label String

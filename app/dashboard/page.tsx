@@ -53,6 +53,10 @@ import {
 } from '../../src/lib/evidenciasUrlPayload';
 import { MENU_KEYS, MENU_LABELS } from '../../src/shared/menuPermissions';
 import { FIRMA_PERM_ADMIN_KEYS, FIRMA_PERM_LABELS } from '../../src/shared/firmaPolicies';
+import {
+  REGISTRO_BITACORA_SLOT_KEYS,
+  REGISTRO_BITACORA_SLOT_LABELS,
+} from '../../src/shared/registroBitacoraPermissions';
 import { INFORME_CERRADO_MSG } from '../../src/lib/informeCerrado';
 import { normalizeObraCarpetaInput, obraCarpetaInputFromDb } from '../../src/lib/obraCarpetaNube';
 
@@ -1300,7 +1304,13 @@ export default function DashboardPage() {
     return [];
   });
   const [rolePermissions, setRolePermissions] = useState<
-    { role: string; label?: string; menuKeys: string[]; firmaPermKeys: string[] }[]
+    {
+      role: string;
+      label?: string;
+      menuKeys: string[];
+      firmaPermKeys: string[];
+      registroBitacoraSlotKeys: string[];
+    }[]
   >([]);
   const [permissionMenuKeys, setPermissionMenuKeys] = useState<string[]>([]);
   const [loadingPermissions, setLoadingPermissions] = useState(false);
@@ -2116,7 +2126,13 @@ export default function DashboardPage() {
             throw new Error(typeof data?.error === 'string' ? data.error : 'Error al cargar permisos');
           }
           return data as {
-            roles?: { role: string; label?: string; menuKeys: string[]; firmaPermKeys?: string[] }[];
+            roles?: {
+              role: string;
+              label?: string;
+              menuKeys: string[];
+              firmaPermKeys?: string[];
+              registroBitacoraSlotKeys?: string[];
+            }[];
             menuKeys?: string[];
           };
         })
@@ -2126,6 +2142,7 @@ export default function DashboardPage() {
               ...r,
               menuKeys: r.menuKeys ?? [],
               firmaPermKeys: r.firmaPermKeys ?? [],
+              registroBitacoraSlotKeys: r.registroBitacoraSlotKeys ?? [],
             })),
           );
           setPermissionMenuKeys(data.menuKeys ?? [...MENU_KEYS]);
@@ -3287,7 +3304,12 @@ export default function DashboardPage() {
       method: 'PUT',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role, menuKeys: next }),
+      body: JSON.stringify({
+        role,
+        menuKeys: next,
+        firmaPermKeys: roleData?.firmaPermKeys ?? [],
+        registroBitacoraSlotKeys: roleData?.registroBitacoraSlotKeys ?? [],
+      }),
     })
       .then((res) => (res.ok ? res.json() : Promise.reject()))
       .catch(() => {
@@ -3314,12 +3336,43 @@ export default function DashboardPage() {
         role,
         menuKeys: roleData?.menuKeys ?? [],
         firmaPermKeys: next,
+        registroBitacoraSlotKeys: roleData?.registroBitacoraSlotKeys ?? [],
       }),
     })
       .then((res) => (res.ok ? res.json() : Promise.reject()))
       .catch(() => {
         setRolePermissions((prev) =>
           prev.map((r) => (r.role === role ? { ...r, firmaPermKeys: current } : r)),
+        );
+      })
+      .finally(() => setSavingRole(null));
+  };
+
+  const handleRegistroBitacoraPermissionToggle = (role: string, slotKey: string, checked: boolean) => {
+    const roleData = rolePermissions.find((r) => r.role === role);
+    const current = roleData?.registroBitacoraSlotKeys ?? [];
+    const next = checked ? [...current, slotKey] : current.filter((k) => k !== slotKey);
+    setRolePermissions((prev) =>
+      prev.map((r) => (r.role === role ? { ...r, registroBitacoraSlotKeys: next } : r)),
+    );
+    setSavingRole(role);
+    fetch('/api/admin/roles/permissions', {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        role,
+        menuKeys: roleData?.menuKeys ?? [],
+        firmaPermKeys: roleData?.firmaPermKeys ?? [],
+        registroBitacoraSlotKeys: next,
+      }),
+    })
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .catch(() => {
+        setRolePermissions((prev) =>
+          prev.map((r) =>
+            r.role === role ? { ...r, registroBitacoraSlotKeys: current } : r,
+          ),
         );
       })
       .finally(() => setSavingRole(null));
@@ -3540,7 +3593,13 @@ export default function DashboardPage() {
       setEditingRoleLabel((prev) => ({ ...prev, [data.role]: data.label }));
       setRolePermissions((prev) => [
         ...prev,
-        { role: data.role, label: data.label, menuKeys: [], firmaPermKeys: [] },
+        {
+          role: data.role,
+          label: data.label,
+          menuKeys: [],
+          firmaPermKeys: [],
+          registroBitacoraSlotKeys: [],
+        },
       ]);
       setNewRoleKey('');
       setNewRoleLabel('');
@@ -10938,6 +10997,67 @@ export default function DashboardPage() {
                                       disabled={savingRole === role}
                                       onChange={(e) =>
                                         handleFirmaPermissionToggle(role, permKey, e.target.checked)
+                                      }
+                                    />
+                                    <span className="perms-check-box" />
+                                  </label>
+                                </td>
+                              ))}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                <h2 className="shell-title" style={{ fontSize: '1.1rem', marginTop: '1.75rem' }}>
+                  Secciones del registro de bitácora
+                </h2>
+                <p className="shell-text">
+                  Indica qué sección puede ver y editar cada rol en{' '}
+                  <strong>Registro de bitácora</strong>. El super administrador suele tener las tres
+                  (Contratista, Interventor, IDU). Si un rol no tiene filas aquí, se aplican los valores
+                  por defecto del sistema (por ejemplo CONTRATISTA solo ve Contratista).
+                </p>
+                {loadingPermissions ? (
+                  <p className="shell-text-muted">Cargando permisos de bitácora...</p>
+                ) : (
+                  <div className="perms-table-wrap">
+                    <table className="perms-table" cellPadding={0} cellSpacing={0}>
+                      <thead>
+                        <tr>
+                          <th className="perms-th perms-th-role">Rol</th>
+                          {REGISTRO_BITACORA_SLOT_KEYS.map((key) => (
+                            <th key={key} className="perms-th">
+                              {REGISTRO_BITACORA_SLOT_LABELS[key]}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rolePermissions.map((row) => {
+                          const role = row.role;
+                          const slotKeys = row.registroBitacoraSlotKeys ?? [];
+                          return (
+                            <tr key={`bitacora-${role}`}>
+                              <td className="perms-td perms-td-role">
+                                {row.label ?? role}
+                                {savingRole === role && <span className="perms-saving"> Guardando...</span>}
+                              </td>
+                              {REGISTRO_BITACORA_SLOT_KEYS.map((slotKey) => (
+                                <td key={slotKey} className="perms-td perms-td-check">
+                                  <label className="perms-check-label">
+                                    <input
+                                      type="checkbox"
+                                      checked={slotKeys.includes(slotKey)}
+                                      disabled={savingRole === role}
+                                      onChange={(e) =>
+                                        handleRegistroBitacoraPermissionToggle(
+                                          role,
+                                          slotKey,
+                                          e.target.checked,
+                                        )
                                       }
                                     />
                                     <span className="perms-check-box" />

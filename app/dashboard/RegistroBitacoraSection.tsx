@@ -5,6 +5,11 @@ import { InformeSearchableSelect, type InformeSearchableOption } from './Informe
 import { SignaturePadField, type SignaturePadFieldHandle } from './SignaturePadField';
 import { IconMic } from './icons';
 import { startSpeechDictado, type WebSpeechRecognition } from '../../src/lib/speechDictado';
+import {
+  REGISTRO_BITACORA_SLOT_KEYS,
+  REGISTRO_BITACORA_SLOT_LABELS,
+  type RegistroBitacoraSlotKey,
+} from '../../src/shared/registroBitacoraPermissions';
 
 const MAX_FILE = 10 * 1024 * 1024;
 
@@ -222,6 +227,8 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
   const [err, setErr] = useState<string | null>(null);
   const [voiceErr, setVoiceErr] = useState<string | null>(null);
   const [persisted, setPersisted] = useState<PersistedUrls>(emptyPersisted);
+  const [slotFlags, setSlotFlags] = useState<Record<RegistroBitacoraSlotKey, boolean> | null>(null);
+  const [loadingSlots, setLoadingSlots] = useState(true);
 
   const sigC = useRef<SignaturePadFieldHandle>(null);
   const sigI = useRef<SignaturePadFieldHandle>(null);
@@ -237,6 +244,39 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
       }
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      setLoadingSlots(true);
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'include' });
+        const data = (await res.json()) as {
+          registroBitacoraSlots?: Partial<Record<RegistroBitacoraSlotKey, boolean>>;
+          error?: string;
+        };
+        if (cancelled) return;
+        if (!res.ok) {
+          setSlotFlags(null);
+          return;
+        }
+        const flags = Object.fromEntries(
+          REGISTRO_BITACORA_SLOT_KEYS.map((k) => [k, Boolean(data.registroBitacoraSlots?.[k])]),
+        ) as Record<RegistroBitacoraSlotKey, boolean>;
+        setSlotFlags(flags);
+      } finally {
+        if (!cancelled) setLoadingSlots(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const canSlot = useCallback(
+    (slot: RegistroBitacoraSlotKey) => slotFlags?.[slot] === true,
+    [slotFlags],
+  );
 
   useEffect(() => {
     if (!projectId) {
@@ -457,63 +497,69 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
       setErr('Seleccione la fecha del registro.');
       return;
     }
+    const allowed = REGISTRO_BITACORA_SLOT_KEYS.filter((s) => canSlot(s));
+    if (allowed.length === 0) {
+      setErr('Su rol no tiene permiso para guardar ninguna sección del registro de bitácora.');
+      return;
+    }
+
     setSaving(true);
     try {
-      let urlFotoC: string | null = null;
-      let urlFotoI: string | null = null;
-      let urlFotoD: string | null = null;
-      if (fotoC) urlFotoC = await uploadEvidenciaFoto(fotoC, projectId);
-      else urlFotoC = persisted.contratistaFotoUrl;
-      if (fotoI) urlFotoI = await uploadEvidenciaFoto(fotoI, projectId);
-      else urlFotoI = persisted.interventoriaFotoUrl;
-      if (fotoD) urlFotoD = await uploadEvidenciaFoto(fotoD, projectId);
-      else urlFotoD = persisted.iduFotoUrl;
+      const body: {
+        projectId: string;
+        fecha: string;
+        contratista?: { observaciones: string; fotoUrl: string | null; firmaUrl: string | null };
+        interventoria?: { observaciones: string; fotoUrl: string | null; firmaUrl: string | null };
+        idu?: { observaciones: string; fotoUrl: string | null; firmaUrl: string | null };
+      } = { projectId, fecha: fechaDia };
 
-      let urlFirmaC: string | null = null;
-      let urlFirmaI: string | null = null;
-      let urlFirmaD: string | null = null;
-      if (firmaCFile) urlFirmaC = await uploadEvidenciaFoto(firmaCFile, projectId);
-      else {
-        const fc = sigC.current?.toPngFile() ?? null;
-        if (fc) urlFirmaC = await uploadEvidenciaFoto(fc, projectId);
-        else urlFirmaC = persisted.contratistaFirmaUrl;
+      if (canSlot('contratista')) {
+        let urlFotoC: string | null = null;
+        let urlFirmaC: string | null = null;
+        if (fotoC) urlFotoC = await uploadEvidenciaFoto(fotoC, projectId);
+        else urlFotoC = persisted.contratistaFotoUrl;
+        if (firmaCFile) urlFirmaC = await uploadEvidenciaFoto(firmaCFile, projectId);
+        else {
+          const fc = sigC.current?.toPngFile() ?? null;
+          if (fc) urlFirmaC = await uploadEvidenciaFoto(fc, projectId);
+          else urlFirmaC = persisted.contratistaFirmaUrl;
+        }
+        body.contratista = { observaciones: obsC, fotoUrl: urlFotoC, firmaUrl: urlFirmaC };
       }
-      if (firmaIFile) urlFirmaI = await uploadEvidenciaFoto(firmaIFile, projectId);
-      else {
-        const fi = sigI.current?.toPngFile() ?? null;
-        if (fi) urlFirmaI = await uploadEvidenciaFoto(fi, projectId);
-        else urlFirmaI = persisted.interventoriaFirmaUrl;
+
+      if (canSlot('interventor')) {
+        let urlFotoI: string | null = null;
+        let urlFirmaI: string | null = null;
+        if (fotoI) urlFotoI = await uploadEvidenciaFoto(fotoI, projectId);
+        else urlFotoI = persisted.interventoriaFotoUrl;
+        if (firmaIFile) urlFirmaI = await uploadEvidenciaFoto(firmaIFile, projectId);
+        else {
+          const fi = sigI.current?.toPngFile() ?? null;
+          if (fi) urlFirmaI = await uploadEvidenciaFoto(fi, projectId);
+          else urlFirmaI = persisted.interventoriaFirmaUrl;
+        }
+        body.interventoria = { observaciones: obsI, fotoUrl: urlFotoI, firmaUrl: urlFirmaI };
       }
-      if (firmaDFile) urlFirmaD = await uploadEvidenciaFoto(firmaDFile, projectId);
-      else {
-        const fd = sigD.current?.toPngFile() ?? null;
-        if (fd) urlFirmaD = await uploadEvidenciaFoto(fd, projectId);
-        else urlFirmaD = persisted.iduFirmaUrl;
+
+      if (canSlot('idu')) {
+        let urlFotoD: string | null = null;
+        let urlFirmaD: string | null = null;
+        if (fotoD) urlFotoD = await uploadEvidenciaFoto(fotoD, projectId);
+        else urlFotoD = persisted.iduFotoUrl;
+        if (firmaDFile) urlFirmaD = await uploadEvidenciaFoto(firmaDFile, projectId);
+        else {
+          const fd = sigD.current?.toPngFile() ?? null;
+          if (fd) urlFirmaD = await uploadEvidenciaFoto(fd, projectId);
+          else urlFirmaD = persisted.iduFirmaUrl;
+        }
+        body.idu = { observaciones: obsD, fotoUrl: urlFotoD, firmaUrl: urlFirmaD };
       }
 
       const res = await fetch('/api/registro-bitacora', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId,
-          fecha: fechaDia,
-          contratista: {
-            observaciones: obsC,
-            fotoUrl: urlFotoC,
-            firmaUrl: urlFirmaC,
-          },
-          interventoria: {
-            observaciones: obsI,
-            fotoUrl: urlFotoI,
-            firmaUrl: urlFirmaI,
-          },
-          idu: {
-            observaciones: obsD,
-            fotoUrl: urlFotoD,
-            firmaUrl: urlFirmaD,
-          },
-        }),
+        body: JSON.stringify(body),
       });
       const data = (await res.json()) as { error?: string; consecutivo?: number };
       if (!res.ok) throw new Error(data.error ?? 'No se pudo guardar');
@@ -628,64 +674,96 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
         </div>
 
         <div className="section-divider" />
-        <SlotBlock
-          title="Contratista"
-          observaciones={obsC}
-          onObservaciones={setObsC}
-          onDictarObs={() => dictar(setObsC)}
-          fotoLabel={labelC}
-          onPickFoto={onPickC}
-          sigRef={sigC}
-          firmaImagenLabel={firmaCLabel}
-          onPickFirmaImagen={onPickFirmaC}
-          onLimpiarFirma={() => {
-            sigC.current?.clear();
-            setFirmaCFile(null);
-            setFirmaCLabel('');
-            setPersisted((p) => ({ ...p, contratistaFirmaUrl: null }));
-          }}
-        />
-        <div className="section-divider" />
-        <SlotBlock
-          title="Interventoría"
-          observaciones={obsI}
-          onObservaciones={setObsI}
-          onDictarObs={() => dictar(setObsI)}
-          fotoLabel={labelI}
-          onPickFoto={onPickI}
-          sigRef={sigI}
-          firmaImagenLabel={firmaILabel}
-          onPickFirmaImagen={onPickFirmaI}
-          onLimpiarFirma={() => {
-            sigI.current?.clear();
-            setFirmaIFile(null);
-            setFirmaILabel('');
-            setPersisted((p) => ({ ...p, interventoriaFirmaUrl: null }));
-          }}
-        />
-        <div className="section-divider" />
-        <SlotBlock
-          title="IDU"
-          observaciones={obsD}
-          onObservaciones={setObsD}
-          onDictarObs={() => dictar(setObsD)}
-          fotoLabel={labelD}
-          onPickFoto={onPickD}
-          sigRef={sigD}
-          firmaImagenLabel={firmaDLabel}
-          onPickFirmaImagen={onPickFirmaD}
-          onLimpiarFirma={() => {
-            sigD.current?.clear();
-            setFirmaDFile(null);
-            setFirmaDLabel('');
-            setPersisted((p) => ({ ...p, iduFirmaUrl: null }));
-          }}
-        />
+        {loadingSlots ? (
+          <p className="shell-text-muted">Cargando permisos de su rol…</p>
+        ) : slotFlags && !REGISTRO_BITACORA_SLOT_KEYS.some((s) => canSlot(s)) ? (
+          <p className="feedback feedback-error">
+            Su rol no tiene ninguna sección asignada en el registro de bitácora. Pida al administrador que configure
+            permisos en Usuarios → Permisos de menú.
+          </p>
+        ) : null}
+
+        {canSlot('contratista') ? (
+          <>
+            <SlotBlock
+              title={REGISTRO_BITACORA_SLOT_LABELS.contratista}
+              observaciones={obsC}
+              onObservaciones={setObsC}
+              onDictarObs={() => dictar(setObsC)}
+              fotoLabel={labelC}
+              onPickFoto={onPickC}
+              sigRef={sigC}
+              firmaImagenLabel={firmaCLabel}
+              onPickFirmaImagen={onPickFirmaC}
+              onLimpiarFirma={() => {
+                sigC.current?.clear();
+                setFirmaCFile(null);
+                setFirmaCLabel('');
+                setPersisted((p) => ({ ...p, contratistaFirmaUrl: null }));
+              }}
+            />
+            <div className="section-divider" />
+          </>
+        ) : null}
+
+        {canSlot('interventor') ? (
+          <>
+            <SlotBlock
+              title={REGISTRO_BITACORA_SLOT_LABELS.interventor}
+              observaciones={obsI}
+              onObservaciones={setObsI}
+              onDictarObs={() => dictar(setObsI)}
+              fotoLabel={labelI}
+              onPickFoto={onPickI}
+              sigRef={sigI}
+              firmaImagenLabel={firmaILabel}
+              onPickFirmaImagen={onPickFirmaI}
+              onLimpiarFirma={() => {
+                sigI.current?.clear();
+                setFirmaIFile(null);
+                setFirmaILabel('');
+                setPersisted((p) => ({ ...p, interventoriaFirmaUrl: null }));
+              }}
+            />
+            <div className="section-divider" />
+          </>
+        ) : null}
+
+        {canSlot('idu') ? (
+          <>
+            <SlotBlock
+              title={REGISTRO_BITACORA_SLOT_LABELS.idu}
+              observaciones={obsD}
+              onObservaciones={setObsD}
+              onDictarObs={() => dictar(setObsD)}
+              fotoLabel={labelD}
+              onPickFoto={onPickD}
+              sigRef={sigD}
+              firmaImagenLabel={firmaDLabel}
+              onPickFirmaImagen={onPickFirmaD}
+              onLimpiarFirma={() => {
+                sigD.current?.clear();
+                setFirmaDFile(null);
+                setFirmaDLabel('');
+                setPersisted((p) => ({ ...p, iduFirmaUrl: null }));
+              }}
+            />
+            <div className="section-divider" />
+          </>
+        ) : null}
 
         <button
           type="submit"
           className="btn-primary"
-          disabled={saving || loadingObras || loadingRegistro || obraOptions.length === 0 || !projectId}
+          disabled={
+            saving ||
+            loadingObras ||
+            loadingRegistro ||
+            loadingSlots ||
+            obraOptions.length === 0 ||
+            !projectId ||
+            !REGISTRO_BITACORA_SLOT_KEYS.some((s) => canSlot(s))
+          }
         >
           {saving ? 'Guardando…' : 'Guardar registro'}
         </button>

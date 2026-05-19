@@ -85,6 +85,9 @@ async function main() {
     { role: 'RESIDENTE_TECNICO', label: 'Residente técnico' },
     { role: 'COSTOS', label: 'Costos' },
     { role: 'DIRECTOR', label: 'Director' },
+    { role: 'CONTRATISTA', label: 'Contratista' },
+    { role: 'INTERVENTOR', label: 'Interventor' },
+    { role: 'IDU', label: 'IDU' },
   ];
   for (const { role, label } of ROLE_LABELS) {
     await prisma.roleLabel.upsert({

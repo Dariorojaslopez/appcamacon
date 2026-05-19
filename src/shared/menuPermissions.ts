@@ -41,6 +41,9 @@ export const ROLES = [
   'RESIDENTE_TECNICO',
   'COSTOS',
   'DIRECTOR',
+  'CONTRATISTA',
+  'INTERVENTOR',
+  'IDU',
 ] as const;
 
 export const ROLE_LABELS: Record<(typeof ROLES)[number], string> = {
@@ -50,4 +53,7 @@ export const ROLE_LABELS: Record<(typeof ROLES)[number], string> = {
   RESIDENTE_TECNICO: 'Residente técnico',
   COSTOS: 'Costos',
   DIRECTOR: 'Director',
+  CONTRATISTA: 'Contratista',
+  INTERVENTOR: 'Interventor',
+  IDU: 'IDU',
 };

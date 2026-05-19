@@ -5,6 +5,10 @@ import {
   dbFirmaPermisosPorSlot,
   dbRoleTieneTokenFirma,
 } from '../../../../src/infrastructure/auth/firmaPermissionsResolver';
+import {
+  dbRegistroBitacoraSlotsForRole,
+  registroBitacoraSlotsToFlags,
+} from '../../../../src/infrastructure/auth/registroBitacoraPermissionsResolver';
 import prisma from '../../../../src/lib/prisma';
 
 export async function GET(req: NextRequest) {
@@ -36,6 +40,7 @@ export async function GET(req: NextRequest) {
   const puedeVerToken = await dbRoleTieneTokenFirma(role);
   const firmaToken = puedeVerToken ? generarTokenFirma(payload.sub, role) : null;
   const firmaSlotPermissions = await dbFirmaPermisosPorSlot(role);
+  const registroBitacoraSlots = registroBitacoraSlotsToFlags(await dbRegistroBitacoraSlotsForRole(role));
 
   return NextResponse.json({
     user: {
@@ -48,5 +53,6 @@ export async function GET(req: NextRequest) {
     allowedMenus,
     firmaToken,
     firmaSlotPermissions,
+    registroBitacoraSlots,
   });
 }
