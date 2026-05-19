@@ -23,6 +23,8 @@ export type EvidenciaUploadResult = {
   previewUrl?: string;
   storage: EvidenciaStorageKind;
   fileId?: string;
+  /** Aviso cuando se usó almacenamiento alternativo (p. ej. disco local). */
+  warning?: string;
 };
 
 export function oneDriveConfigured(): boolean {
@@ -91,11 +93,8 @@ export async function uploadEvidenciaBuffer(
   const refs = projectId ? await loadProjectFolderRefs(projectId) : null;
   const obraShare = refs?.onedriveShareUrl ?? null;
 
-  if (obraShare && isSharePointOrOneDriveShareUrl(obraShare) && !oneDriveConfigured()) {
-    throw new Error(
-      'Esta obra usa carpeta SharePoint/OneDrive, pero el servidor no tiene OneDrive configurado (ONEDRIVE_ENABLED y credenciales Azure). Pida a soporte el Tenant ID, Client ID y secreto de aplicación.',
-    );
-  }
+  const obraQuiereSharePoint =
+    Boolean(obraShare && isSharePointOrOneDriveShareUrl(obraShare));
 
   if (oneDriveConfigured()) {
     const shareUrl = resolveShareUrlForProject(obraShare);
@@ -146,5 +145,13 @@ export async function uploadEvidenciaBuffer(
   await fs.mkdir(uploadsDir, { recursive: true });
   const filePath = path.join(uploadsDir, fileName);
   await fs.writeFile(filePath, buffer);
-  return { url: `/uploads/${localSubdir}/${fileName}`, storage: 'local' };
+  const result: EvidenciaUploadResult = {
+    url: `/uploads/${localSubdir}/${fileName}`,
+    storage: 'local',
+  };
+  if (obraQuiereSharePoint) {
+    result.warning =
+      'La obra está configurada para SharePoint/OneDrive, pero el servidor no tiene OneDrive activo (ONEDRIVE_ENABLED y credenciales Azure). La foto se guardó en el servidor local; configure Azure para subir a la nube.';
+  }
+  return result;
 }

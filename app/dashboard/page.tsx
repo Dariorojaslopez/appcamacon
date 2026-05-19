@@ -659,6 +659,7 @@ type FotoGeoFields = {
 
 type UploadedRegistroFotografico = FotoGeoFields & {
   url: string;
+  warning?: string;
 };
 
 function emptyFotoGeoFields(): FotoGeoFields {
@@ -741,6 +742,7 @@ function RegistroFotograficoInput({
   const selectRef = useRef<HTMLInputElement | null>(null);
   const cameraRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
 
   const previewSrc = imageUrl?.trim() || localPreviewUrl || null;
@@ -762,12 +764,14 @@ function RegistroFotograficoInput({
 
   const handleClear = () => {
     clearLocalPreview();
+    setUploadError(null);
     onClear();
   };
 
   const handleFile = async (file: File | null, input: HTMLInputElement | null) => {
     if (!file) return;
     clearLocalPreview();
+    setUploadError(null);
     const blobUrl = URL.createObjectURL(file);
     setLocalPreviewUrl(blobUrl);
     setUploading(true);
@@ -776,7 +780,15 @@ function RegistroFotograficoInput({
       if (uploaded) {
         onUploaded(uploaded);
         clearLocalPreview();
+      } else {
+        clearLocalPreview();
+        setUploadError(
+          'No se guardó la imagen en el servidor. Revise el mensaje de error o la configuración de SharePoint/OneDrive.',
+        );
       }
+    } catch (err) {
+      clearLocalPreview();
+      setUploadError(err instanceof Error ? err.message : 'Error al subir imagen.');
     } finally {
       setUploading(false);
       if (input) input.value = '';
@@ -835,6 +847,11 @@ function RegistroFotograficoInput({
         disabled={disabled || uploading}
         onChange={(e) => void handleFile(e.target.files?.[0] ?? null, e.currentTarget)}
       />
+      {uploadError ? (
+        <p className="feedback feedback-error registro-foto-upload-error" role="alert">
+          {uploadError}
+        </p>
+      ) : null}
       {previewSrc ? (
         <div className="registro-foto-preview-panel">
           <p className="informe-label-hint" style={{ margin: 0 }}>
@@ -6468,13 +6485,38 @@ export default function DashboardPage() {
       body: formData,
       credentials: 'include',
     });
-    const data = await res.json();
+    let data: { error?: string; url?: string; previewUrl?: string; warning?: string; detail?: string } = {};
+    try {
+      data = (await res.json()) as typeof data;
+    } catch {
+      data = {};
+    }
     const url = data?.previewUrl || data?.url;
     if (!res.ok || !url) {
-      throw new Error(data?.error ?? 'Error al subir imagen.');
+      const serverMsg = typeof data?.error === 'string' ? data.error.trim() : '';
+      const detail = typeof data?.detail === 'string' ? data.detail.trim() : '';
+      if (res.status === 401) {
+        throw new Error('Sesión expirada. Vuelva a iniciar sesión.');
+      }
+      if (res.status === 502) {
+        throw new Error(
+          serverMsg ||
+            'No se pudo subir a SharePoint/OneDrive. Revise el enlace de la obra y las credenciales Azure (ONEDRIVE_*) en el servidor.',
+        );
+      }
+      if (res.status === 400) {
+        throw new Error(serverMsg || 'Datos de la imagen o de la obra no válidos.');
+      }
+      if (res.status === 500 && serverMsg) {
+        throw new Error(detail && detail !== serverMsg ? `${serverMsg} (${detail})` : serverMsg);
+      }
+      throw new Error(
+        serverMsg || `No se pudo subir la imagen (error ${res.status || 'desconocido'}).`,
+      );
     }
     const geo = await geoPromise;
-    return { url: String(url), ...geo };
+    const warning = typeof data?.warning === 'string' ? data.warning.trim() : '';
+    return { url: String(url), ...geo, ...(warning ? { warning } : {}) };
   };
 
   useEffect(() => {
@@ -12902,9 +12944,13 @@ export default function DashboardPage() {
                           return null;
                         }
                       }}
-                      onUploaded={(foto) =>
-                        updateActividadDraft({ imagenUrl: foto.url, ...fotoGeoPayload(foto) })
-                      }
+                      onUploaded={(foto) => {
+                        updateActividadDraft({ imagenUrl: foto.url, ...fotoGeoPayload(foto) });
+                        if (foto.warning) {
+                          setActividadMessage(foto.warning);
+                          setTimeout(() => setActividadMessage(null), 10000);
+                        }
+                      }}
                       onClear={() => updateActividadDraft({ imagenUrl: null, ...clearFotoGeoPayload() })}
                       onPreview={setRegistroFotoPreviewUrl}
                     />
