@@ -1,69 +1,78 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessToken } from '../../../../src/infrastructure/auth/tokens';
-import { uploadEvidenciaBuffer } from '../../../../src/lib/evidenciaStorage';
+import { uploadEvidenciaBuffer, oneDriveConfigured } from '../../../../src/lib/evidenciaStorage';
+import { logUploadFailure } from '../../../../src/lib/uploadErrorLog';
 
 const MAX_BYTES = 10 * 1024 * 1024; // 10MB
 
-function uploadErrorResponse(error: unknown): NextResponse {
-  const msg =
-    error instanceof Error && error.message?.trim()
-      ? error.message.trim()
-      : 'Error al subir imagen';
+type UploadFailContext = {
+  projectId?: string | null;
+  fileName?: string;
+  fileSize?: number;
+  contentType?: string;
+};
+
+function uploadHint(raw: string): string | undefined {
+  if (/Token Microsoft Graph|invalid_client|unauthorized_client/i.test(raw)) {
+    return 'Revise ONEDRIVE_TENANT_ID, ONEDRIVE_CLIENT_ID y ONEDRIVE_CLIENT_SECRET en el .env del servidor.';
+  }
+  if (/shares\/driveItem/i.test(raw) && /403|404/.test(raw)) {
+    return 'Revise el enlace de carpeta en la obra y permisos Graph (Files.ReadWrite.All, Sites.ReadWrite.All, admin consent).';
+  }
+  if (/Upload OneDrive \(403\)/i.test(raw)) {
+    return 'Microsoft rechazó la subida: falta consentimiento de administrador o permisos sobre la carpeta.';
+  }
+  return undefined;
+}
+
+function uploadErrorResponse(error: unknown, ctx: UploadFailContext = {}): NextResponse {
+  const message = logUploadFailure('evidencia-foto', ctx, error);
 
   const isAuth =
     error instanceof Error &&
     (error.name === 'TokenExpiredError' || error.name === 'JsonWebTokenError');
   if (isAuth) {
-    return NextResponse.json({ error: 'Sesión expirada' }, { status: 401 });
+    return NextResponse.json({ error: 'Sesión expirada', code: 'auth' }, { status: 401 });
   }
 
   const isClient =
-    /Obra no encontrada|Archivo|vacío|excede|Solo JPG/i.test(msg) ||
-    /Configura la carpeta/i.test(msg);
+    /Obra no encontrada|Archivo|vacío|excede|Solo JPG/i.test(message) ||
+    /Configura la carpeta/i.test(message);
   if (isClient) {
-    return NextResponse.json({ error: msg, code: 'upload_validation' }, { status: 400 });
+    return NextResponse.json({ error: message, code: 'upload_validation' }, { status: 400 });
   }
 
   const isStorage =
     /SharePoint|OneDrive|Graph|Google Drive|Microsoft|Token Microsoft|credenciales Azure|shares\/driveItem|Upload OneDrive/i.test(
-      msg,
+      message,
     );
+  const hint = uploadHint(message);
+
   if (isStorage) {
-    console.error('Upload evidencia-foto (almacenamiento):', msg);
     return NextResponse.json(
       {
-        error: humanizeStorageError(msg),
+        error: message,
         code: 'storage_error',
-        detail: msg.length > 280 ? `${msg.slice(0, 280)}…` : msg,
+        hint,
+        onedriveConfigured: oneDriveConfigured(),
       },
       { status: 502 },
     );
   }
 
-  console.error('Upload evidencia-foto:', error);
   return NextResponse.json(
-    { error: msg, code: 'upload_failed', detail: msg },
+    {
+      error: message,
+      code: 'upload_failed',
+      hint,
+    },
     { status: 500 },
   );
 }
 
-function humanizeStorageError(raw: string): string {
-  if (/Token Microsoft Graph|invalid_client|unauthorized_client/i.test(raw)) {
-    return 'Credenciales de Azure incorrectas (Tenant ID, Client ID o secreto). Revise el .env del servidor.';
-  }
-  if (/shares\/driveItem|403|404/.test(raw) && /SharePoint|driveItem|OneDrive/i.test(raw)) {
-    return 'No se pudo acceder a la carpeta de SharePoint/OneDrive. Verifique el enlace en la obra y los permisos de la app en Azure (Files.ReadWrite.All, Sites.ReadWrite.All, consentimiento admin).';
-  }
-  if (/Upload OneDrive \(403\)/i.test(raw)) {
-    return 'Microsoft rechazó la subida (403). La app de Azure necesita permisos y consentimiento de administrador sobre esa carpeta.';
-  }
-  if (/SharePoint|OneDrive/i.test(raw)) {
-    return raw.length <= 220 ? raw : `${raw.slice(0, 220)}…`;
-  }
-  return raw.length <= 220 ? raw : `${raw.slice(0, 220)}…`;
-}
-
 export async function POST(req: NextRequest) {
+  const ctx: UploadFailContext = {};
+
   try {
     const authCookie = req.cookies.get('access_token')?.value;
     if (!authCookie) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
@@ -72,7 +81,7 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get('file');
     const projectIdRaw = formData.get('projectId');
-    const projectId =
+    ctx.projectId =
       typeof projectIdRaw === 'string' && projectIdRaw.trim() ? projectIdRaw.trim() : null;
 
     if (!file || typeof file === 'string') {
@@ -80,6 +89,9 @@ export async function POST(req: NextRequest) {
     }
 
     const blob = file as File;
+    ctx.fileSize = blob.size;
+    ctx.contentType = blob.type || undefined;
+
     if (blob.size === 0) {
       return NextResponse.json({ error: 'Archivo vacío' }, { status: 400 });
     }
@@ -100,11 +112,32 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await blob.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const fileName = `${Date.now()}_${safeName}`;
-    const contentType = mime || 'application/octet-stream';
+    ctx.fileName = fileName;
 
-    const uploaded = await uploadEvidenciaBuffer(projectId, fileName, buffer, contentType, 'evidencias', {
-      driveUrlMode: 'direct',
-    });
+    console.info(
+      '[evidencia-foto] inicio',
+      JSON.stringify({
+        projectId: ctx.projectId,
+        fileName,
+        bytes: buffer.length,
+        onedrive: oneDriveConfigured(),
+      }),
+    );
+
+    const uploaded = await uploadEvidenciaBuffer(
+      ctx.projectId ?? null,
+      fileName,
+      buffer,
+      mime || 'application/octet-stream',
+      'evidencias',
+      { driveUrlMode: 'direct' },
+    );
+
+    console.info(
+      '[evidencia-foto] ok',
+      JSON.stringify({ projectId: ctx.projectId, storage: uploaded.storage, url: uploaded.url?.slice(0, 120) }),
+    );
+
     return NextResponse.json(
       {
         url: uploaded.url,
@@ -115,6 +148,6 @@ export async function POST(req: NextRequest) {
       { status: 200 },
     );
   } catch (error: unknown) {
-    return uploadErrorResponse(error);
+    return uploadErrorResponse(error, ctx);
   }
 }

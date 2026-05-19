@@ -101,16 +101,23 @@ export async function uploadEvidenciaBuffer(
     const tenantId = process.env.ONEDRIVE_TENANT_ID!.trim();
     const clientId = process.env.ONEDRIVE_CLIENT_ID!.trim();
     const clientSecret = process.env.ONEDRIVE_CLIENT_SECRET!.trim();
-    const { webUrl } = await uploadEvidenciaToOneDrive(
-      shareUrl,
-      tenantId,
-      clientId,
-      clientSecret,
-      fileName,
-      buffer,
-      contentType,
-    );
-    return { url: webUrl, storage: 'onedrive' };
+    try {
+      const { webUrl } = await uploadEvidenciaToOneDrive(
+        shareUrl,
+        tenantId,
+        clientId,
+        clientSecret,
+        fileName,
+        buffer,
+        contentType,
+      );
+      return { url: webUrl, storage: 'onedrive' };
+    } catch (error) {
+      const base = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `OneDrive/SharePoint (obra=${projectId ?? 'sin-id'}, carpeta=${shareUrl.slice(0, 80)}…): ${base}`,
+      );
+    }
   }
 
   if (googleDriveConfigured()) {

@@ -783,7 +783,7 @@ function RegistroFotograficoInput({
       } else {
         clearLocalPreview();
         setUploadError(
-          'No se guardó la imagen en el servidor. Revise el mensaje de error o la configuración de SharePoint/OneDrive.',
+          'La subida no completó (sin URL). Compruebe que eligió una obra y que el servidor tiene OneDrive configurado.',
         );
       }
     } catch (err) {
@@ -6485,7 +6485,14 @@ export default function DashboardPage() {
       body: formData,
       credentials: 'include',
     });
-    let data: { error?: string; url?: string; previewUrl?: string; warning?: string; detail?: string } = {};
+    let data: {
+      error?: string;
+      url?: string;
+      previewUrl?: string;
+      warning?: string;
+      hint?: string;
+      code?: string;
+    } = {};
     try {
       data = (await res.json()) as typeof data;
     } catch {
@@ -6494,25 +6501,21 @@ export default function DashboardPage() {
     const url = data?.previewUrl || data?.url;
     if (!res.ok || !url) {
       const serverMsg = typeof data?.error === 'string' ? data.error.trim() : '';
-      const detail = typeof data?.detail === 'string' ? data.detail.trim() : '';
-      if (res.status === 401) {
-        throw new Error('Sesión expirada. Vuelva a iniciar sesión.');
-      }
-      if (res.status === 502) {
-        throw new Error(
-          serverMsg ||
-            'No se pudo subir a SharePoint/OneDrive. Revise el enlace de la obra y las credenciales Azure (ONEDRIVE_*) en el servidor.',
-        );
-      }
-      if (res.status === 400) {
-        throw new Error(serverMsg || 'Datos de la imagen o de la obra no válidos.');
-      }
-      if (res.status === 500 && serverMsg) {
-        throw new Error(detail && detail !== serverMsg ? `${serverMsg} (${detail})` : serverMsg);
-      }
-      throw new Error(
-        serverMsg || `No se pudo subir la imagen (error ${res.status || 'desconocido'}).`,
-      );
+      const hint = typeof data?.hint === 'string' ? data.hint.trim() : '';
+      const code = typeof data?.code === 'string' ? data.code : '';
+      const parts = [serverMsg, hint && hint !== serverMsg ? hint : ''].filter(Boolean);
+      const display =
+        parts.join(' — ') ||
+        `Error HTTP ${res.status} al subir imagen (sin detalle del servidor).`;
+      console.error('[uploadRegistroFotografico] fallo', {
+        status: res.status,
+        code,
+        projectId,
+        error: serverMsg,
+        hint,
+        body: data,
+      });
+      throw new Error(display);
     }
     const geo = await geoPromise;
     const warning = typeof data?.warning === 'string' ? data.warning.trim() : '';
@@ -10124,8 +10127,9 @@ export default function DashboardPage() {
                       try {
                         return await uploadRegistroFotografico(file, itemsFilterProjectId);
                       } catch (err) {
-                        setItemsError(err instanceof Error ? err.message : 'Error al subir imagen.');
-                        return null;
+                        const msg = err instanceof Error ? err.message : 'Error al subir imagen.';
+                        setItemsError(msg);
+                        throw new Error(msg);
                       }
                     }}
                     onUploaded={(foto) => {
@@ -10295,8 +10299,9 @@ export default function DashboardPage() {
                                     try {
                                       return await uploadRegistroFotografico(file, itemsFilterProjectId);
                                     } catch (err) {
-                                      setItemsError(err instanceof Error ? err.message : 'Error al subir imagen.');
-                                      return null;
+                                      const msg = err instanceof Error ? err.message : 'Error al subir imagen.';
+                                      setItemsError(msg);
+                                      throw new Error(msg);
                                     }
                                   }}
                                   onUploaded={(foto) =>
@@ -11375,8 +11380,9 @@ export default function DashboardPage() {
                         try {
                           return await uploadRegistroFotografico(file);
                         } catch (err) {
-                          setJornadaError(err instanceof Error ? err.message : 'Error al subir imagen.');
-                          return null;
+                          const msg = err instanceof Error ? err.message : 'Error al subir imagen.';
+                          setJornadaError(msg);
+                          throw new Error(msg);
                         }
                       }}
                       onUploaded={(foto) =>
@@ -11497,8 +11503,9 @@ export default function DashboardPage() {
                         try {
                           return await uploadRegistroFotografico(file);
                         } catch (err) {
-                          setJornadaError(err instanceof Error ? err.message : 'Error al subir imagen.');
-                          return null;
+                          const msg = err instanceof Error ? err.message : 'Error al subir imagen.';
+                          setJornadaError(msg);
+                          throw new Error(msg);
                         }
                       }}
                       onUploaded={(foto) =>
@@ -11986,8 +11993,9 @@ export default function DashboardPage() {
                           try {
                             return await uploadRegistroFotografico(file);
                           } catch (err) {
-                            setEquiposError(err instanceof Error ? err.message : 'Error al subir imagen.');
-                            return null;
+                            const msg = err instanceof Error ? err.message : 'Error al subir imagen.';
+                            setEquiposError(msg);
+                            throw new Error(msg);
                           }
                         }}
                         onUploaded={(foto) =>
@@ -12395,8 +12403,9 @@ export default function DashboardPage() {
                           try {
                             return await uploadRegistroFotografico(file);
                           } catch (err) {
-                            setIngresoError(err instanceof Error ? err.message : 'Error al subir imagen.');
-                            return null;
+                            const msg = err instanceof Error ? err.message : 'Error al subir imagen.';
+                            setIngresoError(msg);
+                            throw new Error(msg);
                           }
                         }}
                         onUploaded={(foto) =>
@@ -12668,8 +12677,9 @@ export default function DashboardPage() {
                           try {
                             return await uploadRegistroFotografico(file);
                           } catch (err) {
-                            setEntregaError(err instanceof Error ? err.message : 'Error al subir imagen.');
-                            return null;
+                            const msg = err instanceof Error ? err.message : 'Error al subir imagen.';
+                            setEntregaError(msg);
+                            throw new Error(msg);
                           }
                         }}
                         onUploaded={(foto) =>
@@ -12940,8 +12950,9 @@ export default function DashboardPage() {
                         try {
                           return await uploadRegistroFotografico(file);
                         } catch (err) {
-                          setActividadError(err instanceof Error ? err.message : 'Error al subir imagen.');
-                          return null;
+                          const msg = err instanceof Error ? err.message : 'Error al subir imagen.';
+                          setActividadError(msg);
+                          throw new Error(msg);
                         }
                       }}
                       onUploaded={(foto) => {
