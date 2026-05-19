@@ -513,17 +513,14 @@ function formatItemCatalogCantidadDisplay(
     : '—';
 }
 
-/** Siguiente código solo numérico (1, 2, 3…) según el máximo entre ítems de la obra. */
-function nextAutonumericItemCatalogCodigo(items: { codigo: string }[]): string {
+/** Siguiente consecutivo autonumérico (1, 2, 3…) por obra. */
+function nextItemCatalogConsecutivo(items: { consecutivo?: number | null }[]): number {
   let max = 0;
   for (const it of items) {
-    const c = String(it.codigo ?? '').trim();
-    if (/^\d+$/.test(c)) {
-      const n = Number(c);
-      if (Number.isFinite(n) && n > max) max = n;
-    }
+    const n = it.consecutivo != null ? Number(it.consecutivo) : NaN;
+    if (Number.isFinite(n) && n > max) max = n;
   }
-  return String(max + 1);
+  return max + 1;
 }
 
 /** Ítem del catálogo en árbol presupuesto (capítulo → subcapítulo → ítem). */
@@ -538,6 +535,7 @@ type ItemCatalogNode = {
     nombreComercial?: string | null;
     nitDocumento: string;
   } | null;
+  consecutivo?: number | null;
   codigo: string;
   descripcion: string;
   unidad?: string | null;
@@ -1423,20 +1421,14 @@ export default function DashboardPage() {
   const itemsAdminFlat = useMemo(() => flattenItemCatalogTree(itemsBudgetChapters), [itemsBudgetChapters]);
   const budgetSubchaptersFlat = useMemo(() => flattenBudgetSubchapters(itemsBudgetChapters), [itemsBudgetChapters]);
 
-  useEffect(() => {
-    if (!itemsFilterProjectId) {
-      setItemNewCodigo('');
-      return;
-    }
-    setItemNewCodigo(nextAutonumericItemCatalogCodigo(itemsAdminFlat));
-  }, [itemsFilterProjectId]);
+  const nextItemAutonum = useMemo(
+    () => (itemsFilterProjectId ? nextItemCatalogConsecutivo(itemsAdminFlat) : null),
+    [itemsFilterProjectId, itemsAdminFlat],
+  );
 
   useEffect(() => {
-    if (!itemsFilterProjectId) return;
-    setItemNewCodigo((prev) =>
-      prev.trim() ? prev : nextAutonumericItemCatalogCodigo(itemsAdminFlat),
-    );
-  }, [itemsAdminFlat, itemsFilterProjectId]);
+    setItemNewCodigo('');
+  }, [itemsFilterProjectId]);
 
   const subchapterPickerOptions = useMemo(() => {
     const opts: { id: string; label: string }[] = [];
@@ -4289,8 +4281,7 @@ export default function DashboardPage() {
       }
       const cantidadPresupuestoNum = parsedCantidad.value;
       const cantidadOut = cantidadPresupuestoNum;
-      const codigo =
-        itemNewCodigo.trim() || nextAutonumericItemCatalogCodigo(itemsAdminFlat);
+      const codigo = itemNewCodigo.trim();
       if (!codigo) {
         setItemsError('Indique el código del ítem.');
         return;
@@ -4327,7 +4318,7 @@ export default function DashboardPage() {
       setItemNewUnidad('');
       setItemNewPrecio('');
       setItemNewCantidadPresupuesto('');
-      setItemNewCodigo(nextAutonumericItemCatalogCodigo([...itemsAdminFlat, { codigo }]));
+      setItemNewCodigo('');
       setItemNewImagenUrl('');
       setItemNewFotoGeo(emptyFotoGeoFields());
       setItemNewProveedorId(itemProveedorOptions[0]?.id ?? '');
@@ -9881,7 +9872,7 @@ export default function DashboardPage() {
 
                 {settingsSubSection === 'items' ? (
                   <>
-                <form className="auth-form" onSubmit={createItemCatalog} style={{ marginBottom: '1.5rem' }}>
+                <form className="auth-form item-catalog-create-form" onSubmit={createItemCatalog} style={{ marginBottom: '1.5rem' }}>
                   <h3 className="shell-title" style={{ fontSize: '1rem' }}>Crear ítem manual</h3>
                   <div className="form-field" style={{ marginBottom: '0.75rem' }}>
                     <label className="form-label" htmlFor="item-new-subchapter">
@@ -9931,8 +9922,20 @@ export default function DashboardPage() {
                       Puede crear el ítem sin proveedor y asignarlo después.
                     </p>
                   </div>
-                  <div className="form-row-inline">
-                    <div className="form-field" style={{ marginBottom: 0 }}>
+                  <div className="item-catalog-form-grid item-catalog-form-grid--4">
+                    <div className="form-field">
+                      <label className="form-label" htmlFor="item-new-autonum">Autonum</label>
+                      <input
+                        id="item-new-autonum"
+                        className="form-input personal-input-readonly"
+                        type="text"
+                        readOnly
+                        aria-readonly="true"
+                        value={nextItemAutonum != null ? String(nextItemAutonum) : '—'}
+                        title="Se asigna automáticamente al crear el ítem (consecutivo en esta obra)."
+                      />
+                    </div>
+                    <div className="form-field">
                       <label className="form-label" htmlFor="item-new-codigo">Código</label>
                       <input
                         id="item-new-codigo"
@@ -9940,21 +9943,11 @@ export default function DashboardPage() {
                         type="text"
                         value={itemNewCodigo}
                         onChange={(e) => setItemNewCodigo(e.target.value)}
-                        placeholder={
-                          itemsFilterProjectId
-                            ? nextAutonumericItemCatalogCodigo(itemsAdminFlat)
-                            : ''
-                        }
-                        title="Editable. Si lo deja vacío al guardar, se usa el siguiente número disponible en la obra."
+                        placeholder="Código del ítem (editable)"
+                        title="Código de referencia del ítem; puede editarse al crear y al modificar."
                       />
-                      {itemsFilterProjectId ? (
-                        <p className="informe-label-hint" style={{ marginTop: '0.35rem', marginBottom: 0 }}>
-                          Siguiente autonumérico sugerido:{' '}
-                          <strong>{nextAutonumericItemCatalogCodigo(itemsAdminFlat)}</strong>
-                        </p>
-                      ) : null}
                     </div>
-                    <div className="form-field" style={{ marginBottom: 0 }}>
+                    <div className="form-field">
                       <label className="form-label" htmlFor="item-new-unidad">Unidad</label>
                       <select
                         id="item-new-unidad"
@@ -9971,13 +9964,20 @@ export default function DashboardPage() {
                         ))}
                       </select>
                     </div>
-                    <div className="form-field" style={{ marginBottom: 0 }}>
-                      <label className="form-label">Precio unitario</label>
-                      <input className="form-input" type="number" step="0.01" value={itemNewPrecio} onChange={(e) => setItemNewPrecio(e.target.value)} />
+                    <div className="form-field">
+                      <label className="form-label" htmlFor="item-new-precio">Precio unitario</label>
+                      <input
+                        id="item-new-precio"
+                        className="form-input"
+                        type="number"
+                        step="0.01"
+                        value={itemNewPrecio}
+                        onChange={(e) => setItemNewPrecio(e.target.value)}
+                      />
                     </div>
                   </div>
-                  <div className="form-row-inline">
-                    <div className="form-field" style={{ marginBottom: 0 }}>
+                  <div className="item-catalog-form-grid item-catalog-form-grid--2">
+                    <div className="form-field">
                       <label className="form-label" htmlFor="item-new-cantidad">Cantidad</label>
                       <input
                         id="item-new-cantidad"
@@ -9989,9 +9989,10 @@ export default function DashboardPage() {
                         onChange={(e) => setItemNewCantidadPresupuesto(e.target.value)}
                       />
                     </div>
-                    <div className="form-field" style={{ marginBottom: 0 }}>
-                      <label className="form-label">Total (cantidad × precio)</label>
+                    <div className="form-field">
+                      <label className="form-label" htmlFor="item-new-total">Total (cantidad × precio)</label>
                       <input
+                        id="item-new-total"
                         className="form-input personal-input-readonly"
                         type="text"
                         readOnly
@@ -10063,6 +10064,7 @@ export default function DashboardPage() {
                           <th>Capítulo</th>
                           <th>Subcapítulo</th>
                           <th>Proveedor</th>
+                          <th>Autonum</th>
                           <th>Código</th>
                           <th>Descripción</th>
                           <th>Unidad</th>
@@ -10126,6 +10128,9 @@ export default function DashboardPage() {
                               ) : (
                                 it.proveedorNombre ?? '—'
                               )}
+                            </td>
+                            <td>
+                              {it.consecutivo != null ? it.consecutivo : '—'}
                             </td>
                             <td>
                               {editingItemId === it.id ? (

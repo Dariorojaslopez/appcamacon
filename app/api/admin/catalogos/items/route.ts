@@ -75,8 +75,17 @@ function isUnknownItemDetailArgError(error: unknown): boolean {
     msg.includes('altura') ||
     msg.includes('imagenUrl') ||
     msg.includes('cantidad') ||
-    msg.includes('cantidadPresupuesto')
+    msg.includes('cantidadPresupuesto') ||
+    msg.includes('consecutivo')
   );
+}
+
+async function nextItemCatalogConsecutivo(projectId: string): Promise<number> {
+  const maxRow = await prisma.itemCatalog.aggregate({
+    where: { projectId },
+    _max: { consecutivo: true },
+  });
+  return (maxRow._max.consecutivo ?? 0) + 1;
 }
 
 export async function GET(req: NextRequest) {
@@ -107,6 +116,7 @@ export async function GET(req: NextRequest) {
       subchapterNombre: it.subchapter?.nombre ?? null,
       proveedorId: it.proveedorId ?? null,
       proveedorNombre: it.proveedor?.nombreComercial || it.proveedor?.nombreRazonSocial || null,
+      consecutivo: it.consecutivo ?? null,
       codigo: it.codigo,
       descripcion: it.descripcion,
       unidad: it.unidad ?? null,
@@ -187,14 +197,24 @@ export async function POST(req: NextRequest) {
         if (!ok) return NextResponse.json({ error: 'Subcapítulo no válido para esta obra' }, { status: 400 });
       }
 
+      const existingImport = await prisma.itemCatalog.findMany({
+        where: { projectId, codigo: { in: parsed.map((p) => p.codigo) } },
+        select: { codigo: true },
+      });
+      const existingImportCodes = new Set(existingImport.map((r) => r.codigo));
+      let importSeq = (await nextItemCatalogConsecutivo(projectId)) - 1;
+
       try {
         await prisma.$transaction(
-          parsed.map((it, idx) =>
-            prisma.itemCatalog.upsert({
+          parsed.map((it, idx) => {
+            const isNew = !existingImportCodes.has(it.codigo);
+            if (isNew) importSeq += 1;
+            return prisma.itemCatalog.upsert({
               where: { projectId_codigo: { projectId, codigo: it.codigo } },
               create: {
                 projectId,
                 subchapterId,
+                ...(isNew ? { consecutivo: importSeq } : {}),
                 codigo: it.codigo,
                 descripcion: it.descripcion,
                 unidad: it.unidad,
@@ -219,18 +239,22 @@ export async function POST(req: NextRequest) {
                 imagenUrl: it.imagenUrl,
                 isActive: true,
               } as any,
-            }),
-          ),
+            });
+          }),
         );
       } catch (e) {
         if (!isUnknownItemDetailArgError(e)) throw e;
+        let fallbackSeq = (await nextItemCatalogConsecutivo(projectId)) - 1;
         await prisma.$transaction(
-          parsed.map((it, idx) =>
-            prisma.itemCatalog.upsert({
+          parsed.map((it, idx) => {
+            const isNew = !existingImportCodes.has(it.codigo);
+            if (isNew) fallbackSeq += 1;
+            return prisma.itemCatalog.upsert({
               where: { projectId_codigo: { projectId, codigo: it.codigo } },
               create: {
                 projectId,
                 subchapterId,
+                ...(isNew ? { consecutivo: fallbackSeq } : {}),
                 codigo: it.codigo,
                 descripcion: it.descripcion,
                 unidad: it.unidad,
@@ -245,8 +269,8 @@ export async function POST(req: NextRequest) {
                 precioUnitario: it.precioUnitario,
                 isActive: true,
               },
-            }),
-          ),
+            });
+          }),
         );
       }
 
@@ -314,17 +338,19 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      const maxRow = await prisma.itemCatalog.aggregate({
+      const maxOrdenRow = await prisma.itemCatalog.aggregate({
         where: { projectId },
         _max: { orden: true },
       });
-      const nextOrden = (maxRow._max.orden ?? -1) + 1;
+      const nextOrden = (maxOrdenRow._max.orden ?? -1) + 1;
+      const nextConsecutivo = await nextItemCatalogConsecutivo(projectId);
       let item: any;
       try {
         item = await prisma.itemCatalog.create({
           data: {
             projectId,
             subchapterId,
+            consecutivo: nextConsecutivo,
             codigo,
             descripcion,
             unidad: unidad || null,
@@ -351,6 +377,7 @@ export async function POST(req: NextRequest) {
           data: {
             projectId,
             subchapterId,
+            consecutivo: nextConsecutivo,
             codigo,
             descripcion,
             unidad: unidad || null,

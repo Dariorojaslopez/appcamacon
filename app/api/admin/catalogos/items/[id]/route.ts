@@ -19,7 +19,8 @@ function isUnknownItemDetailArgError(error: unknown): boolean {
     msg.includes('altura') ||
     msg.includes('imagenUrl') ||
     msg.includes('cantidad') ||
-    msg.includes('cantidadPresupuesto')
+    msg.includes('cantidadPresupuesto') ||
+    msg.includes('consecutivo')
   );
 }
 

@@ -1706,6 +1706,46 @@ body {
   }
 }
 
+/* Formulario crear ítem: cuadrícula alineada (4 + 2 columnas) */
+.item-catalog-create-form .item-catalog-form-grid {
+  display: grid;
+  gap: 0.75rem;
+  align-items: end;
+  margin-bottom: 0.75rem;
+}
+
+.item-catalog-create-form .item-catalog-form-grid .form-field {
+  margin-bottom: 0;
+  min-width: 0;
+}
+
+.item-catalog-create-form .item-catalog-form-grid .form-input,
+.item-catalog-create-form .item-catalog-form-grid select.form-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.item-catalog-create-form .item-catalog-form-grid--4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.item-catalog-create-form .item-catalog-form-grid--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 768px) {
+  .item-catalog-create-form .item-catalog-form-grid--4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .item-catalog-create-form .item-catalog-form-grid--4,
+  .item-catalog-create-form .item-catalog-form-grid--2 {
+    grid-template-columns: 1fr;
+  }
+}
+
 .btn-cancel {
   padding: 0.5rem 0.75rem;
   background: var(--camacon-gris);

@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
           orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
           include: {
             items: {
-              orderBy: [{ orden: 'asc' }, { codigo: 'asc' }],
+              orderBy: [{ orden: 'asc' }, { consecutivo: 'asc' }, { codigo: 'asc' }],
               include: {
                 proveedor: {
                   select: { id: true, nombreRazonSocial: true, nombreComercial: true, nitDocumento: true },

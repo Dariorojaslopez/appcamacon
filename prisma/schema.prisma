@@ -710,6 +710,8 @@ model ItemCatalog {
   proveedorId   String?
   proveedor     ProveedorCatalog? @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
 
+  /// Consecutivo autonumérico por obra (llave operativa: 1, 2, 3… dentro de cada projectId).
+  consecutivo   Int?
   codigo        String
   descripcion   String
   unidad        String?
@@ -733,6 +735,8 @@ model ItemCatalog {
   updatedAt     DateTime @updatedAt
 
   @@unique([projectId, codigo])
+  @@unique([projectId, consecutivo])
+  @@index([projectId, consecutivo])
   @@index([projectId, isActive, orden, codigo])
   @@index([proveedorId])
   @@index([subchapterId, orden])
