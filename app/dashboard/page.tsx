@@ -739,12 +739,45 @@ function RegistroFotograficoInput({
 }) {
   const selectRef = useRef<HTMLInputElement | null>(null);
   const cameraRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
+
+  const previewSrc = imageUrl?.trim() || localPreviewUrl || null;
+
+  useEffect(() => {
+    return () => {
+      if (localPreviewUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(localPreviewUrl);
+      }
+    };
+  }, [localPreviewUrl]);
+
+  const clearLocalPreview = () => {
+    setLocalPreviewUrl((prev) => {
+      if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev);
+      return null;
+    });
+  };
+
+  const handleClear = () => {
+    clearLocalPreview();
+    onClear();
+  };
 
   const handleFile = async (file: File | null, input: HTMLInputElement | null) => {
+    if (!file) return;
+    clearLocalPreview();
+    const blobUrl = URL.createObjectURL(file);
+    setLocalPreviewUrl(blobUrl);
+    setUploading(true);
     try {
       const uploaded = await onFileSelected(file);
-      if (uploaded) onUploaded(uploaded);
+      if (uploaded) {
+        onUploaded(uploaded);
+        clearLocalPreview();
+      }
     } finally {
+      setUploading(false);
       if (input) input.value = '';
     }
   };
@@ -758,27 +791,27 @@ function RegistroFotograficoInput({
         <button
           type="button"
           className="registro-foto-btn registro-foto-btn-primary"
-          disabled={disabled}
+          disabled={disabled || uploading}
           onClick={() => selectRef.current?.click()}
         >
-          Seleccionar archivo
+          {uploading ? 'Subiendo…' : 'Seleccionar archivo'}
         </button>
         <button
           type="button"
           className="registro-foto-btn"
-          disabled={disabled}
+          disabled={disabled || uploading}
           onClick={() => cameraRef.current?.click()}
         >
           Tomar registro fotográfico
         </button>
-        {imageUrl ? (
+        {previewSrc ? (
           <button
             type="button"
             className="registro-foto-btn"
-            disabled={disabled}
-            onClick={() => onPreview(imageUrl)}
+            disabled={uploading}
+            onClick={() => onPreview(previewSrc)}
           >
-            Ver imagen
+            Ver imagen ampliada
           </button>
         ) : null}
       </div>
@@ -788,7 +821,7 @@ function RegistroFotograficoInput({
         className="sr-only"
         type="file"
         accept="image/*"
-        disabled={disabled}
+        disabled={disabled || uploading}
         onChange={(e) => void handleFile(e.target.files?.[0] ?? null, e.currentTarget)}
       />
       <input
@@ -798,15 +831,33 @@ function RegistroFotograficoInput({
         type="file"
         accept="image/*"
         capture="environment"
-        disabled={disabled}
+        disabled={disabled || uploading}
         onChange={(e) => void handleFile(e.target.files?.[0] ?? null, e.currentTarget)}
       />
-      {imageUrl ? (
-        <div className="equipo-imagen-preview">
-          <button type="button" className="registro-foto-preview-btn" onClick={() => onPreview(imageUrl)}>
-            <img src={imageUrl} alt={label} className="calidad-mobile-thumb" />
+      {previewSrc ? (
+        <div className="registro-foto-preview-panel">
+          <p className="informe-label-hint" style={{ margin: 0 }}>
+            {uploading
+              ? 'Subiendo imagen…'
+              : imageUrl
+                ? 'Imagen cargada — clic en la miniatura para ampliar.'
+                : 'Vista previa — se confirmará al terminar la subida.'}
+          </p>
+          <button
+            type="button"
+            className="registro-foto-preview-btn"
+            disabled={uploading}
+            onClick={() => onPreview(previewSrc)}
+            title="Ver imagen ampliada"
+          >
+            <img src={previewSrc} alt={`Vista previa: ${label}`} className="registro-foto-preview-img" />
           </button>
-          <button type="button" className="equipo-imagen-remove-btn" disabled={disabled} onClick={onClear}>
+          <button
+            type="button"
+            className="equipo-imagen-remove-btn"
+            disabled={disabled || uploading}
+            onClick={handleClear}
+          >
             Quitar imagen
           </button>
         </div>
@@ -6396,13 +6447,17 @@ export default function DashboardPage() {
     });
   }, []);
 
-  const uploadRegistroFotografico = async (file: File | null): Promise<UploadedRegistroFotografico | null> => {
+  const uploadRegistroFotografico = async (
+    file: File | null,
+    projectIdOverride?: string,
+  ): Promise<UploadedRegistroFotografico | null> => {
     if (!file) return null;
-    if (!selectedObraId) throw new Error('Seleccione una obra antes de subir la imagen.');
+    const projectId = String(projectIdOverride ?? selectedObraId ?? '').trim();
+    if (!projectId) throw new Error('Seleccione una obra antes de subir la imagen.');
     const geoPromise = captureRegistroFotoGeo();
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('projectId', selectedObraId);
+    formData.append('projectId', projectId);
     const res = await fetch('/api/uploads/evidencia-foto', {
       method: 'POST',
       body: formData,
@@ -10012,8 +10067,12 @@ export default function DashboardPage() {
                     disabled={!itemsFilterProjectId}
                     onFileSelected={async (file) => {
                       setItemsError(null);
+                      if (!itemsFilterProjectId) {
+                        setItemsError('Seleccione una obra antes de subir la imagen.');
+                        return null;
+                      }
                       try {
-                        return await uploadRegistroFotografico(file);
+                        return await uploadRegistroFotografico(file, itemsFilterProjectId);
                       } catch (err) {
                         setItemsError(err instanceof Error ? err.message : 'Error al subir imagen.');
                         return null;
@@ -10179,8 +10238,12 @@ export default function DashboardPage() {
                                   disabled={!itemsFilterProjectId}
                                   onFileSelected={async (file) => {
                                     setItemsError(null);
+                                    if (!itemsFilterProjectId) {
+                                      setItemsError('Seleccione una obra antes de subir la imagen.');
+                                      return null;
+                                    }
                                     try {
-                                      return await uploadRegistroFotografico(file);
+                                      return await uploadRegistroFotografico(file, itemsFilterProjectId);
                                     } catch (err) {
                                       setItemsError(err instanceof Error ? err.message : 'Error al subir imagen.');
                                       return null;
