@@ -3,6 +3,7 @@ import { verifyAccessToken } from '../../../src/infrastructure/auth/tokens';
 import prisma from '../../../src/lib/prisma';
 import { resolveJornadaCatalogoId } from '../../../src/lib/informeDailyScope';
 import { informeCerradoJsonResponse } from '../../../src/lib/informeCerrado';
+import { dayOnlyUtc, parseYmdUtc } from '../../../src/lib/registroBitacoraFecha';
 
 function padNumber(value: number, width: number): string {
   return String(value).padStart(width, '0');
@@ -167,11 +168,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Obra no encontrada o inactiva' }, { status: 400 });
     }
 
-    const reportDate = new Date(date);
-    if (Number.isNaN(reportDate.getTime())) {
+    const reportDate =
+      parseYmdUtc(String(date).trim()) ??
+      (() => {
+        const d = new Date(date);
+        return Number.isNaN(d.getTime()) ? null : dayOnlyUtc(d);
+      })();
+    if (!reportDate) {
       return NextResponse.json({ error: 'Fecha no válida' }, { status: 400 });
     }
-    reportDate.setUTCHours(0, 0, 0, 0);
 
     const jr = await resolveJornadaCatalogoId(body.jornadaId ?? body.jornadaCatalogoId);
     if (jr.valid === false) {

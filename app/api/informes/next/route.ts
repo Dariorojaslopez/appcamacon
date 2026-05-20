@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessToken } from '../../../../src/infrastructure/auth/tokens';
 import prisma from '../../../../src/lib/prisma';
 import { resolveJornadaCatalogoId } from '../../../../src/lib/informeDailyScope';
+import { dayOnlyUtc, parseYmdUtc } from '../../../../src/lib/registroBitacoraFecha';
 
 function padNumber(value: number, width: number): string {
   return String(value).padStart(width, '0');
@@ -37,11 +38,16 @@ export async function GET(req: NextRequest) {
     }
 
     const now = new Date();
-    const baseDate = dateParam ? new Date(dateParam) : new Date(now.toISOString().slice(0, 10));
-    if (Number.isNaN(baseDate.getTime())) {
+    const baseDate = dateParam
+      ? (parseYmdUtc(dateParam.trim()) ??
+        (() => {
+          const d = new Date(dateParam);
+          return Number.isNaN(d.getTime()) ? null : dayOnlyUtc(d);
+        })())
+      : dayOnlyUtc(now);
+    if (!baseDate) {
       return NextResponse.json({ error: 'date no válida' }, { status: 400 });
     }
-    baseDate.setUTCHours(0, 0, 0, 0);
 
     const existing = await prisma.informeDiario.findFirst({
       where: { projectId, date: baseDate, jornadaCatalogoId: jr.id },

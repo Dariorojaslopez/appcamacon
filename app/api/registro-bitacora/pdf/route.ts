@@ -6,6 +6,7 @@ import {
   prismaIndicaTablaRegistroBitacoraDesactualizada,
 } from '../../../../src/lib/prismaRegistroBitacoraSchema';
 import {
+  buildUtcDateRangeInclusive,
   fechaRegistroEnRangoObra,
   parseRangoRegistroBitacora,
   parseYmdUtc,
@@ -14,7 +15,12 @@ import {
 import { buildPdfPreviewContentSecurityPolicy, generateNonce } from '../../../../src/lib/csp';
 import { buildRegistroBitacoraPdfDocumentHtml } from '../../../../src/lib/registroBitacoraPdfHtml';
 import {
+  groupInformesClimaPorYmd,
+  sortedYmdKeysConDatosEnRango,
+} from '../../../../src/lib/registroBitacoraClimaPdf';
+import {
   buildDiaPdfData,
+  buildDiaPdfDataSoloInforme,
   buildObraPdfBase,
   formatFechaEsPdf,
 } from '../../../../src/lib/registroBitacoraPdfBuild';
@@ -75,19 +81,12 @@ export async function GET(req: NextRequest) {
       orderBy: { fecha: 'asc' },
     });
 
-    if (registros.length === 0) {
-      return NextResponse.json(
-        {
-          error:
-            'No hay registros guardados en ese rango de fechas. Guarde al menos un día antes de imprimir.',
-        },
-        { status: 404 },
-      );
-    }
-
-    const fechas = registros.map((r) => r.fecha);
+    const rangoInformes = buildUtcDateRangeInclusive(rango.desde, rango.hasta);
     const informes = await prisma.informeDiario.findMany({
-      where: { projectId, date: { in: fechas } },
+      where: {
+        projectId,
+        date: { gte: rangoInformes.gte, lt: rangoInformes.lt },
+      },
       select: {
         date: true,
         franjaClimaMananaCodigo: true,
@@ -100,13 +99,20 @@ export async function GET(req: NextRequest) {
       orderBy: [{ date: 'asc' }, { jornadaCatalogo: { orden: 'asc' } }],
     });
 
-    const informesPorFecha = new Map<string, typeof informes>();
-    for (const inf of informes) {
-      const key = toYmdUtc(inf.date);
-      const list = informesPorFecha.get(key) ?? [];
-      list.push(inf);
-      informesPorFecha.set(key, list);
+    const informesPorFecha = groupInformesClimaPorYmd(informes);
+    const diasYmd = sortedYmdKeysConDatosEnRango(rango.desde, rango.hasta, registros, informesPorFecha);
+
+    if (diasYmd.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            'No hay registros de bitácora ni informes diarios en ese rango de fechas.',
+        },
+        { status: 404 },
+      );
     }
+
+    const registrosByYmd = new Map(registros.map((r) => [toYmdUtc(r.fecha), r] as const));
 
     const tipos = await prisma.tipoCondicionCatalog.findMany({
       where: { isActive: true },
@@ -115,11 +121,14 @@ export async function GET(req: NextRequest) {
     const catalog = new Map(tipos.map((t) => [t.codigo, t.nombre]));
 
     const obra = buildObraPdfBase(origin, project);
-    const dias = registros.map((reg) => {
-      const fecha = reg.fecha;
-      const key = toYmdUtc(fecha);
-      const informesDelDia = informesPorFecha.get(key) ?? [];
-      return buildDiaPdfData(origin, project, reg, fecha, informesDelDia, catalog);
+    const dias = diasYmd.map((ymd) => {
+      const fecha = parseYmdUtc(ymd)!;
+      const informesDelDia = informesPorFecha.get(ymd) ?? [];
+      const reg = registrosByYmd.get(ymd);
+      if (reg) {
+        return buildDiaPdfData(origin, project, reg, fecha, informesDelDia, catalog);
+      }
+      return buildDiaPdfDataSoloInforme(project, fecha, informesDelDia, catalog);
     });
 
     const periodoTexto =
@@ -128,9 +137,7 @@ export async function GET(req: NextRequest) {
         : `${formatFechaEsPdf(rango.desde)} — ${formatFechaEsPdf(rango.hasta)}`;
 
     const toolbarDetalle =
-      registros.length === 1
-        ? '1 registro'
-        : `${registros.length} registros en el período`;
+      dias.length === 1 ? '1 día' : `${dias.length} días en el período`;
 
     const styleNonce = req.headers.get('x-nonce') ?? generateNonce();
 

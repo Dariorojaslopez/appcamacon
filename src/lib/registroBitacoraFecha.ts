@@ -61,6 +61,13 @@ export function eachYmdInRangeUtc(desde: Date, hasta: Date): Date[] {
   return out;
 }
 
+/** Rango [gte, lt) UTC que cubre desde..hasta inclusive (días civiles). */
+export function buildUtcDateRangeInclusive(desde: Date, hasta: Date): { gte: Date; lt: Date } {
+  const gte = dayOnlyUtc(desde);
+  const lt = new Date(dayOnlyUtc(hasta).getTime() + 86400000);
+  return { gte, lt };
+}
+
 export function parseRangoRegistroBitacora(
   desdeStr: string,
   hastaStr: string,

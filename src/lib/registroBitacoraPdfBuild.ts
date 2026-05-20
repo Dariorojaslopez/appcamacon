@@ -65,6 +65,51 @@ export function buildObraPdfBase(origin: string, project: ProjectPdf): RegistroB
   };
 }
 
+function transcurridoDiasObra(project: ProjectPdf, fecha: Date): number | null {
+  if (!project.startDate) return null;
+  return diffInclusiveCalendarDaysUtc(project.startDate, fecha);
+}
+
+/** Página del PDF con clima del informe diario (sin registro de bitácora guardado ese día). */
+export function buildDiaPdfDataSoloInforme(
+  project: ProjectPdf,
+  fecha: Date,
+  informesDelDia: InformeClimaPorJornada[],
+  catalog: Map<string, string>,
+): RegistroBitacoraPdfDia {
+  const seccionesVacias: RegistroBitacoraPdfSlot[] = [
+    {
+      titulo: REGISTRO_BITACORA_SLOT_LABELS.contratista,
+      observaciones: '',
+      fotoUrl: '',
+      firmaUrl: '',
+    },
+    {
+      titulo: REGISTRO_BITACORA_SLOT_LABELS.interventor,
+      observaciones: '',
+      fotoUrl: '',
+      firmaUrl: '',
+    },
+    {
+      titulo: REGISTRO_BITACORA_SLOT_LABELS.idu,
+      observaciones: '',
+      fotoUrl: '',
+      firmaUrl: '',
+    },
+  ];
+
+  return {
+    consecutivo: 0,
+    fechaTexto: formatFechaEsPdf(fecha),
+    diaSemana: weekdayEsPdf(fecha),
+    tiempoTranscurridoDias: transcurridoDiasObra(project, fecha),
+    climaFilas: buildClimaFilasFromInformes(informesDelDia, catalog),
+    secciones: seccionesVacias,
+    registradoPor: '—',
+    actualizadoTexto: '—',
+  };
+}
+
 export function buildDiaPdfData(
   origin: string,
   project: ProjectPdf,
@@ -78,11 +123,6 @@ export function buildDiaPdfData(
     franjaClimaTardeCodigo: reg.franjaClimaTardeCodigo,
     franjaClimaNocheCodigo: reg.franjaClimaNocheCodigo,
   });
-
-  let transcurridoDias: number | null = null;
-  if (project.startDate) {
-    transcurridoDias = diffInclusiveCalendarDaysUtc(project.startDate, fecha);
-  }
 
   const secciones: RegistroBitacoraPdfSlot[] = [
     {
@@ -109,7 +149,7 @@ export function buildDiaPdfData(
     consecutivo: reg.consecutivo,
     fechaTexto: formatFechaEsPdf(fecha),
     diaSemana: weekdayEsPdf(fecha),
-    tiempoTranscurridoDias: transcurridoDias,
+    tiempoTranscurridoDias: transcurridoDiasObra(project, fecha),
     climaFilas,
     secciones,
     registradoPor: reg.user.name,

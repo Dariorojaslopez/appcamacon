@@ -202,6 +202,7 @@ function SlotBlock({
 type RangoResumen = {
   totalDias: number;
   conRegistro: number;
+  conInforme?: number;
   registros: { fecha: string; consecutivo: number }[];
 };
 
@@ -445,6 +446,7 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
         setRangoResumen({
           totalDias: data.totalDias,
           conRegistro: data.conRegistro,
+          conInforme: data.conInforme,
           registros: data.registros ?? [],
         });
       } finally {
@@ -652,8 +654,14 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
       setErr('La fecha inicial no puede ser posterior a la final.');
       return;
     }
-    if (rangoResumen && rangoResumen.conRegistro === 0) {
-      setErr('No hay registros guardados en ese rango. Guarde al menos un día antes de imprimir.');
+    if (
+      rangoResumen &&
+      rangoResumen.conRegistro === 0 &&
+      (rangoResumen.conInforme ?? 0) === 0
+    ) {
+      setErr(
+        'No hay registros de bitácora ni informes diarios en ese rango. Registre al menos un día o un informe con condición climática.',
+      );
       return;
     }
     const qs = new URLSearchParams({
@@ -792,9 +800,18 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
         {loadingRango && projectId && <p className="shell-text-muted">Buscando registros en el rango…</p>}
         {!loadingRango && rangoResumen && projectId && (
           <p className="shell-text-muted" style={{ marginTop: 0 }}>
-            <strong>{rangoResumen.conRegistro}</strong> registro{rangoResumen.conRegistro === 1 ? '' : 's'} guardado
-            {rangoResumen.conRegistro === 1 ? '' : 's'} de <strong>{rangoResumen.totalDias}</strong> día
-            {rangoResumen.totalDias === 1 ? '' : 's'} en el rango.
+            En el rango: <strong>{rangoResumen.conRegistro}</strong> registro
+            {rangoResumen.conRegistro === 1 ? '' : 's'} de bitácora
+            {(rangoResumen.conInforme ?? 0) > 0 ? (
+              <>
+                {' '}
+                y <strong>{rangoResumen.conInforme}</strong> informe
+                {(rangoResumen.conInforme ?? 0) === 1 ? '' : 's'} diario
+                {(rangoResumen.conInforme ?? 0) === 1 ? '' : 's'}
+              </>
+            ) : null}{' '}
+            (de <strong>{rangoResumen.totalDias}</strong> día{rangoResumen.totalDias === 1 ? '' : 's'}). El PDF incluye
+            la condición climática de los informes diarios del rango.
           </p>
         )}
         {!loadingRango && rangoResumen && rangoResumen.registros.length > 0 && (
@@ -819,12 +836,14 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
               !fechaDesde ||
               !fechaHasta ||
               loadingRango ||
-              (rangoResumen != null && rangoResumen.conRegistro === 0)
+              (rangoResumen != null &&
+                rangoResumen.conRegistro === 0 &&
+                (rangoResumen.conInforme ?? 0) === 0)
             }
           >
             <span className="registro-bitacora-print-btn-title">Vista previa e imprimir PDF del rango</span>
             <span className="registro-bitacora-print-btn-hint">
-              Genera un documento con todos los días guardados entre las fechas elegidas (máx. 93 días).
+              Incluye bitácora y condición climática de los informes diarios entre las fechas (máx. 93 días).
             </span>
           </button>
         </div>

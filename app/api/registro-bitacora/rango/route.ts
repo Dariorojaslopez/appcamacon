@@ -6,6 +6,7 @@ import {
   prismaIndicaTablaRegistroBitacoraDesactualizada,
 } from '../../../../src/lib/prismaRegistroBitacoraSchema';
 import {
+  buildUtcDateRangeInclusive,
   diffInclusiveCalendarDaysUtc,
   fechaRegistroEnRangoObra,
   parseRangoRegistroBitacora,
@@ -59,12 +60,20 @@ export async function GET(req: NextRequest) {
     });
 
     const totalDias = diffInclusiveCalendarDaysUtc(rango.desde, rango.hasta);
+    const rangoInformes = buildUtcDateRangeInclusive(rango.desde, rango.hasta);
+    const conInforme = await prisma.informeDiario.count({
+      where: {
+        projectId,
+        date: { gte: rangoInformes.gte, lt: rangoInformes.lt },
+      },
+    });
 
     return NextResponse.json({
       fechaDesde: fechaDesdeStr,
       fechaHasta: fechaHastaStr,
       totalDias,
       conRegistro: registros.length,
+      conInforme,
       registros: registros.map((r) => ({
         fecha: toYmdUtc(r.fecha),
         consecutivo: r.consecutivo,
