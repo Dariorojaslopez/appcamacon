@@ -2,6 +2,7 @@ import type { RegistroBitacoraObra, User } from '@prisma/client';
 import { storedMediaImgSrc } from './evidenciasUrlPayload';
 import { diffInclusiveCalendarDaysUtc } from './registroBitacoraFecha';
 import { buildClimaFilasDeUnInforme, type InformeDiarioPdfRow } from './registroBitacoraClimaPdf';
+import { agruparPersonalPorCargo } from './registroBitacoraPersonalPdf';
 import type { RegistroBitacoraPdfDia, RegistroBitacoraPdfObra, RegistroBitacoraPdfSlot } from './registroBitacoraPdfHtml';
 import { REGISTRO_BITACORA_SLOT_LABELS } from '../shared/registroBitacoraPermissions';
 
@@ -133,6 +134,7 @@ export function buildInformeDiarioPdfPage(
     diaSemana: weekdayEsPdf(fecha),
     tiempoTranscurridoDias: transcurridoDiasObra(project, fecha),
     climaFilas: buildClimaFilasDeUnInforme(informe, catalog),
+    personalPorCargo: agruparPersonalPorCargo(informe.personal ?? []),
     secciones: reg ? seccionesDesdeRegistro(origin, reg) : seccionesVaciasBitacora(),
     registradoPor: reg?.user.name ?? '—',
     actualizadoTexto: reg

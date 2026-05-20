@@ -12,6 +12,11 @@ export type RegistroBitacoraPdfClimaFranja = {
   tiempoHtml: string;
 };
 
+export type RegistroBitacoraPdfPersonalCargo = {
+  cargo: string;
+  total: number;
+};
+
 export type RegistroBitacoraPdfObra = {
   obraNombre: string;
   obraCodigo: string;
@@ -30,6 +35,7 @@ export type RegistroBitacoraPdfDia = {
   diaSemana: string;
   tiempoTranscurridoDias: number | null;
   climaFilas: RegistroBitacoraPdfClimaFranja[];
+  personalPorCargo: RegistroBitacoraPdfPersonalCargo[];
   secciones: RegistroBitacoraPdfSlot[];
   registradoPor: string;
   actualizadoTexto: string;
@@ -53,6 +59,8 @@ const NESTED_TABLE_ATTRS = 'class="informe-nested" border="1" cellpadding="0" ce
 const SECCION_TABLE_ATTRS = 'class="seccion-grid" border="1" cellpadding="0" cellspacing="0" width="100%"';
 const CLIMA_TABLE_ATTRS =
   'class="informe-grid informe-grid-clima" border="1" cellpadding="0" cellspacing="0" width="100%"';
+const PERSONAL_TABLE_ATTRS =
+  'class="informe-grid informe-grid-personal" border="1" cellpadding="0" cellspacing="0" width="100%"';
 
 function esc(value: unknown): string {
   return String(value ?? '')
@@ -266,6 +274,26 @@ const PDF_STYLES = `
   }
   td.clima-data { text-align: center; background: #fff; }
   .clima-tiempo { display: inline-flex; align-items: center; gap: 4px; justify-content: center; }
+  table.informe-grid-personal {
+    margin-top: 10px;
+    page-break-inside: avoid;
+  }
+  th.personal-hdr {
+    background: #e8e8e8;
+    font-weight: 700;
+    text-align: center;
+  }
+  th.personal-cargo {
+    background: #e8e8e8;
+    font-weight: 700;
+    text-align: left;
+    width: 72%;
+  }
+  td.personal-total {
+    text-align: center;
+    font-weight: 600;
+    background: #fff;
+  }
   table.seccion-grid {
     width: 100%;
     border-collapse: collapse;
@@ -357,16 +385,7 @@ function logosHtml(obra: RegistroBitacoraPdfObra): string {
   return `<div class="logos-inner">${logosContentHtml(obra)}</div>`;
 }
 
-function buildHeaderAndClimaHtml(obra: RegistroBitacoraPdfObra, dia: RegistroBitacoraPdfDia): string {
-  const climaBody = dia.climaFilas
-    .map(
-      (f) => `<tr>
-        <th class="clima-franja">${esc(f.franja)}</th>
-        <td class="clima-data">${f.tiempoHtml}</td>
-      </tr>`,
-    )
-    .join('');
-
+function buildHeaderHtml(obra: RegistroBitacoraPdfObra, dia: RegistroBitacoraPdfDia): string {
   const plazoTxt = obra.plazoContractualDias != null ? `${obra.plazoContractualDias} días` : '—';
   const transcurridoTxt =
     dia.tiempoTranscurridoDias != null ? `${dia.tiempoTranscurridoDias} días` : '—';
@@ -422,18 +441,66 @@ function buildHeaderAndClimaHtml(obra: RegistroBitacoraPdfObra, dia: RegistroBit
           </table>
         </td>
       </tr>
-    </table>
+    </table>`;
+}
 
+function buildClimaHtml(dia: RegistroBitacoraPdfDia): string {
+  const climaBody = dia.climaFilas
+    .map(
+      (f) => `<tr>
+        <th class="clima-franja">${esc(f.franja)}</th>
+        <td class="clima-data">${f.tiempoHtml}</td>
+      </tr>`,
+    )
+    .join('');
+
+  return `
     <table ${CLIMA_TABLE_ATTRS}>
       <colgroup>
         <col width="28%" />
         <col width="72%" />
       </colgroup>
       <tr>
+        <th class="clima-hdr" colspan="2">Condición climática por franja</th>
+      </tr>
+      <tr>
         <th class="clima-hdr">Franja del día</th>
         <th class="clima-hdr">Condición climática</th>
       </tr>
       ${climaBody}
+    </table>`;
+}
+
+function buildPersonalHtml(dia: RegistroBitacoraPdfDia): string {
+  const filas = dia.personalPorCargo ?? [];
+  const body =
+    filas.length > 0
+      ? filas
+          .map(
+            (f) => `<tr>
+        <th class="personal-cargo">${esc(f.cargo)}</th>
+        <td class="personal-total">${esc(f.total)}</td>
+      </tr>`,
+          )
+          .join('')
+      : `<tr>
+        <td colspan="2" class="muted" style="text-align:center;padding:8px;">Sin personal registrado en este informe</td>
+      </tr>`;
+
+  return `
+    <table ${PERSONAL_TABLE_ATTRS}>
+      <colgroup>
+        <col width="72%" />
+        <col width="28%" />
+      </colgroup>
+      <tr>
+        <th class="personal-hdr" colspan="2">Personal</th>
+      </tr>
+      <tr>
+        <th class="personal-cargo">Cargo</th>
+        <th class="personal-hdr">Total</th>
+      </tr>
+      ${body}
     </table>`;
 }
 
@@ -468,8 +535,10 @@ function buildSeccionesHtml(secciones: RegistroBitacoraPdfSlot[]): string {
 
 function buildDaySheetHtml(obra: RegistroBitacoraPdfObra, dia: RegistroBitacoraPdfDia, extraClass = ''): string {
   return `<section class="sheet ${extraClass}">
-    ${buildHeaderAndClimaHtml(obra, dia)}
+    ${buildHeaderHtml(obra, dia)}
     ${buildSeccionesHtml(dia.secciones)}
+    ${buildPersonalHtml(dia)}
+    ${buildClimaHtml(dia)}
     <p class="footer-note">
       Registrado por: ${esc(dia.registradoPor)} · ${esc(dia.actualizadoTexto)}
     </p>
@@ -532,6 +601,7 @@ export function buildRegistroBitacoraPdfHtml(data: RegistroBitacoraPdfData): str
     diaSemana: rest.diaSemana,
     tiempoTranscurridoDias: rest.tiempoTranscurridoDias,
     climaFilas: rest.climaFilas,
+    personalPorCargo: rest.personalPorCargo ?? [],
     secciones: rest.secciones,
     registradoPor: rest.registradoPor,
     actualizadoTexto: rest.actualizadoTexto,

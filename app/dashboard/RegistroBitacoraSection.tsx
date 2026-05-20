@@ -680,7 +680,6 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
     <section className="shell-card shell-card-wide registro-bitacora-shell">
       <h1 className="shell-title">Registro de bitácora</h1>
 
-      {msg && <p className="feedback feedback-success">{msg}</p>}
       {err && <p className="feedback feedback-error">{err}</p>}
       {voiceErr && <p className="feedback feedback-error">{voiceErr}</p>}
 
@@ -931,6 +930,11 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
         >
           {saving ? 'Guardando…' : 'Guardar registro'}
         </button>
+        {msg && (
+          <p className="feedback feedback-success" style={{ marginTop: '1rem', marginBottom: 0 }}>
+            {msg}
+          </p>
+        )}
       </form>
     </section>
   );
