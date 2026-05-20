@@ -1,5 +1,5 @@
 import ExcelJS from 'exceljs';
-import { ITEM_CATALOG_UNIT_VALUES, normalizeItemCatalogUnit } from './itemCatalogUnits';
+import { normalizeItemCatalogUnit } from './itemCatalogUnits';
 
 export const ITEM_CATALOG_EXCEL_HEADERS = [
   'codigo_item',
@@ -125,7 +125,10 @@ export type ParseItemCatalogExcelResult = {
   errors: Array<{ fila: number; mensaje: string }>;
 };
 
-export async function parseItemCatalogExcelBuffer(buffer: Buffer): Promise<ParseItemCatalogExcelResult> {
+export async function parseItemCatalogExcelBuffer(
+  buffer: Buffer,
+  validUnidadCodigos: Set<string>,
+): Promise<ParseItemCatalogExcelResult> {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buffer as unknown as ArrayBuffer);
 
@@ -190,10 +193,14 @@ export async function parseItemCatalogExcelBuffer(buffer: Buffer): Promise<Parse
       continue;
     }
     const unidad = normalizeItemCatalogUnit(unidadRaw);
-    if (!unidad) {
+    if (!unidad || !validUnidadCodigos.has(unidad)) {
+      const lista =
+        validUnidadCodigos.size > 0
+          ? Array.from(validUnidadCodigos).sort().join(', ')
+          : '(configure unidades en administración)';
       errors.push({
         fila: r,
-        mensaje: `Unidad "${unidadRaw}" no válida. Use: ${ITEM_CATALOG_UNIT_VALUES.join(', ')}`,
+        mensaje: `Unidad "${unidadRaw}" no válida. Use: ${lista}`,
       });
       continue;
     }

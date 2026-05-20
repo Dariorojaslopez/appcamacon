@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessToken } from '../../../../../../src/infrastructure/auth/tokens';
 import prisma from '../../../../../../src/lib/prisma';
 import { assertSubchapterBelongsToProject } from '../../../../../../src/lib/budgetHierarchy';
+import { resolveItemCatalogUnidadForSave } from '../../../../../../src/lib/itemCatalogUnits';
 
 function unauthorized(req: NextRequest) {
   const authCookie = req.cookies.get('access_token')?.value;
@@ -75,7 +76,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (!descripcion) return NextResponse.json({ error: 'La descripción es requerida' }, { status: 400 });
       data.descripcion = descripcion;
     }
-    if (body.unidad !== undefined) data.unidad = body.unidad ? String(body.unidad).trim() : null;
+    if (body.unidad !== undefined) {
+      const unidadResolved = await resolveItemCatalogUnidadForSave(prisma, body.unidad);
+      if (unidadResolved.ok === false) {
+        return NextResponse.json({ error: unidadResolved.error }, { status: 400 });
+      }
+      data.unidad = unidadResolved.codigo;
+    }
     if (body.precioUnitario !== undefined) {
       const rawPrecio = body.precioUnitario as unknown;
       if (rawPrecio == null || rawPrecio === '') data.precioUnitario = null;

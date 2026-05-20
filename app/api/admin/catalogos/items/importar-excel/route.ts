@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessToken } from '../../../../../../src/infrastructure/auth/tokens';
 import prisma from '../../../../../../src/lib/prisma';
 import { parseItemCatalogExcelBuffer } from '../../../../../../src/lib/itemCatalogExcel';
+import { loadActiveUnidadCodigos } from '../../../../../../src/lib/unidadCatalog';
 import { assertSubchapterBelongsToProject } from '../../../../../../src/lib/budgetHierarchy';
 import { importItemCatalogExcelRows } from '../../../../../../src/lib/itemCatalogImport';
 
@@ -66,7 +67,8 @@ export async function POST(req: NextRequest) {
     }
 
     const buffer = Buffer.from(await blob.arrayBuffer());
-    const parsed = await parseItemCatalogExcelBuffer(buffer);
+    const validUnidadCodigos = await loadActiveUnidadCodigos(prisma);
+    const parsed = await parseItemCatalogExcelBuffer(buffer, validUnidadCodigos);
 
     if (parsed.errors.length > 0 && parsed.rows.length === 0) {
       return NextResponse.json(

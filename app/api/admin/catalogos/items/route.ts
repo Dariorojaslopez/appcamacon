@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessToken } from '../../../../../src/infrastructure/auth/tokens';
 import prisma from '../../../../../src/lib/prisma';
 import { assertSubchapterBelongsToProject, ensureDefaultBudgetHierarchy } from '../../../../../src/lib/budgetHierarchy';
+import { resolveItemCatalogUnidadForSave } from '../../../../../src/lib/itemCatalogUnits';
 
 type ParsedItem = {
   codigo: string;
@@ -306,6 +307,13 @@ export async function POST(req: NextRequest) {
 
     if (!codigo) return NextResponse.json({ error: 'El código es requerido' }, { status: 400 });
     if (!descripcion) return NextResponse.json({ error: 'La descripción es requerida' }, { status: 400 });
+
+    const unidadResolved = await resolveItemCatalogUnidadForSave(prisma, unidad);
+    if (unidadResolved.ok === false) {
+      return NextResponse.json({ error: unidadResolved.error }, { status: 400 });
+    }
+    const unidadCodigo = unidadResolved.codigo;
+
     if (precioUnitario != null && !Number.isFinite(precioUnitario)) {
       return NextResponse.json({ error: 'Precio unitario inválido' }, { status: 400 });
     }
@@ -353,7 +361,7 @@ export async function POST(req: NextRequest) {
             consecutivo: nextConsecutivo,
             codigo,
             descripcion,
-            unidad: unidad || null,
+            unidad: unidadCodigo,
             precioUnitario,
             cantidad: cantidadPersistida,
             cantidadPresupuesto,
@@ -380,7 +388,7 @@ export async function POST(req: NextRequest) {
             consecutivo: nextConsecutivo,
             codigo,
             descripcion,
-            unidad: unidad || null,
+            unidad: unidadCodigo,
             precioUnitario,
             proveedorId: proveedorId || null,
             orden: nextOrden,

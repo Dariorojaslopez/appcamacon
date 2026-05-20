@@ -119,6 +119,24 @@ model JornadaCatalog {
   @@index([isActive, orden])
 }
 
+/// Unidades de medida para ítems contractuales (combo en catálogo de ítems). Configurables en administración.
+model UnidadCatalog {
+  id          String   @id @default(cuid())
+  /// Valor guardado en ItemCatalog.unidad (ej. m3, und, gal)
+  codigo      String   @unique
+  nombre      String
+  /// Símbolo visible (ej. m³, und)
+  simbolo     String?
+  /// Regla de captura/cálculo: m3 | m2 | length | manual | none
+  tipoCalculo String   @default("manual")
+  orden       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive, orden])
+}
+
 /// Tipos de condición climática / ambiente (combo en suspensiones y cabecera informe). Configurables en administración.
 model TipoCondicionCatalog {
   id        String   @id @default(cuid())

@@ -59,6 +59,8 @@ import {
 } from '../../src/shared/registroBitacoraPermissions';
 import { INFORME_CERRADO_MSG } from '../../src/lib/informeCerrado';
 import { normalizeObraCarpetaInput, obraCarpetaInputFromDb } from '../../src/lib/obraCarpetaNube';
+import { ITEM_CATALOG_UNIT_FALLBACK_OPTIONS } from '../../src/lib/itemCatalogUnits';
+import { UNIDAD_TIPO_CALCULO_LABELS, UNIDAD_TIPO_CALCULO_VALUES } from '../../src/lib/unidadCatalog';
 
 /**
  * Orígenes http extras (NEXT_PUBLIC_VOICE_INSECURE_DEV_ORIGINS).
@@ -265,17 +267,20 @@ function parseItemCatalogCantidadField(s: string): { value: number | null; inval
   return { value: n, invalid: false };
 }
 
-/** Unidades del catálogo de ítems: captura y cálculo de cantidad según tabla operativa. */
-const ITEM_CATALOG_UNIT_OPTIONS: { value: string; label: string }[] = [
-  { value: 'm3', label: 'm³ — Volumen (L × A × H)' },
-  { value: 'm2', label: 'm² — Área (L × A)' },
-  { value: 'ml', label: 'ml — Longitud' },
-  { value: 'm', label: 'm — Longitud simple' },
-  { value: 'und', label: 'und — Conteo' },
-  { value: 'kg', label: 'kg — Peso' },
-  { value: 'ton', label: 'ton — Peso' },
-  { value: 'l', label: 'l — Litros' },
-];
+/** Registro de tipo de cálculo por código de unidad (se actualiza al cargar el catálogo). */
+const unidadTipoCalculoRegistry = new Map<string, ItemCatalogCaptureKind>();
+
+function syncUnidadTipoCalculoRegistry(
+  unidades: { codigo: string; tipoCalculo: string }[],
+): void {
+  unidadTipoCalculoRegistry.clear();
+  for (const u of unidades) {
+    const k = u.tipoCalculo as ItemCatalogCaptureKind;
+    if (k === 'm3' || k === 'm2' || k === 'length' || k === 'manual' || k === 'none') {
+      unidadTipoCalculoRegistry.set(u.codigo, k);
+    }
+  }
+}
 
 function normalizeItemCatalogUnit(raw: string | null | undefined): string | null {
   let u0 = String(raw ?? '')
@@ -314,6 +319,9 @@ type ItemCatalogCaptureKind = 'm3' | 'm2' | 'length' | 'manual' | 'none';
 
 function itemCatalogCaptureKind(rawUnidad: string): ItemCatalogCaptureKind {
   const u = normalizeItemCatalogUnit(rawUnidad);
+  if (u && unidadTipoCalculoRegistry.has(u)) {
+    return unidadTipoCalculoRegistry.get(u)!;
+  }
   if (u === 'm3') return 'm3';
   if (u === 'm2') return 'm2';
   if (u === 'ml' || u === 'm') return 'length';
@@ -1327,6 +1335,7 @@ export default function DashboardPage() {
     | 'cargos'
     | 'proveedores'
     | 'estructuraItems'
+    | 'unidades'
     | 'items'
   >('obras');
   const [obrasList, setObrasList] = useState<
@@ -1586,6 +1595,91 @@ export default function DashboardPage() {
     isActive: true,
   });
 
+  type UnidadCatalogAdmin = {
+    id: string;
+    codigo: string;
+    nombre: string;
+    simbolo: string | null;
+    tipoCalculo: string;
+    orden: number;
+    isActive: boolean;
+  };
+
+  const [unidadesAdmin, setUnidadesAdmin] = useState<UnidadCatalogAdmin[]>([]);
+  const [unidadNew, setUnidadNew] = useState({
+    nombre: '',
+    codigo: '',
+    simbolo: '',
+    tipoCalculo: 'manual',
+    orden: 0,
+  });
+  const [unidadesAdminSaving, setUnidadesAdminSaving] = useState(false);
+  const [unidadesAdminError, setUnidadesAdminError] = useState<string | null>(null);
+  const [unidadesAdminMessage, setUnidadesAdminMessage] = useState<string | null>(null);
+  const [editingUnidadId, setEditingUnidadId] = useState<string | null>(null);
+  const [editingUnidadForm, setEditingUnidadForm] = useState({
+    nombre: '',
+    simbolo: '',
+    tipoCalculo: 'manual',
+    orden: 0,
+    isActive: true,
+  });
+  const [itemCatalogUnitOptions, setItemCatalogUnitOptions] = useState<{ value: string; label: string }[]>([]);
+
+  const refetchItemCatalogUnitOptions = useCallback(async () => {
+    try {
+      const res = await fetch('/api/catalogos/unidades', { credentials: 'include' });
+      const data = await res.json();
+      if (!res.ok) return;
+      const items = Array.isArray(data.items) ? data.items : [];
+      const mapped = items.map((x: { value: string; label: string; codigo: string; tipoCalculo: string }) => ({
+        value: x.value ?? x.codigo,
+        label: x.label,
+        codigo: x.codigo ?? x.value,
+        tipoCalculo: x.tipoCalculo,
+      }));
+      if (mapped.length > 0) {
+        syncUnidadTipoCalculoRegistry(mapped);
+        setItemCatalogUnitOptions(mapped.map((x: { value: string; label: string }) => ({ value: x.value, label: x.label })));
+      } else {
+        syncUnidadTipoCalculoRegistry(
+          ITEM_CATALOG_UNIT_FALLBACK_OPTIONS.map((o) => ({
+            codigo: o.value,
+            tipoCalculo:
+              o.value === 'm3'
+                ? 'm3'
+                : o.value === 'm2'
+                  ? 'm2'
+                  : o.value === 'ml' || o.value === 'm'
+                    ? 'length'
+                    : 'manual',
+          })),
+        );
+        setItemCatalogUnitOptions([...ITEM_CATALOG_UNIT_FALLBACK_OPTIONS]);
+      }
+    } catch {
+      syncUnidadTipoCalculoRegistry(
+        ITEM_CATALOG_UNIT_FALLBACK_OPTIONS.map((o) => ({
+          codigo: o.value,
+          tipoCalculo:
+            o.value === 'm3'
+              ? 'm3'
+              : o.value === 'm2'
+                ? 'm2'
+                : o.value === 'ml' || o.value === 'm'
+                  ? 'length'
+                  : 'manual',
+        })),
+      );
+      setItemCatalogUnitOptions([...ITEM_CATALOG_UNIT_FALLBACK_OPTIONS]);
+    }
+  }, []);
+
+  const itemCatalogUnitSelectOptions = useMemo(
+    () => (itemCatalogUnitOptions.length > 0 ? itemCatalogUnitOptions : ITEM_CATALOG_UNIT_FALLBACK_OPTIONS),
+    [itemCatalogUnitOptions],
+  );
+
   const refetchTiposCondicionInformeOptions = useCallback(async () => {
     try {
       const res = await fetch('/api/catalogos/tipos-condicion', { credentials: 'include' });
@@ -1606,6 +1700,11 @@ export default function DashboardPage() {
     if (activeSection !== 'jornada' && activeSection !== 'settings' && !isInformeSection) return;
     void refetchTiposCondicionInformeOptions();
   }, [activeSection, isInformeSection, refetchTiposCondicionInformeOptions]);
+
+  useEffect(() => {
+    if (activeSection !== 'settings') return;
+    void refetchItemCatalogUnitOptions();
+  }, [activeSection, refetchItemCatalogUnitOptions]);
 
   const opcionesTipoCondicionSelect = useMemo(
     () => (tiposCondicionInformeOptions.length > 0 ? tiposCondicionInformeOptions : CLIMA_INFORME_OPTIONS_FALLBACK),
@@ -2267,6 +2366,22 @@ export default function DashboardPage() {
         } catch {
           setTiposCondicionAdmin([]);
           setTiposCondicionAdminError('Error al cargar tipos de condición.');
+        }
+        return;
+      }
+
+      if (settingsSubSection === 'unidades') {
+        setUnidadesAdminError(null);
+        try {
+          const res = await fetch('/api/admin/catalogos/unidades', { credentials: 'include' });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data?.error ?? 'Error');
+          const items = Array.isArray(data.items) ? (data.items as UnidadCatalogAdmin[]) : [];
+          setUnidadesAdmin(items);
+          syncUnidadTipoCalculoRegistry(items);
+        } catch {
+          setUnidadesAdmin([]);
+          setUnidadesAdminError('Error al cargar unidades.');
         }
         return;
       }
@@ -4891,6 +5006,88 @@ export default function DashboardPage() {
       setTiposCondicionAdminError('Error de conexión.');
     } finally {
       setTiposCondicionAdminSaving(false);
+    }
+  };
+
+  const reloadUnidadesAdmin = async () => {
+    try {
+      const res = await fetch('/api/admin/catalogos/unidades', { credentials: 'include' });
+      const data = await res.json();
+      if (res.ok && Array.isArray(data.items)) {
+        const items = data.items as UnidadCatalogAdmin[];
+        setUnidadesAdmin(items);
+        syncUnidadTipoCalculoRegistry(items);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const createUnidadAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUnidadesAdminSaving(true);
+    setUnidadesAdminError(null);
+    setUnidadesAdminMessage(null);
+    try {
+      const res = await fetch('/api/admin/catalogos/unidades', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          nombre: unidadNew.nombre.trim(),
+          codigo: unidadNew.codigo.trim().toLowerCase() || undefined,
+          simbolo: unidadNew.simbolo.trim() || undefined,
+          tipoCalculo: unidadNew.tipoCalculo,
+          orden: unidadNew.orden,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setUnidadesAdminError(data.error ?? 'No se pudo crear');
+        return;
+      }
+      await reloadUnidadesAdmin();
+      await refetchItemCatalogUnitOptions();
+      setUnidadNew({ nombre: '', codigo: '', simbolo: '', tipoCalculo: 'manual', orden: 0 });
+      setUnidadesAdminMessage('Unidad creada.');
+      setTimeout(() => setUnidadesAdminMessage(null), 3000);
+    } catch {
+      setUnidadesAdminError('Error de conexión.');
+    } finally {
+      setUnidadesAdminSaving(false);
+    }
+  };
+
+  const saveEditUnidadAdmin = async (id: string) => {
+    setUnidadesAdminSaving(true);
+    setUnidadesAdminError(null);
+    try {
+      const res = await fetch(`/api/admin/catalogos/unidades/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          nombre: editingUnidadForm.nombre.trim(),
+          simbolo: editingUnidadForm.simbolo.trim() || null,
+          tipoCalculo: editingUnidadForm.tipoCalculo,
+          orden: editingUnidadForm.orden,
+          isActive: editingUnidadForm.isActive,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setUnidadesAdminError(data.error ?? 'No se pudo guardar');
+        return;
+      }
+      await reloadUnidadesAdmin();
+      await refetchItemCatalogUnitOptions();
+      setEditingUnidadId(null);
+      setUnidadesAdminMessage('Unidad actualizada.');
+      setTimeout(() => setUnidadesAdminMessage(null), 3000);
+    } catch {
+      setUnidadesAdminError('Error de conexión.');
+    } finally {
+      setUnidadesAdminSaving(false);
     }
   };
 
@@ -8023,6 +8220,14 @@ export default function DashboardPage() {
               </button>
               <button
                 type="button"
+                className={`users-tab ${settingsSubSection === 'unidades' ? 'users-tab-active' : ''}`}
+                onClick={() => setSettingsSubSection('unidades')}
+              >
+                <IconCog />
+                Unidades
+              </button>
+              <button
+                type="button"
                 className={`users-tab ${settingsSubSection === 'items' ? 'users-tab-active' : ''}`}
                 onClick={() => setSettingsSubSection('items')}
               >
@@ -9714,6 +9919,230 @@ export default function DashboardPage() {
               </>
             )}
 
+            {settingsSubSection === 'unidades' && (
+              <>
+                <h2 className="shell-title" style={{ fontSize: '1.1rem', marginTop: '0.5rem' }}>
+                  Unidades de medida (ítems contractuales)
+                </h2>
+                <p className="shell-text-muted" style={{ marginBottom: '1rem' }}>
+                  Definen las opciones del combo <strong>Unidad</strong> al crear ítems. El <strong>código</strong> es el
+                  valor guardado en el ítem (ej. <code>m3</code>, <code>und</code>). El <strong>tipo de cálculo</strong>{' '}
+                  indica si el ítem usa dimensiones L×A×H, solo cantidad manual, etc.
+                </p>
+                {unidadesAdminMessage && <p className="feedback feedback-success">{unidadesAdminMessage}</p>}
+                {unidadesAdminError && <p className="feedback feedback-error">{unidadesAdminError}</p>}
+
+                <form className="auth-form" onSubmit={createUnidadAdmin} style={{ marginBottom: '1.5rem' }}>
+                  <div className="form-row-2">
+                    <div className="form-field">
+                      <label className="form-label">Nombre (visible en el combo) *</label>
+                      <input
+                        className="form-input"
+                        type="text"
+                        required
+                        placeholder="Ej. Galones"
+                        value={unidadNew.nombre}
+                        onChange={(e) => setUnidadNew((p) => ({ ...p, nombre: e.target.value }))}
+                      />
+                    </div>
+                    <div className="form-field">
+                      <label className="form-label">Símbolo (opcional)</label>
+                      <input
+                        className="form-input"
+                        type="text"
+                        placeholder="Ej. gal"
+                        value={unidadNew.simbolo}
+                        onChange={(e) => setUnidadNew((p) => ({ ...p, simbolo: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="form-row-2">
+                    <div className="form-field">
+                      <label className="form-label">Código (opcional)</label>
+                      <input
+                        className="form-input"
+                        type="text"
+                        placeholder="Ej. gal — vacío = automático"
+                        value={unidadNew.codigo}
+                        onChange={(e) => setUnidadNew((p) => ({ ...p, codigo: e.target.value.toLowerCase() }))}
+                      />
+                    </div>
+                    <div className="form-field">
+                      <label className="form-label">Tipo de cálculo *</label>
+                      <select
+                        className="form-input"
+                        value={unidadNew.tipoCalculo}
+                        onChange={(e) => setUnidadNew((p) => ({ ...p, tipoCalculo: e.target.value }))}
+                      >
+                        {UNIDAD_TIPO_CALCULO_VALUES.map((v) => (
+                          <option key={v} value={v}>
+                            {UNIDAD_TIPO_CALCULO_LABELS[v]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="form-field">
+                    <label className="form-label">Orden</label>
+                    <input
+                      className="form-input"
+                      type="number"
+                      value={unidadNew.orden}
+                      onChange={(e) => setUnidadNew((p) => ({ ...p, orden: Number(e.target.value) || 0 }))}
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    disabled={unidadesAdminSaving}
+                    style={{ marginTop: '0.75rem' }}
+                  >
+                    {unidadesAdminSaving ? 'Guardando...' : 'Crear unidad'}
+                  </button>
+                </form>
+
+                <h2 className="shell-title" style={{ fontSize: '1.1rem' }}>Listado</h2>
+                {unidadesAdmin.length === 0 ? (
+                  <p className="shell-text-muted shell-empty-hint">No hay unidades. Cree una arriba.</p>
+                ) : (
+                  <div className="users-table-wrap">
+                    <table className="users-table">
+                      <thead>
+                        <tr>
+                          <th>Código</th>
+                          <th>Símbolo</th>
+                          <th>Nombre</th>
+                          <th>Tipo cálculo</th>
+                          <th>Orden</th>
+                          <th>Activo</th>
+                          <th>Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {unidadesAdmin.map((u) => (
+                          <tr key={u.id}>
+                            {editingUnidadId === u.id ? (
+                              <>
+                                <td>
+                                  <code>{u.codigo}</code>
+                                </td>
+                                <td>
+                                  <input
+                                    className="form-input"
+                                    value={editingUnidadForm.simbolo}
+                                    onChange={(e) =>
+                                      setEditingUnidadForm((f) => ({ ...f, simbolo: e.target.value }))
+                                    }
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    className="form-input"
+                                    value={editingUnidadForm.nombre}
+                                    onChange={(e) =>
+                                      setEditingUnidadForm((f) => ({ ...f, nombre: e.target.value }))
+                                    }
+                                  />
+                                </td>
+                                <td>
+                                  <select
+                                    className="form-input"
+                                    value={editingUnidadForm.tipoCalculo}
+                                    onChange={(e) =>
+                                      setEditingUnidadForm((f) => ({ ...f, tipoCalculo: e.target.value }))
+                                    }
+                                  >
+                                    {UNIDAD_TIPO_CALCULO_VALUES.map((v) => (
+                                      <option key={v} value={v}>
+                                        {UNIDAD_TIPO_CALCULO_LABELS[v]}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </td>
+                                <td>
+                                  <input
+                                    className="form-input"
+                                    type="number"
+                                    value={editingUnidadForm.orden}
+                                    onChange={(e) =>
+                                      setEditingUnidadForm((f) => ({
+                                        ...f,
+                                        orden: Number(e.target.value) || 0,
+                                      }))
+                                    }
+                                  />
+                                </td>
+                                <td>
+                                  <label className="perms-check-label">
+                                    <input
+                                      type="checkbox"
+                                      checked={editingUnidadForm.isActive}
+                                      onChange={(e) =>
+                                        setEditingUnidadForm((f) => ({ ...f, isActive: e.target.checked }))
+                                      }
+                                    />
+                                    <span className="perms-check-box" />
+                                  </label>
+                                </td>
+                                <td>
+                                  <div className="users-table-actions">
+                                    <button
+                                      type="button"
+                                      disabled={unidadesAdminSaving}
+                                      onClick={() => void saveEditUnidadAdmin(u.id)}
+                                    >
+                                      {unidadesAdminSaving ? 'Guardando...' : 'Guardar'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn-cancel"
+                                      onClick={() => setEditingUnidadId(null)}
+                                    >
+                                      Cancelar
+                                    </button>
+                                  </div>
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td>
+                                  <code>{u.codigo}</code>
+                                </td>
+                                <td>{u.simbolo ?? '—'}</td>
+                                <td>{u.nombre}</td>
+                                <td>{UNIDAD_TIPO_CALCULO_LABELS[u.tipoCalculo as keyof typeof UNIDAD_TIPO_CALCULO_LABELS] ?? u.tipoCalculo}</td>
+                                <td>{u.orden}</td>
+                                <td>{u.isActive ? 'Sí' : 'No'}</td>
+                                <td>
+                                  <div className="users-table-actions">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingUnidadId(u.id);
+                                        setEditingUnidadForm({
+                                          nombre: u.nombre,
+                                          simbolo: u.simbolo ?? '',
+                                          tipoCalculo: u.tipoCalculo,
+                                          orden: u.orden,
+                                          isActive: u.isActive,
+                                        });
+                                      }}
+                                    >
+                                      <IconEdit /> Editar
+                                    </button>
+                                  </div>
+                                </td>
+                              </>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
+
             {(settingsSubSection === 'items' || settingsSubSection === 'estructuraItems') && (
               <>
                 <h2 className="shell-title" style={{ fontSize: '1.1rem', marginTop: '0.5rem' }}>
@@ -10192,7 +10621,7 @@ export default function DashboardPage() {
                         onChange={(e) => setItemNewUnidad(e.target.value)}
                       >
                         <option value="">Seleccione unidad…</option>
-                        {ITEM_CATALOG_UNIT_OPTIONS.map((o) => (
+                        {itemCatalogUnitSelectOptions.map((o) => (
                           <option key={o.value} value={o.value}>
                             {o.label}
                           </option>
@@ -10441,7 +10870,7 @@ export default function DashboardPage() {
                                       {editingItemForm.unidad.trim()} (texto en BD)
                                     </option>
                                   ) : null}
-                                  {ITEM_CATALOG_UNIT_OPTIONS.map((o) => (
+                                  {itemCatalogUnitSelectOptions.map((o) => (
                                     <option key={o.value} value={o.value}>
                                       {o.label}
                                     </option>
