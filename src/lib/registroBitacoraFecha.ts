@@ -44,3 +44,37 @@ export function diffInclusiveCalendarDaysUtc(a: Date, b: Date): number {
   const ub = dayOnlyUtc(b).getTime();
   return Math.floor((ub - ua) / 86400000) + 1;
 }
+
+export const MAX_REGISTRO_BITACORA_RANGO_DIAS = 93;
+
+/** Lista cada día civil UTC entre desde y hasta (inclusivo). */
+export function eachYmdInRangeUtc(desde: Date, hasta: Date): Date[] {
+  const start = dayOnlyUtc(desde);
+  const end = dayOnlyUtc(hasta);
+  if (start > end) return [];
+  const out: Date[] = [];
+  let cur = start;
+  while (cur <= end) {
+    out.push(new Date(cur));
+    cur = new Date(cur.getTime() + 86400000);
+  }
+  return out;
+}
+
+export function parseRangoRegistroBitacora(
+  desdeStr: string,
+  hastaStr: string,
+): { ok: true; desde: Date; hasta: Date } | { ok: false; error: string } {
+  const desde = parseYmdUtc(desdeStr);
+  const hasta = parseYmdUtc(hastaStr);
+  if (!desde || !hasta) return { ok: false, error: 'Fechas no válidas (use YYYY-MM-DD).' };
+  if (desde > hasta) return { ok: false, error: 'La fecha inicial no puede ser posterior a la final.' };
+  const dias = diffInclusiveCalendarDaysUtc(desde, hasta);
+  if (dias > MAX_REGISTRO_BITACORA_RANGO_DIAS) {
+    return {
+      ok: false,
+      error: `El rango no puede superar ${MAX_REGISTRO_BITACORA_RANGO_DIAS} días.`,
+    };
+  }
+  return { ok: true, desde, hasta };
+}

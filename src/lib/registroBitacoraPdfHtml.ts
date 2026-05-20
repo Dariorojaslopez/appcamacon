@@ -13,23 +13,36 @@ export type RegistroBitacoraPdfClimaFranja = {
   condicion: string;
 };
 
-export type RegistroBitacoraPdfData = {
-  origin: string;
+export type RegistroBitacoraPdfObra = {
   obraNombre: string;
   obraCodigo: string;
   obraLogoUrl: string;
   camaconLogoUrl: string;
+  rangoObraTexto: string;
+  plazoContractualDias: number | null;
+  contratoTexto: string;
+};
+
+export type RegistroBitacoraPdfDia = {
   consecutivo: number;
   fechaTexto: string;
   diaSemana: string;
-  rangoObraTexto: string;
-  plazoContractualDias: number | null;
   tiempoTranscurridoDias: number | null;
-  contratoTexto: string;
   climaFilas: RegistroBitacoraPdfClimaFranja[];
   secciones: RegistroBitacoraPdfSlot[];
   registradoPor: string;
   actualizadoTexto: string;
+};
+
+/** @deprecated Usar RegistroBitacoraPdfObra + RegistroBitacoraPdfDia */
+export type RegistroBitacoraPdfData = RegistroBitacoraPdfObra &
+  RegistroBitacoraPdfDia & { origin: string };
+
+export type RegistroBitacoraPdfDocument = {
+  obra: RegistroBitacoraPdfObra;
+  periodoTexto: string;
+  toolbarDetalle: string;
+  dias: RegistroBitacoraPdfDia[];
 };
 
 function esc(value: unknown): string {
@@ -50,7 +63,6 @@ function climaIconFromLabel(label: string, codigo: string): string {
   return '◌';
 }
 
-/** Etiqueta legible y condición de obra a partir del código del catálogo. */
 export function resolveClimaFranja(
   codigo: string | null | undefined,
   catalog: Map<string, string>,
@@ -71,58 +83,7 @@ export function resolveClimaFranja(
   };
 }
 
-export function buildRegistroBitacoraPdfHtml(data: RegistroBitacoraPdfData): string {
-  const climaRows = data.climaFilas
-    .map(
-      (f) => `<tr>
-        <td class="cell-label">${esc(f.franja)}</td>
-        <td>${f.tiempoHtml}</td>
-        <td>${esc(f.condicion)}</td>
-      </tr>`,
-    )
-    .join('');
-
-  const seccionesHtml = data.secciones
-    .map((s) => {
-      const obs = esc(s.observaciones || '—');
-      const foto = s.fotoUrl
-        ? `<img class="evidencia-img" src="${esc(s.fotoUrl)}" alt="Foto ${esc(s.titulo)}" />`
-        : '<span class="muted">—</span>';
-      const firma = s.firmaUrl
-        ? `<img class="firma-img" src="${esc(s.firmaUrl)}" alt="Firma ${esc(s.titulo)}" />`
-        : '<span class="muted">—</span>';
-      return `<table class="grid section-block">
-        <tr><th class="section-title" colspan="2">${esc(s.titulo)}</th></tr>
-        <tr>
-          <th class="cell-label">Observaciones</th>
-          <td class="obs-cell">${obs}</td>
-        </tr>
-        <tr>
-          <th class="cell-label">Foto</th>
-          <td>${foto}</td>
-        </tr>
-        <tr>
-          <th class="cell-label">Firma</th>
-          <td>${firma}</td>
-        </tr>
-      </table>`;
-    })
-    .join('');
-
-  const logoObra = data.obraLogoUrl
-    ? `<img class="logo-obra" src="${esc(data.obraLogoUrl)}" alt="Logo obra" />`
-    : '';
-  const logoCamacon = data.camaconLogoUrl
-    ? `<img class="logo-camacon" src="${esc(data.camaconLogoUrl)}" alt="Camacón" />`
-    : '';
-
-  return `<!doctype html>
-<html lang="es">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Informe diario de trabajo — ${esc(data.obraCodigo)}</title>
-  <style>
+const PDF_STYLES = `
     * { box-sizing: border-box; }
     body {
       font-family: "Segoe UI", Arial, Helvetica, sans-serif;
@@ -146,7 +107,7 @@ export function buildRegistroBitacoraPdfHtml(data: RegistroBitacoraPdfData): str
       color: #fff;
       box-shadow: 0 2px 8px rgba(0,0,0,.15);
     }
-    .print-toolbar p { margin: 0; font-size: 12px; opacity: .9; }
+    .print-toolbar p { margin: 0; font-size: 12px; opacity: .9; max-width: 70%; }
     .print-toolbar button {
       background: #edd501;
       color: #111485;
@@ -156,6 +117,7 @@ export function buildRegistroBitacoraPdfHtml(data: RegistroBitacoraPdfData): str
       font-weight: 700;
       font-size: 13px;
       cursor: pointer;
+      white-space: nowrap;
     }
     .print-toolbar button:hover { filter: brightness(1.05); }
     .sheet {
@@ -165,6 +127,18 @@ export function buildRegistroBitacoraPdfHtml(data: RegistroBitacoraPdfData): str
       background: #fff;
       box-shadow: 0 4px 24px rgba(0,0,0,.12);
     }
+    .sheet-cover {
+      text-align: center;
+      padding-top: 8mm;
+      padding-bottom: 8mm;
+    }
+    .sheet-cover h2 {
+      margin: 0 0 8px;
+      font-size: 16px;
+      color: #111485;
+      text-transform: uppercase;
+    }
+    .sheet-cover p { margin: 4px 0; color: #374151; }
     table.grid {
       width: 100%;
       border-collapse: collapse;
@@ -239,53 +213,98 @@ export function buildRegistroBitacoraPdfHtml(data: RegistroBitacoraPdfData): str
       color: #6b7280;
       text-align: right;
     }
+    .day-break { page-break-before: always; }
     @media print {
       body { background: #fff; }
       .print-toolbar { display: none !important; }
       .sheet {
-        margin: 0;
+        margin: 0 auto;
         max-width: none;
         box-shadow: none;
         padding: 0;
+        page-break-after: always;
       }
+      .sheet:last-child { page-break-after: auto; }
+      .day-break { page-break-before: always; }
       @page { size: A4 portrait; margin: 12mm; }
     }
-  </style>
-</head>
-<body>
-  <div class="print-toolbar">
-    <p>Vista previa del informe diario — use el botón para imprimir o guardar como PDF.</p>
-    <button type="button" onclick="window.print()">Imprimir / guardar PDF</button>
-  </div>
+`;
 
-  <main class="sheet">
+function buildSeccionesHtml(secciones: RegistroBitacoraPdfSlot[]): string {
+  return secciones
+    .map((s) => {
+      const obs = esc(s.observaciones || '—');
+      const foto = s.fotoUrl
+        ? `<img class="evidencia-img" src="${esc(s.fotoUrl)}" alt="Foto ${esc(s.titulo)}" />`
+        : '<span class="muted">—</span>';
+      const firma = s.firmaUrl
+        ? `<img class="firma-img" src="${esc(s.firmaUrl)}" alt="Firma ${esc(s.titulo)}" />`
+        : '<span class="muted">—</span>';
+      return `<table class="grid section-block">
+        <tr><th class="section-title" colspan="2">${esc(s.titulo)}</th></tr>
+        <tr>
+          <th class="cell-label">Observaciones</th>
+          <td class="obs-cell">${obs}</td>
+        </tr>
+        <tr>
+          <th class="cell-label">Foto</th>
+          <td>${foto}</td>
+        </tr>
+        <tr>
+          <th class="cell-label">Firma</th>
+          <td>${firma}</td>
+        </tr>
+      </table>`;
+    })
+    .join('');
+}
+
+function logosHtml(obra: RegistroBitacoraPdfObra): string {
+  const logoObra = obra.obraLogoUrl
+    ? `<img class="logo-obra" src="${esc(obra.obraLogoUrl)}" alt="Logo obra" />`
+    : '';
+  const logoCamacon = obra.camaconLogoUrl
+    ? `<img class="logo-camacon" src="${esc(obra.camaconLogoUrl)}" alt="Camacón" />`
+    : '';
+  return `${logoObra}${logoCamacon}`;
+}
+
+function buildDaySheetHtml(obra: RegistroBitacoraPdfObra, dia: RegistroBitacoraPdfDia, extraClass = ''): string {
+  const climaRows = dia.climaFilas
+    .map(
+      (f) => `<tr>
+        <td class="cell-label">${esc(f.franja)}</td>
+        <td>${f.tiempoHtml}</td>
+        <td>${esc(f.condicion)}</td>
+      </tr>`,
+    )
+    .join('');
+
+  return `<section class="sheet ${extraClass}">
     <table class="grid">
       <tr class="header-logos">
         <td colspan="2" style="width:58%">
-          <div class="logos-wrap">
-            ${logoObra}
-            ${logoCamacon}
-          </div>
+          <div class="logos-wrap">${logosHtml(obra)}</div>
         </td>
         <td style="width:42%; padding:0; vertical-align:top;">
           <table class="meta-table">
-            <tr><th>Número</th><td>${esc(data.consecutivo)}</td></tr>
-            <tr><th>Fecha</th><td>${esc(data.fechaTexto)}</td></tr>
-            <tr><th>Día de la semana</th><td>${esc(data.diaSemana)}</td></tr>
+            <tr><th>Número</th><td>${esc(dia.consecutivo)}</td></tr>
+            <tr><th>Fecha</th><td>${esc(dia.fechaTexto)}</td></tr>
+            <tr><th>Día de la semana</th><td>${esc(dia.diaSemana)}</td></tr>
           </table>
         </td>
       </tr>
       <tr class="title-row"><td colspan="3">Informe diario de trabajo</td></tr>
       <tr>
         <td colspan="2" style="vertical-align:top;">
-          <p class="proyecto-nombre">${esc(data.obraCodigo)} — ${esc(data.obraNombre)}</p>
-          <p class="proyecto-rango">${esc(data.rangoObraTexto)}</p>
+          <p class="proyecto-nombre">${esc(obra.obraCodigo)} — ${esc(obra.obraNombre)}</p>
+          <p class="proyecto-rango">${esc(obra.rangoObraTexto)}</p>
         </td>
         <td style="padding:0; vertical-align:top;">
           <table class="meta-table">
-            <tr><th>Contrato</th><td>${esc(data.contratoTexto)}</td></tr>
-            <tr><th>Plazo contractual</th><td>${data.plazoContractualDias != null ? esc(`${data.plazoContractualDias} días`) : '—'}</td></tr>
-            <tr><th>Tiempo transcurrido</th><td>${data.tiempoTranscurridoDias != null ? esc(`${data.tiempoTranscurridoDias} días`) : '—'}</td></tr>
+            <tr><th>Contrato</th><td>${esc(obra.contratoTexto)}</td></tr>
+            <tr><th>Plazo contractual</th><td>${obra.plazoContractualDias != null ? esc(`${obra.plazoContractualDias} días`) : '—'}</td></tr>
+            <tr><th>Tiempo transcurrido</th><td>${dia.tiempoTranscurridoDias != null ? esc(`${dia.tiempoTranscurridoDias} días`) : '—'}</td></tr>
           </table>
         </td>
       </tr>
@@ -300,12 +319,77 @@ export function buildRegistroBitacoraPdfHtml(data: RegistroBitacoraPdfData): str
       ${climaRows}
     </table>
 
-    ${seccionesHtml}
+    ${buildSeccionesHtml(dia.secciones)}
 
     <p class="footer-note">
-      Registrado por: ${esc(data.registradoPor)} · ${esc(data.actualizadoTexto)}
+      Registrado por: ${esc(dia.registradoPor)} · ${esc(dia.actualizadoTexto)}
     </p>
-  </main>
+  </section>`;
+}
+
+export function buildRegistroBitacoraPdfDocumentHtml(doc: RegistroBitacoraPdfDocument): string {
+  const { obra, periodoTexto, toolbarDetalle, dias } = doc;
+  const multi = dias.length > 1;
+
+  const coverHtml = multi
+    ? `<section class="sheet sheet-cover">
+        <div class="logos-wrap" style="justify-content:center;margin-bottom:16px;">${logosHtml(obra)}</div>
+        <h2>Registro de bitácora</h2>
+        <p><strong>${esc(obra.obraCodigo)}</strong> — ${esc(obra.obraNombre)}</p>
+        <p>Período: <strong>${esc(periodoTexto)}</strong></p>
+        <p>${esc(toolbarDetalle)}</p>
+      </section>`
+    : '';
+
+  const sheetsHtml = dias
+    .map((dia, i) => buildDaySheetHtml(obra, dia, multi && i > 0 ? 'day-break' : ''))
+    .join('\n');
+
+  return `<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bitácora — ${esc(obra.obraCodigo)} — ${esc(periodoTexto)}</title>
+  <style>${PDF_STYLES}</style>
+</head>
+<body>
+  <div class="print-toolbar">
+    <p>Vista previa · ${esc(periodoTexto)} · ${esc(toolbarDetalle)}</p>
+    <button type="button" onclick="window.print()">Imprimir / guardar PDF</button>
+  </div>
+  ${coverHtml}
+  ${sheetsHtml}
 </body>
 </html>`;
+}
+
+/** Un solo día (compatibilidad). */
+export function buildRegistroBitacoraPdfHtml(data: RegistroBitacoraPdfData): string {
+  const { origin: _o, ...rest } = data;
+  const obra: RegistroBitacoraPdfObra = {
+    obraNombre: rest.obraNombre,
+    obraCodigo: rest.obraCodigo,
+    obraLogoUrl: rest.obraLogoUrl,
+    camaconLogoUrl: rest.camaconLogoUrl,
+    rangoObraTexto: rest.rangoObraTexto,
+    plazoContractualDias: rest.plazoContractualDias,
+    contratoTexto: rest.contratoTexto,
+  };
+  const dia: RegistroBitacoraPdfDia = {
+    consecutivo: rest.consecutivo,
+    fechaTexto: rest.fechaTexto,
+    diaSemana: rest.diaSemana,
+    tiempoTranscurridoDias: rest.tiempoTranscurridoDias,
+    climaFilas: rest.climaFilas,
+    secciones: rest.secciones,
+    registradoPor: rest.registradoPor,
+    actualizadoTexto: rest.actualizadoTexto,
+  };
+  return buildRegistroBitacoraPdfDocumentHtml({
+    obra,
+    periodoTexto: dia.fechaTexto,
+    toolbarDetalle: '1 registro',
+    dias: [dia],
+  });
 }

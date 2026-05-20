@@ -3613,3 +3613,41 @@ ul.informe-searchable-list {
   color: var(--camacon-text-muted, #6b7280);
   line-height: 1.4;
 }
+
+.registro-bitacora-rango-fechas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  max-width: 32rem;
+  margin-bottom: 0.75rem;
+}
+
+@media (max-width: 520px) {
+  .registro-bitacora-rango-fechas {
+    grid-template-columns: 1fr;
+  }
+}
+
+.registro-bitacora-rango-lista {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.registro-bitacora-rango-link {
+  border: 1px solid var(--camacon-border-medium);
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+  color: var(--camacon-primary, #111485);
+}
+
+.registro-bitacora-rango-link:hover {
+  background: #eef2ff;
+  border-color: var(--camacon-primary, #111485);
+}

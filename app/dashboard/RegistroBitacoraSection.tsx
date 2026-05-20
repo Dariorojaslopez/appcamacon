@@ -199,9 +199,19 @@ function SlotBlock({
   );
 }
 
+type RangoResumen = {
+  totalDias: number;
+  conRegistro: number;
+  registros: { fecha: string; consecutivo: number }[];
+};
+
 export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
   const [projectId, setProjectId] = useState('');
   const [fechaDia, setFechaDia] = useState(localYmd);
+  const [fechaDesde, setFechaDesde] = useState(localYmd);
+  const [fechaHasta, setFechaHasta] = useState(localYmd);
+  const [rangoResumen, setRangoResumen] = useState<RangoResumen | null>(null);
+  const [loadingRango, setLoadingRango] = useState(false);
   const [proyectoMeta, setProyectoMeta] = useState<ProyectoMeta | null>(null);
   const [loadingMeta, setLoadingMeta] = useState(false);
   const [loadingRegistro, setLoadingRegistro] = useState(false);
@@ -304,7 +314,16 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
           name: data.name,
           code: data.code,
         });
-        setFechaDia((prev) => clampYmd(prev, data.fechaMin ?? null, data.fechaMax ?? null));
+        const min = data.fechaMin ?? null;
+        const max = data.fechaMax ?? null;
+        setFechaDia((prev) => clampYmd(prev, min, max));
+        setFechaHasta((prev) => clampYmd(prev, min, max));
+        setFechaDesde((prev) => {
+          const hoy = clampYmd(localYmd(), min, max);
+          const hasta = clampYmd(prev || hoy, min, max);
+          const desdeMes = hoy.slice(0, 8) + '01';
+          return clampYmd(desdeMes < (min ?? desdeMes) ? min ?? desdeMes : desdeMes, min, max);
+        });
       } finally {
         if (!cancelled) setLoadingMeta(false);
       }
@@ -397,6 +416,45 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
       cancelled = true;
     };
   }, [projectId, fechaDia, applyRegistro]);
+
+  useEffect(() => {
+    if (!projectId || !fechaDesde || !fechaHasta) {
+      setRangoResumen(null);
+      return;
+    }
+    if (fechaDesde > fechaHasta) {
+      setRangoResumen(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      setLoadingRango(true);
+      try {
+        const qs = new URLSearchParams({
+          projectId,
+          fechaDesde,
+          fechaHasta,
+        });
+        const res = await fetch(`/api/registro-bitacora/rango?${qs}`, { credentials: 'include' });
+        const data = (await res.json()) as RangoResumen & { error?: string };
+        if (cancelled) return;
+        if (!res.ok) {
+          setRangoResumen(null);
+          return;
+        }
+        setRangoResumen({
+          totalDias: data.totalDias,
+          conRegistro: data.conRegistro,
+          registros: data.registros ?? [],
+        });
+      } finally {
+        if (!cancelled) setLoadingRango(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, fechaDesde, fechaHasta]);
 
   useEffect(() => {
     if (!fotoC && persisted.contratistaFotoUrl) setLabelC('Imagen guardada');
@@ -586,15 +644,30 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
       setErr('Seleccione una obra para imprimir.');
       return;
     }
-    if (!fechaDia) {
-      setErr('Seleccione la fecha del registro.');
+    if (!fechaDesde || !fechaHasta) {
+      setErr('Indique el rango de fechas para imprimir.');
       return;
     }
-    window.open(
-      `/api/registro-bitacora/pdf?projectId=${encodeURIComponent(projectId)}&fecha=${encodeURIComponent(fechaDia)}`,
-      '_blank',
-      'noopener,noreferrer',
-    );
+    if (fechaDesde > fechaHasta) {
+      setErr('La fecha inicial no puede ser posterior a la final.');
+      return;
+    }
+    if (rangoResumen && rangoResumen.conRegistro === 0) {
+      setErr('No hay registros guardados en ese rango. Guarde al menos un día antes de imprimir.');
+      return;
+    }
+    const qs = new URLSearchParams({
+      projectId,
+      fechaDesde,
+      fechaHasta,
+    });
+    window.open(`/api/registro-bitacora/pdf?${qs}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const irADiaRegistro = (ymd: string) => {
+    setFechaDia(ymd);
+    setErr(null);
+    setMsg(null);
   };
 
   return (
@@ -666,16 +739,92 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
         )}
         {loadingRegistro && projectId && <p className="shell-text-muted">Cargando datos del día…</p>}
 
+        <div className="section-divider" />
+        <h2 className="section-title" style={{ marginBottom: '0.75rem' }}>
+          Consultar e imprimir por rango
+        </h2>
+        <p className="informe-label-hint" style={{ marginTop: 0, marginBottom: '1rem' }}>
+          Elija un rango de fechas para buscar registros guardados y generar el PDF (un informe por cada día con
+          registro).
+        </p>
+
+        <div className="registro-bitacora-rango-fechas">
+          <div className="form-field">
+            <label className="form-label" htmlFor="rb-desde">
+              Desde
+            </label>
+            <input
+              id="rb-desde"
+              type="date"
+              className="form-input"
+              value={fechaDesde}
+              min={proyectoMeta?.fechaMin ?? undefined}
+              max={proyectoMeta?.fechaMax ?? undefined}
+              disabled={!projectId || loadingMeta}
+              onChange={(e) => {
+                const v = clampYmd(e.target.value, proyectoMeta?.fechaMin ?? null, proyectoMeta?.fechaMax ?? null);
+                setFechaDesde(v);
+                if (fechaHasta && v > fechaHasta) setFechaHasta(v);
+              }}
+            />
+          </div>
+          <div className="form-field">
+            <label className="form-label" htmlFor="rb-hasta">
+              Hasta
+            </label>
+            <input
+              id="rb-hasta"
+              type="date"
+              className="form-input"
+              value={fechaHasta}
+              min={proyectoMeta?.fechaMin ?? undefined}
+              max={proyectoMeta?.fechaMax ?? undefined}
+              disabled={!projectId || loadingMeta}
+              onChange={(e) => {
+                const v = clampYmd(e.target.value, proyectoMeta?.fechaMin ?? null, proyectoMeta?.fechaMax ?? null);
+                setFechaHasta(v);
+                if (fechaDesde && v < fechaDesde) setFechaDesde(v);
+              }}
+            />
+          </div>
+        </div>
+
+        {loadingRango && projectId && <p className="shell-text-muted">Buscando registros en el rango…</p>}
+        {!loadingRango && rangoResumen && projectId && (
+          <p className="shell-text-muted" style={{ marginTop: 0 }}>
+            <strong>{rangoResumen.conRegistro}</strong> registro{rangoResumen.conRegistro === 1 ? '' : 's'} guardado
+            {rangoResumen.conRegistro === 1 ? '' : 's'} de <strong>{rangoResumen.totalDias}</strong> día
+            {rangoResumen.totalDias === 1 ? '' : 's'} en el rango.
+          </p>
+        )}
+        {!loadingRango && rangoResumen && rangoResumen.registros.length > 0 && (
+          <ul className="registro-bitacora-rango-lista">
+            {rangoResumen.registros.map((r) => (
+              <li key={r.fecha}>
+                <button type="button" className="registro-bitacora-rango-link" onClick={() => irADiaRegistro(r.fecha)}>
+                  {r.fecha} · consecutivo {r.consecutivo}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
         <div className="form-field registro-bitacora-print-wrap">
           <button
             type="button"
             className="registro-bitacora-print-btn"
             onClick={handleImprimir}
-            disabled={!projectId || !fechaDia}
+            disabled={
+              !projectId ||
+              !fechaDesde ||
+              !fechaHasta ||
+              loadingRango ||
+              (rangoResumen != null && rangoResumen.conRegistro === 0)
+            }
           >
-            <span className="registro-bitacora-print-btn-title">Vista previa e imprimir PDF</span>
+            <span className="registro-bitacora-print-btn-title">Vista previa e imprimir PDF del rango</span>
             <span className="registro-bitacora-print-btn-hint">
-              Abre el informe con formato oficial (encabezado, clima y firmas). Guarde el registro antes de imprimir.
+              Genera un documento con todos los días guardados entre las fechas elegidas (máx. 93 días).
             </span>
           </button>
         </div>
