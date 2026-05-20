@@ -9926,8 +9926,7 @@ export default function DashboardPage() {
                 </h2>
                 <p className="shell-text-muted" style={{ marginBottom: '1rem' }}>
                   Definen las opciones del combo <strong>Unidad</strong> al crear ítems. El <strong>código</strong> es el
-                  valor guardado en el ítem (ej. <code>m3</code>, <code>und</code>). El <strong>tipo de cálculo</strong>{' '}
-                  indica si el ítem usa dimensiones L×A×H, solo cantidad manual, etc.
+                  valor guardado en el ítem (ej. <code>m3</code>, <code>und</code>).
                 </p>
                 {unidadesAdminMessage && <p className="feedback feedback-success">{unidadesAdminMessage}</p>}
                 {unidadesAdminError && <p className="feedback feedback-error">{unidadesAdminError}</p>}
@@ -9956,19 +9955,19 @@ export default function DashboardPage() {
                       />
                     </div>
                   </div>
-                  <div className="form-row-2">
+                  <div className="form-field">
+                    <label className="form-label">Código (opcional)</label>
+                    <input
+                      className="form-input"
+                      type="text"
+                      placeholder="Ej. gal — vacío = automático"
+                      value={unidadNew.codigo}
+                      onChange={(e) => setUnidadNew((p) => ({ ...p, codigo: e.target.value.toLowerCase() }))}
+                    />
+                  </div>
+                  <div className="form-row-2" style={{ marginTop: '0.75rem' }}>
                     <div className="form-field">
-                      <label className="form-label">Código (opcional)</label>
-                      <input
-                        className="form-input"
-                        type="text"
-                        placeholder="Ej. gal — vacío = automático"
-                        value={unidadNew.codigo}
-                        onChange={(e) => setUnidadNew((p) => ({ ...p, codigo: e.target.value.toLowerCase() }))}
-                      />
-                    </div>
-                    <div className="form-field">
-                      <label className="form-label">Tipo de cálculo *</label>
+                      <label className="form-label">Tipo de cálculo</label>
                       <select
                         className="form-input"
                         value={unidadNew.tipoCalculo}
@@ -9981,15 +9980,15 @@ export default function DashboardPage() {
                         ))}
                       </select>
                     </div>
-                  </div>
-                  <div className="form-field">
-                    <label className="form-label">Orden</label>
-                    <input
-                      className="form-input"
-                      type="number"
-                      value={unidadNew.orden}
-                      onChange={(e) => setUnidadNew((p) => ({ ...p, orden: Number(e.target.value) || 0 }))}
-                    />
+                    <div className="form-field">
+                      <label className="form-label">Orden</label>
+                      <input
+                        className="form-input"
+                        type="number"
+                        value={unidadNew.orden}
+                        onChange={(e) => setUnidadNew((p) => ({ ...p, orden: Number(e.target.value) || 0 }))}
+                      />
+                    </div>
                   </div>
                   <button
                     type="submit"
@@ -10012,10 +10011,10 @@ export default function DashboardPage() {
                           <th>Código</th>
                           <th>Símbolo</th>
                           <th>Nombre</th>
-                          <th>Tipo cálculo</th>
-                          <th>Orden</th>
                           <th>Activo</th>
                           <th>Acciones</th>
+                          <th>Tipo cálculo</th>
+                          <th>Orden</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -10041,34 +10040,6 @@ export default function DashboardPage() {
                                     value={editingUnidadForm.nombre}
                                     onChange={(e) =>
                                       setEditingUnidadForm((f) => ({ ...f, nombre: e.target.value }))
-                                    }
-                                  />
-                                </td>
-                                <td>
-                                  <select
-                                    className="form-input"
-                                    value={editingUnidadForm.tipoCalculo}
-                                    onChange={(e) =>
-                                      setEditingUnidadForm((f) => ({ ...f, tipoCalculo: e.target.value }))
-                                    }
-                                  >
-                                    {UNIDAD_TIPO_CALCULO_VALUES.map((v) => (
-                                      <option key={v} value={v}>
-                                        {UNIDAD_TIPO_CALCULO_LABELS[v]}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </td>
-                                <td>
-                                  <input
-                                    className="form-input"
-                                    type="number"
-                                    value={editingUnidadForm.orden}
-                                    onChange={(e) =>
-                                      setEditingUnidadForm((f) => ({
-                                        ...f,
-                                        orden: Number(e.target.value) || 0,
-                                      }))
                                     }
                                   />
                                 </td>
@@ -10102,6 +10073,34 @@ export default function DashboardPage() {
                                     </button>
                                   </div>
                                 </td>
+                                <td>
+                                  <select
+                                    className="form-input"
+                                    value={editingUnidadForm.tipoCalculo}
+                                    onChange={(e) =>
+                                      setEditingUnidadForm((f) => ({ ...f, tipoCalculo: e.target.value }))
+                                    }
+                                  >
+                                    {UNIDAD_TIPO_CALCULO_VALUES.map((v) => (
+                                      <option key={v} value={v}>
+                                        {UNIDAD_TIPO_CALCULO_LABELS[v]}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </td>
+                                <td>
+                                  <input
+                                    className="form-input"
+                                    type="number"
+                                    value={editingUnidadForm.orden}
+                                    onChange={(e) =>
+                                      setEditingUnidadForm((f) => ({
+                                        ...f,
+                                        orden: Number(e.target.value) || 0,
+                                      }))
+                                    }
+                                  />
+                                </td>
                               </>
                             ) : (
                               <>
@@ -10110,8 +10109,6 @@ export default function DashboardPage() {
                                 </td>
                                 <td>{u.simbolo ?? '—'}</td>
                                 <td>{u.nombre}</td>
-                                <td>{UNIDAD_TIPO_CALCULO_LABELS[u.tipoCalculo as keyof typeof UNIDAD_TIPO_CALCULO_LABELS] ?? u.tipoCalculo}</td>
-                                <td>{u.orden}</td>
                                 <td>{u.isActive ? 'Sí' : 'No'}</td>
                                 <td>
                                   <div className="users-table-actions">
@@ -10132,6 +10129,12 @@ export default function DashboardPage() {
                                     </button>
                                   </div>
                                 </td>
+                                <td>
+                                  {UNIDAD_TIPO_CALCULO_LABELS[
+                                    u.tipoCalculo as keyof typeof UNIDAD_TIPO_CALCULO_LABELS
+                                  ] ?? u.tipoCalculo}
+                                </td>
+                                <td>{u.orden}</td>
                               </>
                             )}
                           </tr>
