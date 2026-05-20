@@ -536,9 +536,9 @@ function buildSeccionesHtml(secciones: RegistroBitacoraPdfSlot[]): string {
 function buildDaySheetHtml(obra: RegistroBitacoraPdfObra, dia: RegistroBitacoraPdfDia, extraClass = ''): string {
   return `<section class="sheet ${extraClass}">
     ${buildHeaderHtml(obra, dia)}
-    ${buildSeccionesHtml(dia.secciones)}
-    ${buildPersonalHtml(dia)}
     ${buildClimaHtml(dia)}
+    ${buildPersonalHtml(dia)}
+    ${buildSeccionesHtml(dia.secciones)}
     <p class="footer-note">
       Registrado por: ${esc(dia.registradoPor)} · ${esc(dia.actualizadoTexto)}
     </p>
