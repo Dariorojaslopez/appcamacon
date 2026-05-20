@@ -84,243 +84,376 @@ export function resolveClimaFranja(
 }
 
 const PDF_STYLES = `
-    * { box-sizing: border-box; }
-    body {
-      font-family: "Segoe UI", Arial, Helvetica, sans-serif;
-      color: #111;
-      margin: 0;
-      padding: 0;
-      font-size: 11px;
-      line-height: 1.35;
-      background: #e5e7eb;
-    }
-    .print-toolbar {
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 10px 16px;
-      background: #111485;
-      color: #fff;
-      box-shadow: 0 2px 8px rgba(0,0,0,.15);
-    }
-    .print-toolbar p { margin: 0; font-size: 12px; opacity: .9; max-width: 70%; }
-    .print-toolbar button {
-      background: #edd501;
-      color: #111485;
-      border: none;
-      border-radius: 8px;
-      padding: 10px 18px;
-      font-weight: 700;
-      font-size: 13px;
-      cursor: pointer;
-      white-space: nowrap;
-    }
-    .print-toolbar button:hover { filter: brightness(1.05); }
+  * { box-sizing: border-box; }
+  body {
+    font-family: Arial, Helvetica, "Segoe UI", sans-serif;
+    color: #000;
+    margin: 0;
+    padding: 0;
+    font-size: 10.5pt;
+    line-height: 1.3;
+    background: #d1d5db;
+  }
+  .print-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 16px;
+    background: #111485;
+    color: #fff;
+  }
+  .print-toolbar p { margin: 0; font-size: 12px; max-width: 72%; }
+  .print-toolbar button {
+    background: #edd501;
+    color: #111485;
+    border: none;
+    border-radius: 6px;
+    padding: 9px 16px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .sheet {
+    max-width: 210mm;
+    margin: 14px auto 28px;
+    padding: 8mm 10mm 10mm;
+    background: #fff;
+    box-shadow: 0 2px 12px rgba(0,0,0,.12);
+  }
+  .sheet-cover {
+    text-align: center;
+    padding: 12mm 8mm;
+  }
+  .sheet-cover h2 {
+    margin: 12px 0 6px;
+    font-size: 14pt;
+    text-transform: uppercase;
+    color: #111485;
+  }
+  table.informe-grid {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    border: 1px solid #000;
+  }
+  table.informe-grid + table.informe-grid {
+    border-top: none;
+  }
+  table.informe-grid th,
+  table.informe-grid td {
+    border: 1px solid #000;
+    padding: 5px 7px;
+    vertical-align: middle;
+  }
+  table.informe-grid th.hdr {
+    background: #e8e8e8;
+    font-weight: 700;
+    text-align: left;
+    width: 22%;
+    white-space: nowrap;
+  }
+  table.informe-grid td.val {
+    font-weight: 600;
+    background: #fff;
+  }
+  table.informe-grid td.cell-logos {
+    background: #fff;
+    vertical-align: middle;
+    text-align: center;
+    width: 36%;
+    min-height: 72px;
+    padding: 8px;
+  }
+  .logos-inner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    min-height: 58px;
+  }
+  .logo-obra { max-height: 52px; max-width: 160px; object-fit: contain; display: block; }
+  .logo-camacon { max-height: 48px; max-width: 120px; object-fit: contain; display: block; }
+  .logo-fallback {
+    font-size: 9pt;
+    color: #6b7280;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  td.title-main {
+    text-align: center;
+    font-weight: 800;
+    font-size: 11.5pt;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    background: #f5f5f5;
+    padding: 9px 8px;
+  }
+  td.cell-proyecto {
+    vertical-align: top;
+    background: #fff;
+  }
+  th.hdr-proyecto {
+    background: #e8e8e8;
+    font-weight: 700;
+    text-align: left;
+    vertical-align: top;
+    width: 12%;
+  }
+  .proyecto-nombre {
+    font-weight: 800;
+    font-size: 10.5pt;
+    text-transform: uppercase;
+    margin: 0 0 3px;
+    line-height: 1.25;
+  }
+  .proyecto-rango {
+    margin: 0;
+    font-size: 9pt;
+    font-weight: 400;
+    color: #333;
+  }
+  td.cell-meta-side {
+    padding: 0 !important;
+    vertical-align: top;
+    width: 28%;
+  }
+  table.informe-nested {
+    width: 100%;
+    height: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+  table.informe-nested th,
+  table.informe-nested td {
+    border: 1px solid #000;
+    padding: 4px 6px;
+    font-size: 10pt;
+  }
+  table.informe-nested th {
+    background: #e8e8e8;
+    font-weight: 700;
+    width: 48%;
+    text-align: left;
+  }
+  table.informe-nested td {
+    font-weight: 600;
+    background: #fff;
+  }
+  th.clima-hdr {
+    background: #e8e8e8;
+    font-weight: 700;
+    text-align: center;
+  }
+  th.clima-franja {
+    background: #e8e8e8;
+    font-weight: 700;
+    text-align: left;
+    width: 22%;
+  }
+  td.clima-data { text-align: center; background: #fff; }
+  .clima-tiempo { display: inline-flex; align-items: center; gap: 4px; justify-content: center; }
+  table.seccion-grid {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    border: 1px solid #000;
+    margin-top: 10px;
+    page-break-inside: avoid;
+  }
+  table.seccion-grid th,
+  table.seccion-grid td {
+    border: 1px solid #000;
+    padding: 6px 8px;
+    vertical-align: top;
+  }
+  th.seccion-titulo {
+    text-align: center;
+    text-transform: uppercase;
+    font-weight: 800;
+    font-size: 11pt;
+    background: #dde3f0;
+    color: #111485;
+    padding: 7px;
+  }
+  th.seccion-label {
+    background: #e8e8e8;
+    font-weight: 700;
+    width: 18%;
+    text-align: left;
+  }
+  td.obs-cell { white-space: pre-wrap; min-height: 44px; background: #fff; }
+  .evidencia-img {
+    display: block;
+    max-width: 100%;
+    max-height: 180px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    margin: 0 auto;
+  }
+  .firma-img {
+    display: block;
+    max-height: 80px;
+    max-width: 240px;
+    object-fit: contain;
+  }
+  .muted { color: #9ca3af; font-style: italic; }
+  .footer-note {
+    margin-top: 12px;
+    font-size: 8.5pt;
+    color: #6b7280;
+    text-align: right;
+  }
+  .day-break { page-break-before: always; }
+  @media print {
+    body { background: #fff; }
+    .print-toolbar { display: none !important; }
     .sheet {
-      max-width: 210mm;
-      margin: 16px auto 32px;
-      padding: 10mm 12mm 14mm;
-      background: #fff;
-      box-shadow: 0 4px 24px rgba(0,0,0,.12);
+      margin: 0 auto;
+      max-width: none;
+      box-shadow: none;
+      padding: 0;
+      page-break-after: always;
     }
-    .sheet-cover {
-      text-align: center;
-      padding-top: 8mm;
-      padding-bottom: 8mm;
-    }
-    .sheet-cover h2 {
-      margin: 0 0 8px;
-      font-size: 16px;
-      color: #111485;
-      text-transform: uppercase;
-    }
-    .sheet-cover p { margin: 4px 0; color: #374151; }
-    table.grid {
-      width: 100%;
-      border-collapse: collapse;
-      table-layout: fixed;
-    }
-    table.grid th,
-    table.grid td {
-      border: 1px solid #222;
-      padding: 6px 8px;
-      vertical-align: middle;
-    }
-    table.grid th {
-      background: #ececec;
-      font-weight: 700;
-      text-align: left;
-    }
-    .header-logos td { vertical-align: middle; height: 72px; }
-    .logos-wrap {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      min-height: 64px;
-    }
-    .logo-obra { max-height: 56px; max-width: 180px; object-fit: contain; }
-    .logo-camacon { max-height: 52px; max-width: 140px; object-fit: contain; }
-    .meta-table { width: 100%; border-collapse: collapse; }
-    .meta-table th, .meta-table td {
-      border: 1px solid #222;
-      padding: 5px 8px;
-      font-size: 11px;
-    }
-    .meta-table th { background: #ececec; width: 42%; font-weight: 700; }
-    .title-row td {
-      text-align: center;
-      font-weight: 800;
-      font-size: 13px;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      background: #f8f8f8;
-      padding: 10px;
-    }
-    .proyecto-nombre {
-      font-weight: 800;
-      font-size: 12px;
-      text-transform: uppercase;
-      margin: 0 0 4px;
-    }
-    .proyecto-rango { margin: 0; color: #374151; font-size: 10px; }
-    .cell-label { width: 22%; font-weight: 700; background: #ececec; }
-    .clima-tiempo { display: inline-flex; align-items: center; gap: 6px; }
-    .section-block { margin-top: 10px; page-break-inside: avoid; }
-    .section-title {
-      text-align: center;
-      text-transform: uppercase;
-      font-size: 12px;
-      background: #e8ecf4 !important;
-      color: #111485;
-    }
-    .obs-cell { white-space: pre-wrap; min-height: 48px; }
-    .evidencia-img {
-      max-width: 100%;
-      max-height: 220px;
-      object-fit: contain;
-      border: 1px solid #d1d5db;
-      border-radius: 4px;
-    }
-    .firma-img { max-height: 90px; max-width: 280px; object-fit: contain; }
-    .muted { color: #6b7280; }
-    .footer-note {
-      margin-top: 14px;
-      font-size: 9px;
-      color: #6b7280;
-      text-align: right;
-    }
-    .day-break { page-break-before: always; }
-    @media print {
-      body { background: #fff; }
-      .print-toolbar { display: none !important; }
-      .sheet {
-        margin: 0 auto;
-        max-width: none;
-        box-shadow: none;
-        padding: 0;
-        page-break-after: always;
-      }
-      .sheet:last-child { page-break-after: auto; }
-      .day-break { page-break-before: always; }
-      @page { size: A4 portrait; margin: 12mm; }
-    }
+    .sheet:last-child { page-break-after: auto; }
+    @page { size: A4 portrait; margin: 10mm; }
+  }
 `;
+
+function logosContentHtml(obra: RegistroBitacoraPdfObra): string {
+  const parts: string[] = [];
+  if (obra.obraLogoUrl) {
+    parts.push(`<img class="logo-obra" src="${esc(obra.obraLogoUrl)}" alt="" />`);
+  } else {
+    parts.push(`<span class="logo-fallback">${esc(obra.obraCodigo)}</span>`);
+  }
+  if (obra.camaconLogoUrl) {
+    parts.push(`<img class="logo-camacon" src="${esc(obra.camaconLogoUrl)}" alt="Camacón" />`);
+  }
+  return parts.join('');
+}
+
+function logosHtml(obra: RegistroBitacoraPdfObra): string {
+  return `<div class="logos-inner">${logosContentHtml(obra)}</div>`;
+}
+
+function buildHeaderAndClimaHtml(obra: RegistroBitacoraPdfObra, dia: RegistroBitacoraPdfDia): string {
+  const climaBody = dia.climaFilas
+    .map(
+      (f) => `<tr>
+        <th class="clima-franja">${esc(f.franja)}</th>
+        <td class="clima-data">${f.tiempoHtml}</td>
+        <td class="clima-data">${esc(f.condicion)}</td>
+      </tr>`,
+    )
+    .join('');
+
+  const plazoTxt = obra.plazoContractualDias != null ? `${obra.plazoContractualDias} días` : '—';
+  const transcurridoTxt =
+    dia.tiempoTranscurridoDias != null ? `${dia.tiempoTranscurridoDias} días` : '—';
+
+  return `
+    <table class="informe-grid" role="presentation">
+      <colgroup>
+        <col style="width:36%" />
+        <col style="width:18%" />
+        <col style="width:18%" />
+        <col style="width:28%" />
+      </colgroup>
+      <tr>
+        <td rowspan="3" class="cell-logos">${logosHtml(obra)}</td>
+        <th class="hdr">Número</th>
+        <td class="val" colspan="2">${esc(dia.consecutivo)}</td>
+      </tr>
+      <tr>
+        <th class="hdr">Fecha</th>
+        <td class="val" colspan="2">${esc(dia.fechaTexto)}</td>
+      </tr>
+      <tr>
+        <th class="hdr">Día de la semana</th>
+        <td class="val" colspan="2">${esc(dia.diaSemana)}</td>
+      </tr>
+      <tr>
+        <td colspan="4" class="title-main">Informe diario de trabajo</td>
+      </tr>
+      <tr>
+        <th class="hdr-proyecto">Proyecto</th>
+        <td colspan="2" class="cell-proyecto">
+          <p class="proyecto-nombre">${esc(obra.obraCodigo)} — ${esc(obra.obraNombre)}</p>
+          <p class="proyecto-rango">${esc(obra.rangoObraTexto)}</p>
+        </td>
+        <td class="cell-meta-side">
+          <table class="informe-nested" role="presentation">
+            <tr>
+              <th>Contrato</th>
+              <td>${esc(obra.contratoTexto)}</td>
+            </tr>
+            <tr>
+              <th>Plazo contractual</th>
+              <td>${esc(plazoTxt)}</td>
+            </tr>
+            <tr>
+              <th>Tiempo transcurrido</th>
+              <td>${esc(transcurridoTxt)}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <table class="informe-grid" role="presentation">
+      <colgroup>
+        <col style="width:22%" />
+        <col style="width:39%" />
+        <col style="width:39%" />
+      </colgroup>
+      <tr>
+        <th class="clima-hdr">Condición climática</th>
+        <th class="clima-hdr">Tiempo</th>
+        <th class="clima-hdr">Condición</th>
+      </tr>
+      ${climaBody}
+    </table>`;
+}
 
 function buildSeccionesHtml(secciones: RegistroBitacoraPdfSlot[]): string {
   return secciones
     .map((s) => {
       const obs = esc(s.observaciones || '—');
       const foto = s.fotoUrl
-        ? `<img class="evidencia-img" src="${esc(s.fotoUrl)}" alt="Foto ${esc(s.titulo)}" />`
-        : '<span class="muted">—</span>';
+        ? `<img class="evidencia-img" src="${esc(s.fotoUrl)}" alt="" />`
+        : '<span class="muted">Sin foto</span>';
       const firma = s.firmaUrl
-        ? `<img class="firma-img" src="${esc(s.firmaUrl)}" alt="Firma ${esc(s.titulo)}" />`
-        : '<span class="muted">—</span>';
-      return `<table class="grid section-block">
-        <tr><th class="section-title" colspan="2">${esc(s.titulo)}</th></tr>
+        ? `<img class="firma-img" src="${esc(s.firmaUrl)}" alt="" />`
+        : '<span class="muted">Sin firma</span>';
+      return `<table class="seccion-grid" role="presentation">
+        <tr><th class="seccion-titulo" colspan="2">${esc(s.titulo)}</th></tr>
         <tr>
-          <th class="cell-label">Observaciones</th>
+          <th class="seccion-label">Observaciones</th>
           <td class="obs-cell">${obs}</td>
         </tr>
         <tr>
-          <th class="cell-label">Foto</th>
-          <td>${foto}</td>
+          <th class="seccion-label">Foto</th>
+          <td style="text-align:center;background:#fff;">${foto}</td>
         </tr>
         <tr>
-          <th class="cell-label">Firma</th>
-          <td>${firma}</td>
+          <th class="seccion-label">Firma</th>
+          <td style="background:#fff;">${firma}</td>
         </tr>
       </table>`;
     })
     .join('');
 }
 
-function logosHtml(obra: RegistroBitacoraPdfObra): string {
-  const logoObra = obra.obraLogoUrl
-    ? `<img class="logo-obra" src="${esc(obra.obraLogoUrl)}" alt="Logo obra" />`
-    : '';
-  const logoCamacon = obra.camaconLogoUrl
-    ? `<img class="logo-camacon" src="${esc(obra.camaconLogoUrl)}" alt="Camacón" />`
-    : '';
-  return `${logoObra}${logoCamacon}`;
-}
-
 function buildDaySheetHtml(obra: RegistroBitacoraPdfObra, dia: RegistroBitacoraPdfDia, extraClass = ''): string {
-  const climaRows = dia.climaFilas
-    .map(
-      (f) => `<tr>
-        <td class="cell-label">${esc(f.franja)}</td>
-        <td>${f.tiempoHtml}</td>
-        <td>${esc(f.condicion)}</td>
-      </tr>`,
-    )
-    .join('');
-
   return `<section class="sheet ${extraClass}">
-    <table class="grid">
-      <tr class="header-logos">
-        <td colspan="2" style="width:58%">
-          <div class="logos-wrap">${logosHtml(obra)}</div>
-        </td>
-        <td style="width:42%; padding:0; vertical-align:top;">
-          <table class="meta-table">
-            <tr><th>Número</th><td>${esc(dia.consecutivo)}</td></tr>
-            <tr><th>Fecha</th><td>${esc(dia.fechaTexto)}</td></tr>
-            <tr><th>Día de la semana</th><td>${esc(dia.diaSemana)}</td></tr>
-          </table>
-        </td>
-      </tr>
-      <tr class="title-row"><td colspan="3">Informe diario de trabajo</td></tr>
-      <tr>
-        <td colspan="2" style="vertical-align:top;">
-          <p class="proyecto-nombre">${esc(obra.obraCodigo)} — ${esc(obra.obraNombre)}</p>
-          <p class="proyecto-rango">${esc(obra.rangoObraTexto)}</p>
-        </td>
-        <td style="padding:0; vertical-align:top;">
-          <table class="meta-table">
-            <tr><th>Contrato</th><td>${esc(obra.contratoTexto)}</td></tr>
-            <tr><th>Plazo contractual</th><td>${obra.plazoContractualDias != null ? esc(`${obra.plazoContractualDias} días`) : '—'}</td></tr>
-            <tr><th>Tiempo transcurrido</th><td>${dia.tiempoTranscurridoDias != null ? esc(`${dia.tiempoTranscurridoDias} días`) : '—'}</td></tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-
-    <table class="grid" style="margin-top:10px;">
-      <tr>
-        <th class="cell-label">Condición climática</th>
-        <th style="width:38%">Tiempo</th>
-        <th style="width:28%">Condición</th>
-      </tr>
-      ${climaRows}
-    </table>
-
+    ${buildHeaderAndClimaHtml(obra, dia)}
     ${buildSeccionesHtml(dia.secciones)}
-
     <p class="footer-note">
       Registrado por: ${esc(dia.registradoPor)} · ${esc(dia.actualizadoTexto)}
     </p>
@@ -333,7 +466,7 @@ export function buildRegistroBitacoraPdfDocumentHtml(doc: RegistroBitacoraPdfDoc
 
   const coverHtml = multi
     ? `<section class="sheet sheet-cover">
-        <div class="logos-wrap" style="justify-content:center;margin-bottom:16px;">${logosHtml(obra)}</div>
+        <div class="logos-inner" style="margin-bottom:14px;">${logosContentHtml(obra)}</div>
         <h2>Registro de bitácora</h2>
         <p><strong>${esc(obra.obraCodigo)}</strong> — ${esc(obra.obraNombre)}</p>
         <p>Período: <strong>${esc(periodoTexto)}</strong></p>
