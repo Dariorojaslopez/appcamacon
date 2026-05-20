@@ -17,7 +17,7 @@ export function buildPdfPreviewContentSecurityPolicy(nonce: string): string {
   return [
     "default-src 'self'",
     `style-src 'self' 'nonce-${nonce}' 'unsafe-inline'`,
-    "script-src 'self' 'unsafe-inline'",
+    `script-src 'self' 'nonce-${nonce}'`,
     "img-src 'self' data: blob: https: http:",
     "font-src 'self' data:",
     "connect-src 'self'",

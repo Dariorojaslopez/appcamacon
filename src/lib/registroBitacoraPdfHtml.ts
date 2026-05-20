@@ -390,7 +390,7 @@ const PDF_STYLES = `
   }
   .day-break { page-break-before: always; }
   @media print {
-    body { background: #fff; }
+    body { background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .print-toolbar { display: none !important; }
     .sheet {
       margin: 0 auto;
@@ -400,6 +400,7 @@ const PDF_STYLES = `
       page-break-after: always;
     }
     .sheet:last-child { page-break-after: auto; }
+    .sheet-cover { page-break-after: always; }
     @page { size: A4 portrait; margin: 10mm; }
   }
 `;
@@ -613,6 +614,7 @@ export function buildRegistroBitacoraPdfDocumentHtml(doc: RegistroBitacoraPdfDoc
   const { obra, periodoTexto, toolbarDetalle, dias, styleNonce } = doc;
   const multi = dias.length > 1;
   const styleNonceAttr = styleNonce ? ` nonce="${esc(styleNonce)}"` : '';
+  const scriptNonceAttr = styleNonce ? ` nonce="${esc(styleNonce)}"` : '';
 
   const coverHtml = multi
     ? `<section class="sheet sheet-cover">
@@ -639,10 +641,25 @@ export function buildRegistroBitacoraPdfDocumentHtml(doc: RegistroBitacoraPdfDoc
 <body>
   <div class="print-toolbar">
     <p>Vista previa · ${esc(periodoTexto)} · ${esc(toolbarDetalle)}</p>
-    <button type="button" onclick="window.print()">Imprimir / guardar PDF</button>
+    <button type="button" id="btn-print-pdf">Imprimir / guardar PDF</button>
   </div>
   ${coverHtml}
   ${sheetsHtml}
+  <script${scriptNonceAttr}>
+    (function () {
+      function doPrint() {
+        try { window.print(); } catch (e) { console.error(e); }
+      }
+      var btn = document.getElementById('btn-print-pdf');
+      if (btn) btn.addEventListener('click', doPrint);
+      document.addEventListener('keydown', function (ev) {
+        if ((ev.ctrlKey || ev.metaKey) && ev.key === 'p') {
+          ev.preventDefault();
+          doPrint();
+        }
+      });
+    })();
+  </script>
 </body>
 </html>`;
 }
