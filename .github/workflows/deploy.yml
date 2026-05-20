@@ -8,15 +8,25 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
-      - name: Deploy to VPS
-        uses: appleboy/ssh-action@master
+      - name: Comprobar secretos de deploy
+        run: |
+          if [ -z "${{ secrets.HOST }}" ]; then echo "::error::Falta el secret HOST en el repositorio."; exit 1; fi
+          if [ -z "${{ secrets.USERNAME }}" ]; then echo "::error::Falta el secret USERNAME."; exit 1; fi
+          if [ -z "${{ secrets.SSH_KEY }}" ]; then echo "::error::Falta el secret SSH_KEY."; exit 1; fi
+          echo "Secretos presentes (host y usuario configurados)."
 
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          timeout: 120s
+          command_timeout: 15m
 
           script: |
             set -e
