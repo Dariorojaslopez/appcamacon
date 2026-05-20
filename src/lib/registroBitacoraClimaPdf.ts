@@ -42,8 +42,10 @@ export function buildUtcDateRangeForYmdKeys(ymdKeys: string[]): { gte: Date; lt:
   };
 }
 
-export const INFORME_CLIMA_PDF_SELECT = {
+export const INFORME_DIARIO_PDF_SELECT = {
   date: true,
+  informeNo: true,
+  informeConsecutivo: true,
   franjaClimaMananaCodigo: true,
   franjaClimaTardeCodigo: true,
   franjaClimaNocheCodigo: true,
@@ -52,12 +54,17 @@ export const INFORME_CLIMA_PDF_SELECT = {
   },
 } as const;
 
-/** Consulta informes por cada día del rango (evita desfases DATE vs TIMESTAMP). */
-export async function findInformesClimaEnRango(
+export type InformeDiarioPdfRow = InformeClimaPorJornadaRow & {
+  informeNo: string | null;
+  informeConsecutivo: number | null;
+};
+
+/** Todos los informes diarios de la obra en el rango (uno por obra + fecha + jornada). */
+export async function findInformesDiariosEnRango(
   projectId: string,
   desde: Date,
   hasta: Date,
-): Promise<InformeClimaPorJornadaRow[]> {
+): Promise<InformeDiarioPdfRow[]> {
   const days = eachYmdInRangeUtc(desde, hasta);
   if (days.length === 0) return [];
   const batches = await Promise.all(
@@ -67,12 +74,21 @@ export async function findInformesClimaEnRango(
           projectId,
           date: { gte: day, lt: new Date(day.getTime() + 86400000) },
         },
-        select: INFORME_CLIMA_PDF_SELECT,
+        select: INFORME_DIARIO_PDF_SELECT,
         orderBy: [{ date: 'asc' }, { jornadaCatalogo: { orden: 'asc' } }],
       }),
     ),
   );
   return batches.flat();
+}
+
+/** @deprecated Use findInformesDiariosEnRango */
+export async function findInformesClimaEnRango(
+  projectId: string,
+  desde: Date,
+  hasta: Date,
+): Promise<InformeClimaPorJornadaRow[]> {
+  return findInformesDiariosEnRango(projectId, desde, hasta);
 }
 
 export function informeTieneFranjaClima(inf: InformeClimaPorJornada): boolean {
@@ -149,7 +165,15 @@ export function labelJornadaInforme(
   return `${jornada.nombre} (${jornada.horaInicio} – ${jornada.horaFin})`;
 }
 
-/** Una fila por franja y por cada informe/jornada del día (ej. 2 jornadas → 6 filas). */
+/** Tres filas (mañana, tarde, noche) de un solo informe diario. */
+export function buildClimaFilasDeUnInforme(
+  informe: InformeClimaPorJornada,
+  catalog: Map<string, string>,
+): RegistroBitacoraPdfClimaFranja[] {
+  return buildClimaFilasFromInformes([informe], catalog);
+}
+
+/** Una fila por franja y por cada informe del arreglo (en PDF: un informe → 3 filas). */
 export function buildClimaFilasFromInformes(
   informes: InformeClimaPorJornada[],
   catalog: Map<string, string>,

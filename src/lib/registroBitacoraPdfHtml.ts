@@ -23,7 +23,11 @@ export type RegistroBitacoraPdfObra = {
 };
 
 export type RegistroBitacoraPdfDia = {
+  /** Consecutivo de bitácora del día (si existe). */
   consecutivo: number;
+  /** Número del informe diario (ej. IDO-2026-006). */
+  informeNo: string;
+  jornadaTexto: string;
   fechaTexto: string;
   diaSemana: string;
   tiempoTranscurridoDias: number | null;
@@ -380,9 +384,13 @@ function buildHeaderAndClimaHtml(obra: RegistroBitacoraPdfObra, dia: RegistroBit
         <col width="28%" />
       </colgroup>
       <tr>
-        <td rowspan="3" class="cell-logos">${logosHtml(obra)}</td>
-        <th class="hdr">Número</th>
-        <td class="val" colspan="2">${esc(dia.consecutivo)}</td>
+        <td rowspan="5" class="cell-logos">${logosHtml(obra)}</td>
+        <th class="hdr">Informe No.</th>
+        <td class="val" colspan="2">${esc(dia.informeNo)}</td>
+      </tr>
+      <tr>
+        <th class="hdr">Jornada</th>
+        <td class="val" colspan="2">${esc(dia.jornadaTexto)}</td>
       </tr>
       <tr>
         <th class="hdr">Fecha</th>
@@ -391,6 +399,10 @@ function buildHeaderAndClimaHtml(obra: RegistroBitacoraPdfObra, dia: RegistroBit
       <tr>
         <th class="hdr">Día de la semana</th>
         <td class="val" colspan="2">${esc(dia.diaSemana)}</td>
+      </tr>
+      <tr>
+        <th class="hdr">Bitácora No.</th>
+        <td class="val" colspan="2">${dia.consecutivo > 0 ? esc(dia.consecutivo) : '—'}</td>
       </tr>
       <tr>
         <td colspan="4" class="title-main">Informe diario de trabajo</td>
@@ -525,6 +537,8 @@ export function buildRegistroBitacoraPdfHtml(data: RegistroBitacoraPdfData): str
   };
   const dia: RegistroBitacoraPdfDia = {
     consecutivo: rest.consecutivo,
+    informeNo: (rest as RegistroBitacoraPdfDia).informeNo ?? String(rest.consecutivo),
+    jornadaTexto: (rest as RegistroBitacoraPdfDia).jornadaTexto ?? '—',
     fechaTexto: rest.fechaTexto,
     diaSemana: rest.diaSemana,
     tiempoTranscurridoDias: rest.tiempoTranscurridoDias,

@@ -2,8 +2,9 @@ import type { RegistroBitacoraObra, User } from '@prisma/client';
 import { storedMediaImgSrc } from './evidenciasUrlPayload';
 import { diffInclusiveCalendarDaysUtc } from './registroBitacoraFecha';
 import {
-  buildClimaFilasFromInformes,
-  type InformeClimaPorJornada,
+  buildClimaFilasDeUnInforme,
+  labelJornadaInforme,
+  type InformeDiarioPdfRow,
 } from './registroBitacoraClimaPdf';
 import type { RegistroBitacoraPdfDia, RegistroBitacoraPdfObra, RegistroBitacoraPdfSlot } from './registroBitacoraPdfHtml';
 import { REGISTRO_BITACORA_SLOT_LABELS } from '../shared/registroBitacoraPermissions';
@@ -70,14 +71,8 @@ function transcurridoDiasObra(project: ProjectPdf, fecha: Date): number | null {
   return diffInclusiveCalendarDaysUtc(project.startDate, fecha);
 }
 
-/** Página del PDF con clima del informe diario (sin registro de bitácora guardado ese día). */
-export function buildDiaPdfDataSoloInforme(
-  project: ProjectPdf,
-  fecha: Date,
-  informesDelDia: InformeClimaPorJornada[],
-  catalog: Map<string, string>,
-): RegistroBitacoraPdfDia {
-  const seccionesVacias: RegistroBitacoraPdfSlot[] = [
+function seccionesVaciasBitacora(): RegistroBitacoraPdfSlot[] {
+  return [
     {
       titulo: REGISTRO_BITACORA_SLOT_LABELS.contratista,
       observaciones: '',
@@ -97,34 +92,10 @@ export function buildDiaPdfDataSoloInforme(
       firmaUrl: '',
     },
   ];
-
-  return {
-    consecutivo: 0,
-    fechaTexto: formatFechaEsPdf(fecha),
-    diaSemana: weekdayEsPdf(fecha),
-    tiempoTranscurridoDias: transcurridoDiasObra(project, fecha),
-    climaFilas: buildClimaFilasFromInformes(informesDelDia, catalog),
-    secciones: seccionesVacias,
-    registradoPor: '—',
-    actualizadoTexto: '—',
-  };
 }
 
-export function buildDiaPdfData(
-  origin: string,
-  project: ProjectPdf,
-  reg: RegistroWithUser,
-  fecha: Date,
-  informesDelDia: InformeClimaPorJornada[],
-  catalog: Map<string, string>,
-): RegistroBitacoraPdfDia {
-  const climaFilas = buildClimaFilasFromInformes(informesDelDia, catalog, {
-    franjaClimaMananaCodigo: reg.franjaClimaMananaCodigo,
-    franjaClimaTardeCodigo: reg.franjaClimaTardeCodigo,
-    franjaClimaNocheCodigo: reg.franjaClimaNocheCodigo,
-  });
-
-  const secciones: RegistroBitacoraPdfSlot[] = [
+function seccionesDesdeRegistro(origin: string, reg: RegistroWithUser): RegistroBitacoraPdfSlot[] {
+  return [
     {
       titulo: REGISTRO_BITACORA_SLOT_LABELS.contratista,
       observaciones: reg.contratistaObservaciones,
@@ -144,15 +115,34 @@ export function buildDiaPdfData(
       firmaUrl: absMediaPdf(origin, reg.iduFirmaUrl),
     },
   ];
+}
+
+/** Una hoja del PDF = un informe diario (obra + fecha + jornada) + bitácora del mismo día si existe. */
+export function buildInformeDiarioPdfPage(
+  origin: string,
+  project: ProjectPdf,
+  informe: InformeDiarioPdfRow,
+  reg: RegistroWithUser | null,
+  catalog: Map<string, string>,
+): RegistroBitacoraPdfDia {
+  const fecha = informe.date;
+  const jornadaTexto = labelJornadaInforme(informe.jornadaCatalogo);
+  const informeNo =
+    informe.informeNo?.trim() ||
+    (informe.informeConsecutivo != null ? String(informe.informeConsecutivo) : '—');
 
   return {
-    consecutivo: reg.consecutivo,
+    consecutivo: reg?.consecutivo ?? 0,
+    informeNo,
+    jornadaTexto,
     fechaTexto: formatFechaEsPdf(fecha),
     diaSemana: weekdayEsPdf(fecha),
     tiempoTranscurridoDias: transcurridoDiasObra(project, fecha),
-    climaFilas,
-    secciones,
-    registradoPor: reg.user.name,
-    actualizadoTexto: reg.updatedAt.toLocaleString('es-CO', { timeZone: 'America/Bogota' }),
+    climaFilas: buildClimaFilasDeUnInforme(informe, catalog),
+    secciones: reg ? seccionesDesdeRegistro(origin, reg) : seccionesVaciasBitacora(),
+    registradoPor: reg?.user.name ?? '—',
+    actualizadoTexto: reg
+      ? reg.updatedAt.toLocaleString('es-CO', { timeZone: 'America/Bogota' })
+      : '—',
   };
 }

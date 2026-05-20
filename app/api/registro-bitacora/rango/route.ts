@@ -11,10 +11,7 @@ import {
   parseRangoRegistroBitacora,
   toYmdUtc,
 } from '../../../../src/lib/registroBitacoraFecha';
-import {
-  findInformesClimaEnRango,
-  informeTieneFranjaClima,
-} from '../../../../src/lib/registroBitacoraClimaPdf';
+import { findInformesDiariosEnRango, labelJornadaInforme } from '../../../../src/lib/registroBitacoraClimaPdf';
 
 export async function GET(req: NextRequest) {
   try {
@@ -63,21 +60,22 @@ export async function GET(req: NextRequest) {
     });
 
     const totalDias = diffInclusiveCalendarDaysUtc(rango.desde, rango.hasta);
-    const informesEnRango = await findInformesClimaEnRango(projectId, rango.desde, rango.hasta);
-    const diasConClima = new Set(
-      informesEnRango.filter(informeTieneFranjaClima).map((i) => toYmdUtc(i.date)),
-    );
-    const conInforme = diasConClima.size;
+    const informesEnRango = await findInformesDiariosEnRango(projectId, rango.desde, rango.hasta);
 
     return NextResponse.json({
       fechaDesde: fechaDesdeStr,
       fechaHasta: fechaHastaStr,
       totalDias,
       conRegistro: registros.length,
-      conInforme,
+      conInforme: informesEnRango.length,
       registros: registros.map((r) => ({
         fecha: toYmdUtc(r.fecha),
         consecutivo: r.consecutivo,
+      })),
+      informes: informesEnRango.map((inf) => ({
+        fecha: toYmdUtc(inf.date),
+        informeNo: inf.informeNo ?? null,
+        jornada: labelJornadaInforme(inf.jornadaCatalogo),
       })),
     });
   } catch (error: unknown) {

@@ -204,6 +204,7 @@ type RangoResumen = {
   conRegistro: number;
   conInforme?: number;
   registros: { fecha: string; consecutivo: number }[];
+  informes?: { fecha: string; informeNo: string | null; jornada: string }[];
 };
 
 export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
@@ -448,6 +449,7 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
           conRegistro: data.conRegistro,
           conInforme: data.conInforme,
           registros: data.registros ?? [],
+          informes: data.informes ?? [],
         });
       } finally {
         if (!cancelled) setLoadingRango(false);
@@ -654,13 +656,9 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
       setErr('La fecha inicial no puede ser posterior a la final.');
       return;
     }
-    if (
-      rangoResumen &&
-      rangoResumen.conRegistro === 0 &&
-      (rangoResumen.conInforme ?? 0) === 0
-    ) {
+    if (rangoResumen && (rangoResumen.conInforme ?? 0) === 0) {
       setErr(
-        'No hay registros de bitácora ni informes diarios en ese rango. Registre al menos un día o un informe con condición climática.',
+        'No hay informes diarios en ese rango. Cree el informe en «Datos generales» (obra, fecha y jornada) antes de imprimir.',
       );
       return;
     }
@@ -752,8 +750,8 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
           Consultar e imprimir por rango
         </h2>
         <p className="informe-label-hint" style={{ marginTop: 0, marginBottom: '1rem' }}>
-          Elija un rango de fechas para buscar registros guardados y generar el PDF (un informe por cada día con
-          registro).
+          Elija un rango de fechas: se listan los informes diarios (obra + fecha + jornada) y se genera una hoja por cada
+          uno, con sus franjas de clima (mañana, tarde, noche) y la bitácora del mismo día si existe.
         </p>
 
         <div className="registro-bitacora-rango-fechas">
@@ -800,26 +798,19 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
         {loadingRango && projectId && <p className="shell-text-muted">Buscando registros en el rango…</p>}
         {!loadingRango && rangoResumen && projectId && (
           <p className="shell-text-muted" style={{ marginTop: 0 }}>
-            En el rango: <strong>{rangoResumen.conRegistro}</strong> registro
-            {rangoResumen.conRegistro === 1 ? '' : 's'} de bitácora
-            {(rangoResumen.conInforme ?? 0) > 0 ? (
-              <>
-                {' '}
-                y <strong>{rangoResumen.conInforme}</strong> informe
-                {(rangoResumen.conInforme ?? 0) === 1 ? '' : 's'} diario
-                {(rangoResumen.conInforme ?? 0) === 1 ? '' : 's'}
-              </>
-            ) : null}{' '}
-            (de <strong>{rangoResumen.totalDias}</strong> día{rangoResumen.totalDias === 1 ? '' : 's'}). El PDF incluye
-            la condición climática de los informes diarios del rango.
+            En el rango hay <strong>{rangoResumen.conInforme ?? 0}</strong> informe
+            {(rangoResumen.conInforme ?? 0) === 1 ? '' : 's'} diario
+            {(rangoResumen.conInforme ?? 0) === 1 ? '' : 's'} (una hoja por informe) y{' '}
+            <strong>{rangoResumen.conRegistro}</strong> registro{rangoResumen.conRegistro === 1 ? '' : 's'} de bitácora
+            por día.
           </p>
         )}
-        {!loadingRango && rangoResumen && rangoResumen.registros.length > 0 && (
+        {!loadingRango && rangoResumen && (rangoResumen.informes?.length ?? 0) > 0 && (
           <ul className="registro-bitacora-rango-lista">
-            {rangoResumen.registros.map((r) => (
-              <li key={r.fecha}>
-                <button type="button" className="registro-bitacora-rango-link" onClick={() => irADiaRegistro(r.fecha)}>
-                  {r.fecha} · consecutivo {r.consecutivo}
+            {rangoResumen.informes!.map((inf, i) => (
+              <li key={`${inf.fecha}-${inf.jornada}-${i}`}>
+                <button type="button" className="registro-bitacora-rango-link" onClick={() => irADiaRegistro(inf.fecha)}>
+                  {inf.fecha} · {inf.informeNo ?? 'sin número'} · {inf.jornada}
                 </button>
               </li>
             ))}
@@ -836,14 +827,12 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
               !fechaDesde ||
               !fechaHasta ||
               loadingRango ||
-              (rangoResumen != null &&
-                rangoResumen.conRegistro === 0 &&
-                (rangoResumen.conInforme ?? 0) === 0)
+              (rangoResumen != null && (rangoResumen.conInforme ?? 0) === 0)
             }
           >
             <span className="registro-bitacora-print-btn-title">Vista previa e imprimir PDF del rango</span>
             <span className="registro-bitacora-print-btn-hint">
-              Incluye bitácora y condición climática de los informes diarios entre las fechas (máx. 93 días).
+              Una hoja por informe diario (fecha + jornada), con clima mañana/tarde/noche (máx. 93 días).
             </span>
           </button>
         </div>
