@@ -1,11 +1,7 @@
 import type { RegistroBitacoraObra, User } from '@prisma/client';
 import { storedMediaImgSrc } from './evidenciasUrlPayload';
 import { diffInclusiveCalendarDaysUtc } from './registroBitacoraFecha';
-import {
-  buildClimaFilasDeUnInforme,
-  labelJornadaInforme,
-  type InformeDiarioPdfRow,
-} from './registroBitacoraClimaPdf';
+import { buildClimaFilasDeUnInforme, type InformeDiarioPdfRow } from './registroBitacoraClimaPdf';
 import type { RegistroBitacoraPdfDia, RegistroBitacoraPdfObra, RegistroBitacoraPdfSlot } from './registroBitacoraPdfHtml';
 import { REGISTRO_BITACORA_SLOT_LABELS } from '../shared/registroBitacoraPermissions';
 
@@ -126,7 +122,6 @@ export function buildInformeDiarioPdfPage(
   catalog: Map<string, string>,
 ): RegistroBitacoraPdfDia {
   const fecha = informe.date;
-  const jornadaTexto = labelJornadaInforme(informe.jornadaCatalogo);
   const informeNo =
     informe.informeNo?.trim() ||
     (informe.informeConsecutivo != null ? String(informe.informeConsecutivo) : '—');
@@ -134,7 +129,6 @@ export function buildInformeDiarioPdfPage(
   return {
     consecutivo: reg?.consecutivo ?? 0,
     informeNo,
-    jornadaTexto,
     fechaTexto: formatFechaEsPdf(fecha),
     diaSemana: weekdayEsPdf(fecha),
     tiempoTranscurridoDias: transcurridoDiasObra(project, fecha),

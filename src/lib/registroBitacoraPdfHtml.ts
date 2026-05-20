@@ -10,7 +10,6 @@ export type RegistroBitacoraPdfSlot = {
 export type RegistroBitacoraPdfClimaFranja = {
   franja: string;
   tiempoHtml: string;
-  jornada: string;
 };
 
 export type RegistroBitacoraPdfObra = {
@@ -27,7 +26,6 @@ export type RegistroBitacoraPdfDia = {
   consecutivo: number;
   /** Número del informe diario (ej. IDO-2026-006). */
   informeNo: string;
-  jornadaTexto: string;
   fechaTexto: string;
   diaSemana: string;
   tiempoTranscurridoDias: number | null;
@@ -267,7 +265,6 @@ const PDF_STYLES = `
     width: 22%;
   }
   td.clima-data { text-align: center; background: #fff; }
-  td.clima-jornada { text-align: left; font-size: 9.5pt; }
   .clima-tiempo { display: inline-flex; align-items: center; gap: 4px; justify-content: center; }
   table.seccion-grid {
     width: 100%;
@@ -366,7 +363,6 @@ function buildHeaderAndClimaHtml(obra: RegistroBitacoraPdfObra, dia: RegistroBit
       (f) => `<tr>
         <th class="clima-franja">${esc(f.franja)}</th>
         <td class="clima-data">${f.tiempoHtml}</td>
-        <td class="clima-data clima-jornada">${esc(f.jornada)}</td>
       </tr>`,
     )
     .join('');
@@ -384,13 +380,9 @@ function buildHeaderAndClimaHtml(obra: RegistroBitacoraPdfObra, dia: RegistroBit
         <col width="28%" />
       </colgroup>
       <tr>
-        <td rowspan="5" class="cell-logos">${logosHtml(obra)}</td>
+        <td rowspan="4" class="cell-logos">${logosHtml(obra)}</td>
         <th class="hdr">Informe No.</th>
         <td class="val" colspan="2">${esc(dia.informeNo)}</td>
-      </tr>
-      <tr>
-        <th class="hdr">Jornada</th>
-        <td class="val" colspan="2">${esc(dia.jornadaTexto)}</td>
       </tr>
       <tr>
         <th class="hdr">Fecha</th>
@@ -434,14 +426,12 @@ function buildHeaderAndClimaHtml(obra: RegistroBitacoraPdfObra, dia: RegistroBit
 
     <table ${CLIMA_TABLE_ATTRS}>
       <colgroup>
-        <col width="20%" />
-        <col width="32%" />
-        <col width="48%" />
+        <col width="28%" />
+        <col width="72%" />
       </colgroup>
       <tr>
         <th class="clima-hdr">Franja del día</th>
         <th class="clima-hdr">Condición climática</th>
-        <th class="clima-hdr">Jornada</th>
       </tr>
       ${climaBody}
     </table>`;
@@ -538,7 +528,6 @@ export function buildRegistroBitacoraPdfHtml(data: RegistroBitacoraPdfData): str
   const dia: RegistroBitacoraPdfDia = {
     consecutivo: rest.consecutivo,
     informeNo: (rest as RegistroBitacoraPdfDia).informeNo ?? String(rest.consecutivo),
-    jornadaTexto: (rest as RegistroBitacoraPdfDia).jornadaTexto ?? '—',
     fechaTexto: rest.fechaTexto,
     diaSemana: rest.diaSemana,
     tiempoTranscurridoDias: rest.tiempoTranscurridoDias,

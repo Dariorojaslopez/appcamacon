@@ -195,13 +195,11 @@ export function buildClimaFilasFromInformes(
   if (sorted.length > 0) {
     const rows: RegistroBitacoraPdfClimaFranja[] = [];
     for (const inf of sorted) {
-      const jornada = labelJornadaInforme(inf.jornadaCatalogo);
       for (const f of FRANJAS_DIA) {
         const resolved = resolveClimaFranja(inf[f.key], catalog);
         rows.push({
           franja: f.label,
           tiempoHtml: resolved.tiempoHtml,
-          jornada,
         });
       }
     }
@@ -214,7 +212,6 @@ export function buildClimaFilasFromInformes(
       return {
         franja: f.label,
         tiempoHtml: resolved.tiempoHtml,
-        jornada: '—',
       };
     });
   }
@@ -222,6 +219,5 @@ export function buildClimaFilasFromInformes(
   return FRANJAS_DIA.map((f) => ({
     franja: f.label,
     tiempoHtml: '—',
-    jornada: '—',
   }));
 }

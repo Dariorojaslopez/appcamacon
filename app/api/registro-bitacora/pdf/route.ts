@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            'No hay informes diarios en ese rango. Cree el informe en «Datos generales» para cada fecha y jornada antes de imprimir.',
+            'No hay informes diarios en ese rango. Cree el informe en «Datos generales» para cada fecha antes de imprimir.',
         },
         { status: 404 },
       );

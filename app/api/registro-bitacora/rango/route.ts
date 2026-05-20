@@ -11,7 +11,7 @@ import {
   parseRangoRegistroBitacora,
   toYmdUtc,
 } from '../../../../src/lib/registroBitacoraFecha';
-import { findInformesDiariosEnRango, labelJornadaInforme } from '../../../../src/lib/registroBitacoraClimaPdf';
+import { findInformesDiariosEnRango } from '../../../../src/lib/registroBitacoraClimaPdf';
 
 export async function GET(req: NextRequest) {
   try {
@@ -75,7 +75,6 @@ export async function GET(req: NextRequest) {
       informes: informesEnRango.map((inf) => ({
         fecha: toYmdUtc(inf.date),
         informeNo: inf.informeNo ?? null,
-        jornada: labelJornadaInforme(inf.jornadaCatalogo),
       })),
     });
   } catch (error: unknown) {
