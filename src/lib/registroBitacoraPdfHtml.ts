@@ -43,7 +43,15 @@ export type RegistroBitacoraPdfDocument = {
   periodoTexto: string;
   toolbarDetalle: string;
   dias: RegistroBitacoraPdfDia[];
+  /** Nonce CSP (header x-nonce) para que el navegador aplique los estilos de la tabla. */
+  styleNonce?: string;
 };
+
+const TABLE_ATTRS = 'class="informe-grid" border="1" cellpadding="0" cellspacing="0" width="100%"';
+const NESTED_TABLE_ATTRS = 'class="informe-nested" border="1" cellpadding="0" cellspacing="0" width="100%"';
+const SECCION_TABLE_ATTRS = 'class="seccion-grid" border="1" cellpadding="0" cellspacing="0" width="100%"';
+const CLIMA_TABLE_ATTRS =
+  'class="informe-grid informe-grid-clima" border="1" cellpadding="0" cellspacing="0" width="100%"';
 
 function esc(value: unknown): string {
   return String(value ?? '')
@@ -139,7 +147,8 @@ const PDF_STYLES = `
     table-layout: fixed;
     border: 1px solid #000;
   }
-  table.informe-grid + table.informe-grid {
+  table.informe-grid-clima {
+    margin-top: -1px;
     border-top: none;
   }
   table.informe-grid th,
@@ -261,15 +270,20 @@ const PDF_STYLES = `
     width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
-    border: 1px solid #000;
+    border: 1px solid #000 !important;
     margin-top: 10px;
     page-break-inside: avoid;
   }
   table.seccion-grid th,
   table.seccion-grid td {
-    border: 1px solid #000;
+    border: 1px solid #000 !important;
     padding: 6px 8px;
     vertical-align: top;
+  }
+  table.informe-grid,
+  table.informe-nested,
+  table.seccion-grid {
+    border-collapse: collapse !important;
   }
   th.seccion-titulo {
     text-align: center;
@@ -301,6 +315,13 @@ const PDF_STYLES = `
     max-height: 80px;
     max-width: 240px;
     object-fit: contain;
+  }
+  td.cell-foto {
+    text-align: center;
+    background: #fff;
+  }
+  td.cell-firma {
+    background: #fff;
   }
   .muted { color: #9ca3af; font-style: italic; }
   .footer-note {
@@ -358,12 +379,12 @@ function buildHeaderAndClimaHtml(obra: RegistroBitacoraPdfObra, dia: RegistroBit
     dia.tiempoTranscurridoDias != null ? `${dia.tiempoTranscurridoDias} días` : '—';
 
   return `
-    <table class="informe-grid" role="presentation">
+    <table ${TABLE_ATTRS}>
       <colgroup>
-        <col style="width:36%" />
-        <col style="width:18%" />
-        <col style="width:18%" />
-        <col style="width:28%" />
+        <col width="36%" />
+        <col width="18%" />
+        <col width="18%" />
+        <col width="28%" />
       </colgroup>
       <tr>
         <td rowspan="3" class="cell-logos">${logosHtml(obra)}</td>
@@ -388,7 +409,7 @@ function buildHeaderAndClimaHtml(obra: RegistroBitacoraPdfObra, dia: RegistroBit
           <p class="proyecto-rango">${esc(obra.rangoObraTexto)}</p>
         </td>
         <td class="cell-meta-side">
-          <table class="informe-nested" role="presentation">
+          <table ${NESTED_TABLE_ATTRS}>
             <tr>
               <th>Contrato</th>
               <td>${esc(obra.contratoTexto)}</td>
@@ -406,11 +427,11 @@ function buildHeaderAndClimaHtml(obra: RegistroBitacoraPdfObra, dia: RegistroBit
       </tr>
     </table>
 
-    <table class="informe-grid" role="presentation">
+    <table ${CLIMA_TABLE_ATTRS}>
       <colgroup>
-        <col style="width:22%" />
-        <col style="width:39%" />
-        <col style="width:39%" />
+        <col width="22%" />
+        <col width="39%" />
+        <col width="39%" />
       </colgroup>
       <tr>
         <th class="clima-hdr">Condición climática</th>
@@ -431,7 +452,7 @@ function buildSeccionesHtml(secciones: RegistroBitacoraPdfSlot[]): string {
       const firma = s.firmaUrl
         ? `<img class="firma-img" src="${esc(s.firmaUrl)}" alt="" />`
         : '<span class="muted">Sin firma</span>';
-      return `<table class="seccion-grid" role="presentation">
+      return `<table ${SECCION_TABLE_ATTRS}>
         <tr><th class="seccion-titulo" colspan="2">${esc(s.titulo)}</th></tr>
         <tr>
           <th class="seccion-label">Observaciones</th>
@@ -439,11 +460,11 @@ function buildSeccionesHtml(secciones: RegistroBitacoraPdfSlot[]): string {
         </tr>
         <tr>
           <th class="seccion-label">Foto</th>
-          <td style="text-align:center;background:#fff;">${foto}</td>
+          <td class="cell-foto">${foto}</td>
         </tr>
         <tr>
           <th class="seccion-label">Firma</th>
-          <td style="background:#fff;">${firma}</td>
+          <td class="cell-firma">${firma}</td>
         </tr>
       </table>`;
     })
@@ -461,8 +482,9 @@ function buildDaySheetHtml(obra: RegistroBitacoraPdfObra, dia: RegistroBitacoraP
 }
 
 export function buildRegistroBitacoraPdfDocumentHtml(doc: RegistroBitacoraPdfDocument): string {
-  const { obra, periodoTexto, toolbarDetalle, dias } = doc;
+  const { obra, periodoTexto, toolbarDetalle, dias, styleNonce } = doc;
   const multi = dias.length > 1;
+  const styleNonceAttr = styleNonce ? ` nonce="${esc(styleNonce)}"` : '';
 
   const coverHtml = multi
     ? `<section class="sheet sheet-cover">
@@ -484,7 +506,7 @@ export function buildRegistroBitacoraPdfDocumentHtml(doc: RegistroBitacoraPdfDoc
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Bitácora — ${esc(obra.obraCodigo)} — ${esc(periodoTexto)}</title>
-  <style>${PDF_STYLES}</style>
+  <style${styleNonceAttr}>${PDF_STYLES}</style>
 </head>
 <body>
   <div class="print-toolbar">

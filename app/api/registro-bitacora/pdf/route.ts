@@ -11,6 +11,7 @@ import {
   parseYmdUtc,
   toYmdUtc,
 } from '../../../../src/lib/registroBitacoraFecha';
+import { buildPdfPreviewContentSecurityPolicy, generateNonce } from '../../../../src/lib/csp';
 import { buildRegistroBitacoraPdfDocumentHtml } from '../../../../src/lib/registroBitacoraPdfHtml';
 import {
   buildDiaPdfData,
@@ -127,16 +128,22 @@ export async function GET(req: NextRequest) {
         ? '1 registro'
         : `${registros.length} registros en el período`;
 
+    const styleNonce = req.headers.get('x-nonce') ?? generateNonce();
+
     const html = buildRegistroBitacoraPdfDocumentHtml({
       obra,
       periodoTexto,
       toolbarDetalle,
       dias,
+      styleNonce,
     });
 
     return new NextResponse(html, {
       status: 200,
-      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Security-Policy': buildPdfPreviewContentSecurityPolicy(styleNonce),
+      },
     });
   } catch (error: unknown) {
     const err = error as { name?: string };

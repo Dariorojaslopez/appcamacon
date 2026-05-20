@@ -12,6 +12,22 @@ export function generateNonce(): string {
   return btoa(binary);
 }
 
+/** CSP relajado solo para la vista HTML imprimible de bitácora (estilos con nonce + inline mínimo). */
+export function buildPdfPreviewContentSecurityPolicy(nonce: string): string {
+  return [
+    "default-src 'self'",
+    `style-src 'self' 'nonce-${nonce}' 'unsafe-inline'`,
+    "script-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https: http:",
+    "font-src 'self' data:",
+    "connect-src 'self'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'self'",
+    "object-src 'none'",
+  ].join('; ');
+}
+
 export function buildContentSecurityPolicy(nonce: string, isDev: boolean): string {
   const scriptDev = isDev ? " 'unsafe-eval'" : '';
   return [
