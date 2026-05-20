@@ -10,14 +10,13 @@ export type RegistroBitacoraPdfSlot = {
 export type RegistroBitacoraPdfClimaFranja = {
   franja: string;
   tiempoHtml: string;
-  condicion: string;
+  jornada: string;
 };
 
 export type RegistroBitacoraPdfObra = {
   obraNombre: string;
   obraCodigo: string;
   obraLogoUrl: string;
-  camaconLogoUrl: string;
   rangoObraTexto: string;
   plazoContractualDias: number | null;
   contratoTexto: string;
@@ -184,8 +183,7 @@ const PDF_STYLES = `
     gap: 12px;
     min-height: 58px;
   }
-  .logo-obra { max-height: 52px; max-width: 160px; object-fit: contain; display: block; }
-  .logo-camacon { max-height: 48px; max-width: 120px; object-fit: contain; display: block; }
+  .logo-obra { max-height: 64px; max-width: 220px; object-fit: contain; display: block; }
   .logo-fallback {
     font-size: 9pt;
     color: #6b7280;
@@ -265,6 +263,7 @@ const PDF_STYLES = `
     width: 22%;
   }
   td.clima-data { text-align: center; background: #fff; }
+  td.clima-jornada { text-align: left; font-size: 9.5pt; }
   .clima-tiempo { display: inline-flex; align-items: center; gap: 4px; justify-content: center; }
   table.seccion-grid {
     width: 100%;
@@ -347,16 +346,10 @@ const PDF_STYLES = `
 `;
 
 function logosContentHtml(obra: RegistroBitacoraPdfObra): string {
-  const parts: string[] = [];
   if (obra.obraLogoUrl) {
-    parts.push(`<img class="logo-obra" src="${esc(obra.obraLogoUrl)}" alt="" />`);
-  } else {
-    parts.push(`<span class="logo-fallback">${esc(obra.obraCodigo)}</span>`);
+    return `<img class="logo-obra" src="${esc(obra.obraLogoUrl)}" alt="${esc(obra.obraNombre)}" />`;
   }
-  if (obra.camaconLogoUrl) {
-    parts.push(`<img class="logo-camacon" src="${esc(obra.camaconLogoUrl)}" alt="Camacón" />`);
-  }
-  return parts.join('');
+  return `<span class="logo-fallback">${esc(obra.obraCodigo)}</span>`;
 }
 
 function logosHtml(obra: RegistroBitacoraPdfObra): string {
@@ -369,7 +362,7 @@ function buildHeaderAndClimaHtml(obra: RegistroBitacoraPdfObra, dia: RegistroBit
       (f) => `<tr>
         <th class="clima-franja">${esc(f.franja)}</th>
         <td class="clima-data">${f.tiempoHtml}</td>
-        <td class="clima-data">${esc(f.condicion)}</td>
+        <td class="clima-data clima-jornada">${esc(f.jornada)}</td>
       </tr>`,
     )
     .join('');
@@ -429,14 +422,14 @@ function buildHeaderAndClimaHtml(obra: RegistroBitacoraPdfObra, dia: RegistroBit
 
     <table ${CLIMA_TABLE_ATTRS}>
       <colgroup>
-        <col width="22%" />
-        <col width="39%" />
-        <col width="39%" />
+        <col width="20%" />
+        <col width="32%" />
+        <col width="48%" />
       </colgroup>
       <tr>
         <th class="clima-hdr">Condición climática</th>
         <th class="clima-hdr">Tiempo</th>
-        <th class="clima-hdr">Condición</th>
+        <th class="clima-hdr">Jornada</th>
       </tr>
       ${climaBody}
     </table>`;
@@ -526,7 +519,6 @@ export function buildRegistroBitacoraPdfHtml(data: RegistroBitacoraPdfData): str
     obraNombre: rest.obraNombre,
     obraCodigo: rest.obraCodigo,
     obraLogoUrl: rest.obraLogoUrl,
-    camaconLogoUrl: rest.camaconLogoUrl,
     rangoObraTexto: rest.rangoObraTexto,
     plazoContractualDias: rest.plazoContractualDias,
     contratoTexto: rest.contratoTexto,

@@ -2,11 +2,10 @@ import type { RegistroBitacoraObra, User } from '@prisma/client';
 import { storedMediaImgSrc } from './evidenciasUrlPayload';
 import { diffInclusiveCalendarDaysUtc } from './registroBitacoraFecha';
 import {
-  resolveClimaFranja,
-  type RegistroBitacoraPdfDia,
-  type RegistroBitacoraPdfObra,
-  type RegistroBitacoraPdfSlot,
-} from './registroBitacoraPdfHtml';
+  buildClimaFilasFromInformes,
+  type InformeClimaPorJornada,
+} from './registroBitacoraClimaPdf';
+import type { RegistroBitacoraPdfDia, RegistroBitacoraPdfObra, RegistroBitacoraPdfSlot } from './registroBitacoraPdfHtml';
 import { REGISTRO_BITACORA_SLOT_LABELS } from '../shared/registroBitacoraPermissions';
 
 type ProjectPdf = {
@@ -19,12 +18,6 @@ type ProjectPdf = {
 };
 
 type RegistroWithUser = RegistroBitacoraObra & { user: Pick<User, 'name'> };
-
-type InformeClima = {
-  franjaClimaMananaCodigo: string | null;
-  franjaClimaTardeCodigo: string | null;
-  franjaClimaNocheCodigo: string | null;
-} | null;
 
 export function absMediaPdf(origin: string, stored: string | null | undefined): string {
   const rel = storedMediaImgSrc(stored) ?? (typeof stored === 'string' && stored.trim() ? stored.trim() : '');
@@ -66,7 +59,6 @@ export function buildObraPdfBase(origin: string, project: ProjectPdf): RegistroB
     obraNombre: project.name,
     obraCodigo: project.code,
     obraLogoUrl: absMediaPdf(origin, project.logoUrl),
-    camaconLogoUrl: `${origin}/images/Logo_camacon.png`,
     rangoObraTexto: rangoTxt,
     plazoContractualDias: plazoDias,
     contratoTexto: project.description?.trim() || project.code,
@@ -78,16 +70,14 @@ export function buildDiaPdfData(
   project: ProjectPdf,
   reg: RegistroWithUser,
   fecha: Date,
-  informeDia: InformeClima,
+  informesDelDia: InformeClimaPorJornada[],
   catalog: Map<string, string>,
 ): RegistroBitacoraPdfDia {
-  const codManana = reg.franjaClimaMananaCodigo ?? informeDia?.franjaClimaMananaCodigo;
-  const codTarde = reg.franjaClimaTardeCodigo ?? informeDia?.franjaClimaTardeCodigo;
-  const codNoche = reg.franjaClimaNocheCodigo ?? informeDia?.franjaClimaNocheCodigo;
-
-  const manana = resolveClimaFranja(codManana, catalog);
-  const tarde = resolveClimaFranja(codTarde, catalog);
-  const noche = resolveClimaFranja(codNoche, catalog);
+  const climaFilas = buildClimaFilasFromInformes(informesDelDia, catalog, {
+    franjaClimaMananaCodigo: reg.franjaClimaMananaCodigo,
+    franjaClimaTardeCodigo: reg.franjaClimaTardeCodigo,
+    franjaClimaNocheCodigo: reg.franjaClimaNocheCodigo,
+  });
 
   let transcurridoDias: number | null = null;
   if (project.startDate) {
@@ -120,11 +110,7 @@ export function buildDiaPdfData(
     fechaTexto: formatFechaEsPdf(fecha),
     diaSemana: weekdayEsPdf(fecha),
     tiempoTranscurridoDias: transcurridoDias,
-    climaFilas: [
-      { franja: 'Mañana', tiempoHtml: manana.tiempoHtml, condicion: manana.condicion },
-      { franja: 'Tarde', tiempoHtml: tarde.tiempoHtml, condicion: tarde.condicion },
-      { franja: 'Noche', tiempoHtml: noche.tiempoHtml, condicion: noche.condicion },
-    ],
+    climaFilas,
     secciones,
     registradoPor: reg.user.name,
     actualizadoTexto: reg.updatedAt.toLocaleString('es-CO', { timeZone: 'America/Bogota' }),

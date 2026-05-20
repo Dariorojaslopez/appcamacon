@@ -93,15 +93,19 @@ export async function GET(req: NextRequest) {
         franjaClimaMananaCodigo: true,
         franjaClimaTardeCodigo: true,
         franjaClimaNocheCodigo: true,
-        updatedAt: true,
+        jornadaCatalogo: {
+          select: { nombre: true, horaInicio: true, horaFin: true, orden: true },
+        },
       },
-      orderBy: { updatedAt: 'desc' },
+      orderBy: [{ date: 'asc' }, { jornadaCatalogo: { orden: 'asc' } }],
     });
 
-    const informePorFecha = new Map<string, (typeof informes)[0]>();
+    const informesPorFecha = new Map<string, typeof informes>();
     for (const inf of informes) {
       const key = toYmdUtc(inf.date);
-      if (!informePorFecha.has(key)) informePorFecha.set(key, inf);
+      const list = informesPorFecha.get(key) ?? [];
+      list.push(inf);
+      informesPorFecha.set(key, list);
     }
 
     const tipos = await prisma.tipoCondicionCatalog.findMany({
@@ -114,8 +118,8 @@ export async function GET(req: NextRequest) {
     const dias = registros.map((reg) => {
       const fecha = reg.fecha;
       const key = toYmdUtc(fecha);
-      const informeDia = informePorFecha.get(key) ?? null;
-      return buildDiaPdfData(origin, project, reg, fecha, informeDia, catalog);
+      const informesDelDia = informesPorFecha.get(key) ?? [];
+      return buildDiaPdfData(origin, project, reg, fecha, informesDelDia, catalog);
     });
 
     const periodoTexto =
