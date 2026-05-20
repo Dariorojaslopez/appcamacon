@@ -427,8 +427,8 @@ function buildHeaderAndClimaHtml(obra: RegistroBitacoraPdfObra, dia: RegistroBit
         <col width="48%" />
       </colgroup>
       <tr>
+        <th class="clima-hdr">Franja del día</th>
         <th class="clima-hdr">Condición climática</th>
-        <th class="clima-hdr">Tiempo</th>
         <th class="clima-hdr">Jornada</th>
       </tr>
       ${climaBody}

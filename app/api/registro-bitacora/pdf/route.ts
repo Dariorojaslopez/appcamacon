@@ -6,7 +6,6 @@ import {
   prismaIndicaTablaRegistroBitacoraDesactualizada,
 } from '../../../../src/lib/prismaRegistroBitacoraSchema';
 import {
-  buildUtcDateRangeInclusive,
   fechaRegistroEnRangoObra,
   parseRangoRegistroBitacora,
   parseYmdUtc,
@@ -15,6 +14,7 @@ import {
 import { buildPdfPreviewContentSecurityPolicy, generateNonce } from '../../../../src/lib/csp';
 import { buildRegistroBitacoraPdfDocumentHtml } from '../../../../src/lib/registroBitacoraPdfHtml';
 import {
+  findInformesClimaEnRango,
   groupInformesClimaPorYmd,
   sortedYmdKeysConDatosEnRango,
 } from '../../../../src/lib/registroBitacoraClimaPdf';
@@ -81,23 +81,7 @@ export async function GET(req: NextRequest) {
       orderBy: { fecha: 'asc' },
     });
 
-    const rangoInformes = buildUtcDateRangeInclusive(rango.desde, rango.hasta);
-    const informes = await prisma.informeDiario.findMany({
-      where: {
-        projectId,
-        date: { gte: rangoInformes.gte, lt: rangoInformes.lt },
-      },
-      select: {
-        date: true,
-        franjaClimaMananaCodigo: true,
-        franjaClimaTardeCodigo: true,
-        franjaClimaNocheCodigo: true,
-        jornadaCatalogo: {
-          select: { nombre: true, horaInicio: true, horaFin: true, orden: true },
-        },
-      },
-      orderBy: [{ date: 'asc' }, { jornadaCatalogo: { orden: 'asc' } }],
-    });
+    const informes = await findInformesClimaEnRango(projectId, rango.desde, rango.hasta);
 
     const informesPorFecha = groupInformesClimaPorYmd(informes);
     const diasYmd = sortedYmdKeysConDatosEnRango(rango.desde, rango.hasta, registros, informesPorFecha);

@@ -1,10 +1,8 @@
 import prisma from './prisma';
+import { parseInformeDayUtc } from './registroBitacoraFecha';
 
 export function normalizeReportDate(dateStr: string): Date | null {
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return null;
-  d.setUTCHours(0, 0, 0, 0);
-  return d;
+  return parseInformeDayUtc(dateStr);
 }
 
 export type JornadaResolveResult =

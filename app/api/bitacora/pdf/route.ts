@@ -3,13 +3,8 @@ import { verifyAccessToken } from '../../../../src/infrastructure/auth/tokens';
 import prisma from '../../../../src/lib/prisma';
 import { resolveJornadaCatalogoId } from '../../../../src/lib/informeDailyScope';
 import { syncBitacoraFromInforme } from '../../../../src/lib/bitacora';
-
-function normalizeDate(date: string): Date | null {
-  const d = new Date(date);
-  if (Number.isNaN(d.getTime())) return null;
-  d.setUTCHours(0, 0, 0, 0);
-  return d;
-}
+import { formatFranjasClimaTexto } from '../../../../src/lib/registroBitacoraClimaPdf';
+import { parseInformeDayUtc } from '../../../../src/lib/registroBitacoraFecha';
 
 function esc(value: unknown): string {
   return String(value ?? '')
@@ -32,7 +27,7 @@ export async function GET(req: NextRequest) {
     if (!projectId || !dateStr) {
       return NextResponse.json({ error: 'projectId y date son requeridos' }, { status: 400 });
     }
-    const date = normalizeDate(dateStr);
+    const date = parseInformeDayUtc(dateStr);
     if (!date) return NextResponse.json({ error: 'Fecha no válida' }, { status: 400 });
     const jr = await resolveJornadaCatalogoId(jornadaId);
     if (jr.valid === false) return NextResponse.json({ error: jr.error }, { status: jr.status });
@@ -42,6 +37,12 @@ export async function GET(req: NextRequest) {
       include: { project: true, jornadaCatalogo: true, bitacoraClimas: true },
     });
     if (!informe) return NextResponse.json({ error: 'No existe informe para generar bitácora' }, { status: 404 });
+
+    const tipos = await prisma.tipoCondicionCatalog.findMany({
+      where: { isActive: true },
+      select: { codigo: true, nombre: true },
+    });
+    const catalog = new Map(tipos.map((t) => [t.codigo, t.nombre]));
 
     await syncBitacoraFromInforme({
       informeId: informe.id,
@@ -59,6 +60,10 @@ export async function GET(req: NextRequest) {
     const validationUrl = `${origin}/api/bitacora/eventos?projectId=${encodeURIComponent(projectId)}&date=${encodeURIComponent(dateStr)}${jornadaId ? `&jornadaId=${encodeURIComponent(jornadaId)}` : ''}`;
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(validationUrl)}`;
     const clima = informe.bitacoraClimas[0];
+    const franjasTexto = formatFranjasClimaTexto(informe, catalog);
+    const climaLinea = franjasTexto
+      ? franjasTexto
+      : `${clima?.tipo ?? informe.tipoClima ?? 'No registrado'}${clima?.temperatura != null ? ` · Temp: ${clima.temperatura}` : ''}${clima?.humedad != null ? ` · Humedad: ${clima.humedad}` : ''}`;
 
     const html = `<!doctype html>
 <html lang="es">
@@ -99,8 +104,8 @@ export async function GET(req: NextRequest) {
       <div>QR de validación</div>
     </div>
   </header>
-  <h2>Clima</h2>
-  <p>${esc(clima?.tipo ?? informe.tipoClima ?? 'No registrado')} · Temp: ${esc(clima?.temperatura ?? 'N/A')} · Humedad: ${esc(clima?.humedad ?? 'N/A')}</p>
+  <h2>Condición climática por franja</h2>
+  <p>${esc(climaLinea || 'No registrado')}</p>
   <h2>Timeline oficial</h2>
   <div class="timeline">
     ${eventos

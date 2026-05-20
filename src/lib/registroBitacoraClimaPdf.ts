@@ -1,4 +1,5 @@
-import { parseYmdUtc, toYmdUtc } from './registroBitacoraFecha';
+import prisma from './prisma';
+import { eachYmdInRangeUtc, parseYmdUtc, toYmdUtc } from './registroBitacoraFecha';
 import {
   resolveClimaFranja,
   type RegistroBitacoraPdfClimaFranja,
@@ -41,6 +42,47 @@ export function buildUtcDateRangeForYmdKeys(ymdKeys: string[]): { gte: Date; lt:
   };
 }
 
+export const INFORME_CLIMA_PDF_SELECT = {
+  date: true,
+  franjaClimaMananaCodigo: true,
+  franjaClimaTardeCodigo: true,
+  franjaClimaNocheCodigo: true,
+  jornadaCatalogo: {
+    select: { nombre: true, horaInicio: true, horaFin: true, orden: true },
+  },
+} as const;
+
+/** Consulta informes por cada día del rango (evita desfases DATE vs TIMESTAMP). */
+export async function findInformesClimaEnRango(
+  projectId: string,
+  desde: Date,
+  hasta: Date,
+): Promise<InformeClimaPorJornadaRow[]> {
+  const days = eachYmdInRangeUtc(desde, hasta);
+  if (days.length === 0) return [];
+  const batches = await Promise.all(
+    days.map((day) =>
+      prisma.informeDiario.findMany({
+        where: {
+          projectId,
+          date: { gte: day, lt: new Date(day.getTime() + 86400000) },
+        },
+        select: INFORME_CLIMA_PDF_SELECT,
+        orderBy: [{ date: 'asc' }, { jornadaCatalogo: { orden: 'asc' } }],
+      }),
+    ),
+  );
+  return batches.flat();
+}
+
+export function informeTieneFranjaClima(inf: InformeClimaPorJornada): boolean {
+  return Boolean(
+    inf.franjaClimaMananaCodigo?.trim() ||
+      inf.franjaClimaTardeCodigo?.trim() ||
+      inf.franjaClimaNocheCodigo?.trim(),
+  );
+}
+
 export function groupInformesClimaPorYmd(
   informes: InformeClimaPorJornadaRow[],
 ): Map<string, InformeClimaPorJornada[]> {
@@ -73,8 +115,8 @@ export function sortedYmdKeysConDatosEnRango(
     const k = toYmdUtc(r.fecha);
     if (k >= minYmd && k <= maxYmd) keys.add(k);
   }
-  for (const k of Array.from(informesPorFecha.keys())) {
-    if (k >= minYmd && k <= maxYmd) keys.add(k);
+  for (const [k, list] of Array.from(informesPorFecha.entries())) {
+    if (k >= minYmd && k <= maxYmd && list.some(informeTieneFranjaClima)) keys.add(k);
   }
   return Array.from(keys).sort();
 }
@@ -84,6 +126,21 @@ const FRANJAS_DIA = [
   { key: 'franjaClimaTardeCodigo' as const, label: 'Tarde' },
   { key: 'franjaClimaNocheCodigo' as const, label: 'Noche' },
 ];
+
+/** Texto plano de franjas para PDF de bitácora digital u otros resúmenes. */
+export function formatFranjasClimaTexto(
+  inf: InformeClimaPorJornada,
+  catalog: Map<string, string>,
+): string {
+  const partes: string[] = [];
+  for (const f of FRANJAS_DIA) {
+    const c = (inf[f.key] ?? '').trim();
+    if (!c) continue;
+    const nombre = catalog.get(c) ?? c;
+    partes.push(`${f.label}: ${nombre}`);
+  }
+  return partes.length > 0 ? partes.join(' · ') : '';
+}
 
 export function labelJornadaInforme(
   jornada: InformeClimaPorJornada['jornadaCatalogo'],

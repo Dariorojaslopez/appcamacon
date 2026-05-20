@@ -6,12 +6,15 @@ import {
   prismaIndicaTablaRegistroBitacoraDesactualizada,
 } from '../../../../src/lib/prismaRegistroBitacoraSchema';
 import {
-  buildUtcDateRangeInclusive,
   diffInclusiveCalendarDaysUtc,
   fechaRegistroEnRangoObra,
   parseRangoRegistroBitacora,
   toYmdUtc,
 } from '../../../../src/lib/registroBitacoraFecha';
+import {
+  findInformesClimaEnRango,
+  informeTieneFranjaClima,
+} from '../../../../src/lib/registroBitacoraClimaPdf';
 
 export async function GET(req: NextRequest) {
   try {
@@ -60,13 +63,11 @@ export async function GET(req: NextRequest) {
     });
 
     const totalDias = diffInclusiveCalendarDaysUtc(rango.desde, rango.hasta);
-    const rangoInformes = buildUtcDateRangeInclusive(rango.desde, rango.hasta);
-    const conInforme = await prisma.informeDiario.count({
-      where: {
-        projectId,
-        date: { gte: rangoInformes.gte, lt: rangoInformes.lt },
-      },
-    });
+    const informesEnRango = await findInformesClimaEnRango(projectId, rango.desde, rango.hasta);
+    const diasConClima = new Set(
+      informesEnRango.filter(informeTieneFranjaClima).map((i) => toYmdUtc(i.date)),
+    );
+    const conInforme = diasConClima.size;
 
     return NextResponse.json({
       fechaDesde: fechaDesdeStr,

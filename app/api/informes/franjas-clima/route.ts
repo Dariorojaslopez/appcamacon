@@ -3,7 +3,7 @@ import { verifyAccessToken } from '../../../../src/infrastructure/auth/tokens';
 import prisma from '../../../../src/lib/prisma';
 import { resolveJornadaCatalogoId } from '../../../../src/lib/informeDailyScope';
 import { informeCerradoJsonResponse } from '../../../../src/lib/informeCerrado';
-import { parseYmdUtc } from '../../../../src/lib/registroBitacoraFecha';
+import { parseInformeDayUtc } from '../../../../src/lib/registroBitacoraFecha';
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'projectId y date son requeridos' }, { status: 400 });
     }
 
-    const reportDate = parseYmdUtc(dateStr);
+    const reportDate = parseInformeDayUtc(dateStr);
     if (!reportDate) return NextResponse.json({ error: 'Fecha no válida' }, { status: 400 });
 
     const jr = await resolveJornadaCatalogoId(body.jornadaId);

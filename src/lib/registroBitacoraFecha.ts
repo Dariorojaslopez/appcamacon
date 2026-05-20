@@ -21,6 +21,16 @@ export function dayOnlyUtc(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 }
 
+/** Fecha de informe diario: YYYY-MM-DD en UTC o normaliza un instante al día UTC. */
+export function parseInformeDayUtc(dateInput: string): Date | null {
+  const trimmed = dateInput.trim();
+  const ymd = parseYmdUtc(trimmed);
+  if (ymd) return ymd;
+  const d = new Date(trimmed);
+  if (Number.isNaN(d.getTime())) return null;
+  return dayOnlyUtc(d);
+}
+
 export function fechaRegistroEnRangoObra(
   fechaDay: Date,
   startDate: Date | null,
