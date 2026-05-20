@@ -56,12 +56,17 @@ export const INFORME_DIARIO_PDF_SELECT = {
     select: { cargo: true },
     orderBy: { createdAt: 'asc' as const },
   },
+  equipos: {
+    select: { descripcion: true, estado: true },
+    orderBy: { createdAt: 'asc' as const },
+  },
 } as const;
 
 export type InformeDiarioPdfRow = InformeClimaPorJornadaRow & {
   informeNo: string | null;
   informeConsecutivo: number | null;
   personal: { cargo: string }[];
+  equipos: { descripcion: string; estado: string | null }[];
 };
 
 /** Todos los informes diarios de la obra en el rango (uno por obra + fecha + jornada). */

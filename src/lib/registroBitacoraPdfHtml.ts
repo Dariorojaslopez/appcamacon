@@ -17,6 +17,11 @@ export type RegistroBitacoraPdfPersonalCargo = {
   total: number;
 };
 
+export type RegistroBitacoraPdfEquipoMaterial = {
+  descripcion: string;
+  estado: string;
+};
+
 export type RegistroBitacoraPdfObra = {
   obraNombre: string;
   obraCodigo: string;
@@ -36,6 +41,7 @@ export type RegistroBitacoraPdfDia = {
   tiempoTranscurridoDias: number | null;
   climaFilas: RegistroBitacoraPdfClimaFranja[];
   personalPorCargo: RegistroBitacoraPdfPersonalCargo[];
+  equiposMateriales: RegistroBitacoraPdfEquipoMaterial[];
   secciones: RegistroBitacoraPdfSlot[];
   registradoPor: string;
   actualizadoTexto: string;
@@ -61,6 +67,8 @@ const CLIMA_TABLE_ATTRS =
   'class="informe-grid informe-grid-clima" border="1" cellpadding="0" cellspacing="0" width="100%"';
 const PERSONAL_TABLE_ATTRS =
   'class="informe-grid informe-grid-personal" border="1" cellpadding="0" cellspacing="0" width="100%"';
+const EQUIPOS_TABLE_ATTRS =
+  'class="informe-grid informe-grid-equipos" border="1" cellpadding="0" cellspacing="0" width="100%"';
 
 function esc(value: unknown): string {
   return String(value ?? '')
@@ -294,6 +302,28 @@ const PDF_STYLES = `
     font-weight: 600;
     background: #fff;
   }
+  table.informe-grid-equipos {
+    margin-top: 10px;
+    page-break-inside: avoid;
+  }
+  th.equipos-hdr {
+    background: #e8e8e8;
+    font-weight: 700;
+    text-align: center;
+  }
+  th.equipos-col-hdr {
+    background: #e8e8e8;
+    font-weight: 700;
+    text-align: left;
+  }
+  td.equipos-data {
+    background: #fff;
+    text-align: left;
+  }
+  td.equipos-estado {
+    background: #fff;
+    text-align: center;
+  }
   table.seccion-grid {
     width: 100%;
     border-collapse: collapse;
@@ -504,6 +534,39 @@ function buildPersonalHtml(dia: RegistroBitacoraPdfDia): string {
     </table>`;
 }
 
+function buildEquiposMaterialesHtml(dia: RegistroBitacoraPdfDia): string {
+  const filas = dia.equiposMateriales ?? [];
+  const body =
+    filas.length > 0
+      ? filas
+          .map(
+            (e) => `<tr>
+        <td class="equipos-data">${esc(e.descripcion)}</td>
+        <td class="equipos-estado">${esc(e.estado)}</td>
+      </tr>`,
+          )
+          .join('')
+      : `<tr>
+        <td colspan="2" class="muted" style="text-align:center;padding:8px;">Sin equipos registrados en este informe</td>
+      </tr>`;
+
+  return `
+    <table ${EQUIPOS_TABLE_ATTRS}>
+      <colgroup>
+        <col width="68%" />
+        <col width="32%" />
+      </colgroup>
+      <tr>
+        <th class="equipos-hdr" colspan="2">Equipos y materiales</th>
+      </tr>
+      <tr>
+        <th class="equipos-col-hdr">Descripción</th>
+        <th class="equipos-col-hdr" style="text-align:center;">Estado</th>
+      </tr>
+      ${body}
+    </table>`;
+}
+
 function buildSeccionesHtml(secciones: RegistroBitacoraPdfSlot[]): string {
   return secciones
     .map((s) => {
@@ -538,6 +601,7 @@ function buildDaySheetHtml(obra: RegistroBitacoraPdfObra, dia: RegistroBitacoraP
     ${buildHeaderHtml(obra, dia)}
     ${buildClimaHtml(dia)}
     ${buildPersonalHtml(dia)}
+    ${buildEquiposMaterialesHtml(dia)}
     ${buildSeccionesHtml(dia.secciones)}
     <p class="footer-note">
       Registrado por: ${esc(dia.registradoPor)} · ${esc(dia.actualizadoTexto)}
@@ -602,6 +666,7 @@ export function buildRegistroBitacoraPdfHtml(data: RegistroBitacoraPdfData): str
     tiempoTranscurridoDias: rest.tiempoTranscurridoDias,
     climaFilas: rest.climaFilas,
     personalPorCargo: rest.personalPorCargo ?? [],
+    equiposMateriales: rest.equiposMateriales ?? [],
     secciones: rest.secciones,
     registradoPor: rest.registradoPor,
     actualizadoTexto: rest.actualizadoTexto,
