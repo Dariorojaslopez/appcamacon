@@ -666,11 +666,18 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
         )}
         {loadingRegistro && projectId && <p className="shell-text-muted">Cargando datos del día…</p>}
 
-        <div className="form-field" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
-          <button type="button" className="btn-secondary" onClick={handleImprimir} disabled={!projectId || !fechaDia}>
-            Imprimir / PDF del día
+        <div className="form-field registro-bitacora-print-wrap">
+          <button
+            type="button"
+            className="registro-bitacora-print-btn"
+            onClick={handleImprimir}
+            disabled={!projectId || !fechaDia}
+          >
+            <span className="registro-bitacora-print-btn-title">Vista previa e imprimir PDF</span>
+            <span className="registro-bitacora-print-btn-hint">
+              Abre el informe con formato oficial (encabezado, clima y firmas). Guarde el registro antes de imprimir.
+            </span>
           </button>
-          <span className="informe-label-hint">Abre una vista para imprimir o guardar PDF (requiere haber guardado el registro).</span>
         </div>
 
         <div className="section-divider" />
