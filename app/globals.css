@@ -2475,6 +2475,55 @@ ul.informe-searchable-list {
   font-weight: 400;
 }
 
+/* Lista de obras permitidas (editar usuario) */
+.user-obra-pick-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  max-height: 12rem;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.35rem;
+  background: #fff;
+}
+
+.user-obra-pick-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.5rem 0.55rem 0.5rem 0.45rem;
+  border-radius: 4px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.user-obra-pick-item:hover {
+  background: #f9fafb;
+}
+
+.user-obra-pick-item--selected {
+  background: #fffbeb;
+  border-left-color: var(--color-primary, #edd501);
+}
+
+.user-obra-pick-item .user-obra-pick-check {
+  display: inline-flex;
+  flex-shrink: 0;
+  justify-content: flex-start;
+  align-items: center;
+  margin-top: 0.1rem;
+}
+
+.user-obra-pick-item-text {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.4;
+  font-size: 0.9rem;
+  word-break: break-word;
+}
+
 /* Subpestañas Usuarios */
 .users-tabs {
   display: flex;

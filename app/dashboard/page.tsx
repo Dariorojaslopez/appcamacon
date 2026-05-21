@@ -11315,29 +11315,28 @@ export default function DashboardPage() {
                                 Ninguna
                               </button>
                             </div>
-                            <div
-                              className="perms-grid"
-                              style={{
-                                maxHeight: '12rem',
-                                overflowY: 'auto',
-                                border: '1px solid var(--border, #ddd)',
-                                borderRadius: '6px',
-                                padding: '0.5rem 0.75rem',
-                              }}
-                            >
-                              {editUserObras.map((o) => (
-                                <label key={o.id} className="perms-check-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
-                                  <input
-                                    type="checkbox"
-                                    checked={editUserProjectIds.includes(o.id)}
-                                    onChange={() => toggleEditUserObra(o.id)}
-                                  />
-                                  <span className="perms-check-box" />
-                                  <span>
-                                    {o.code} · {o.name}
-                                  </span>
-                                </label>
-                              ))}
+                            <div className="user-obra-pick-list">
+                              {editUserObras.map((o) => {
+                                const checked = editUserProjectIds.includes(o.id);
+                                return (
+                                  <label
+                                    key={o.id}
+                                    className={`user-obra-pick-item${checked ? ' user-obra-pick-item--selected' : ''}`}
+                                  >
+                                    <span className="perms-check-label user-obra-pick-check">
+                                      <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        onChange={() => toggleEditUserObra(o.id)}
+                                      />
+                                      <span className="perms-check-box" />
+                                    </span>
+                                    <span className="user-obra-pick-item-text">
+                                      {o.code} · {o.name}
+                                    </span>
+                                  </label>
+                                );
+                              })}
                             </div>
                             <p className="shell-text-muted" style={{ marginTop: '0.35rem', marginBottom: 0, fontSize: '0.85rem' }}>
                               Solo las obras marcadas aparecerán en el combo del informe diario.
