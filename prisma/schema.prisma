@@ -20,6 +20,21 @@ model User {
 
   informes              InformeDiario[]
   registrosBitacoraObra RegistroBitacoraObra[]
+  projectAccess         UserProjectAccess[]
+}
+
+/// Obras a las que un usuario puede acceder (informe diario y catálogos por obra).
+model UserProjectAccess {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, projectId])
+  @@index([userId])
+  @@index([projectId])
 }
 
 model Project {
@@ -50,6 +65,7 @@ model Project {
   proveedoresCatalog ProveedorCatalog[]
   itemsCatalog      ItemCatalog[]
   budgetChapters    BudgetChapter[]
+  userAccess        UserProjectAccess[]
 }
 
 /// Capítulo de presupuesto (nivel 1: rubros tipo licitación / APU).

@@ -1292,6 +1292,11 @@ export default function DashboardPage() {
   const [usersList, setUsersList] = useState<{ id: string; identification: string; email: string; name: string; role: string; isActive: boolean }[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [editUser, setEditUser] = useState<{ id: string; identification: string; email: string; name: string; role: string; isActive: boolean } | null>(null);
+  const [editUserObras, setEditUserObras] = useState<
+    { id: string; code: string; name: string; consecutivo: number | null; assigned: boolean }[]
+  >([]);
+  const [editUserProjectIds, setEditUserProjectIds] = useState<string[]>([]);
+  const [loadingEditUserObras, setLoadingEditUserObras] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', email: '', role: '', password: '' });
   const [savingUser, setSavingUser] = useState(false);
   const [roleLabels, setRoleLabels] = useState<{ role: string; label: string }[]>([]);
@@ -2669,17 +2674,15 @@ export default function DashboardPage() {
             const list = Array.isArray(data.obras) ? data.obras : [];
             setObrasForInforme(list);
             setSelectedObraIdState((current) => {
-              if (!current) return current;
-              const exists = list.some((o) => o.id === current);
-              if (!exists) {
-                try {
-                  sessionStorage.removeItem('sigocc_selectedObraId');
-                } catch {
-                  // ignore
-                }
-                return '';
+              const exists = current && list.some((o) => o.id === current);
+              if (exists) return current;
+              if (list.length > 0) return list[0].id;
+              try {
+                sessionStorage.removeItem('sigocc_selectedObraId');
+              } catch {
+                // ignore
               }
-              return current;
+              return '';
             });
             return;
           }
@@ -2695,17 +2698,15 @@ export default function DashboardPage() {
             .map((o) => ({ id: o.id, name: o.name, code: o.code }));
           setObrasForInforme(list);
           setSelectedObraIdState((current) => {
-            if (!current) return current;
-            const exists = list.some((o) => o.id === current);
-            if (!exists) {
-              try {
-                sessionStorage.removeItem('sigocc_selectedObraId');
-              } catch {
-                // ignore
-              }
-              return '';
+            const exists = current && list.some((o) => o.id === current);
+            if (exists) return current;
+            if (list.length > 0) return list[0].id;
+            try {
+              sessionStorage.removeItem('sigocc_selectedObraId');
+            } catch {
+              // ignore
             }
-            return current;
+            return '';
           });
         } catch {
           setObrasForInforme([]);
@@ -3593,9 +3594,40 @@ export default function DashboardPage() {
     }
   };
 
-  const openEditUser = (u: { id: string; identification: string; email: string; name: string; role: string; isActive: boolean }) => {
+  const openEditUser = async (u: {
+    id: string;
+    identification: string;
+    email: string;
+    name: string;
+    role: string;
+    isActive: boolean;
+  }) => {
     setEditUser(u);
     setEditForm({ name: u.name, email: u.email, role: u.role, password: '' });
+    setLoadingEditUserObras(true);
+    setEditUserObras([]);
+    setEditUserProjectIds([]);
+    try {
+      const res = await fetch(`/api/admin/users/${encodeURIComponent(u.id)}/obras`, { credentials: 'include' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? 'Error');
+      const obras = Array.isArray(data.obras) ? data.obras : [];
+      setEditUserObras(obras);
+      const ids = Array.isArray(data.projectIds)
+        ? (data.projectIds as string[])
+        : obras.filter((o: { assigned: boolean }) => o.assigned).map((o: { id: string }) => o.id);
+      setEditUserProjectIds(ids);
+    } catch {
+      setUserError('No se pudieron cargar las obras del usuario.');
+    } finally {
+      setLoadingEditUserObras(false);
+    }
+  };
+
+  const toggleEditUserObra = (projectId: string) => {
+    setEditUserProjectIds((prev) =>
+      prev.includes(projectId) ? prev.filter((id) => id !== projectId) : [...prev, projectId],
+    );
   };
 
   const saveEditUser = async (e: React.FormEvent) => {
@@ -3620,7 +3652,24 @@ export default function DashboardPage() {
         return;
       }
       setUsersList((prev) => prev.map((x) => (x.id === editUser.id ? { ...x, ...data.user } : x)));
+
+      if (editForm.role !== 'SUPER_ADMIN') {
+        const obrasRes = await fetch(`/api/admin/users/${encodeURIComponent(editUser.id)}/obras`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ projectIds: editUserProjectIds }),
+        });
+        const obrasData = await obrasRes.json();
+        if (!obrasRes.ok) {
+          setUserError(obrasData.error ?? 'Usuario guardado, pero falló la asignación de obras.');
+          return;
+        }
+      }
+
       setEditUser(null);
+      setEditUserObras([]);
+      setEditUserProjectIds([]);
       setUserMessage('Usuario actualizado.');
       setTimeout(() => setUserMessage(null), 3000);
     } catch {
@@ -7852,6 +7901,8 @@ export default function DashboardPage() {
                 <span>Obra</span>
                 {loadingObrasForInforme ? (
                   <span className="shell-text-muted">Cargando obras...</span>
+                ) : obrasForInforme.length === 0 ? (
+                  <span className="shell-text-muted">Sin obras asignadas para su usuario.</span>
                 ) : (
                   <select
                     className="personal-input"
@@ -11241,6 +11292,59 @@ export default function DashboardPage() {
                           onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
                         />
                       </div>
+                      <div className="form-field">
+                        <label className="form-label">Obras permitidas (informe diario)</label>
+                        {editForm.role === 'SUPER_ADMIN' ? (
+                          <p className="shell-text-muted" style={{ margin: 0 }}>
+                            Los usuarios con rol <strong>SUPER ADMIN</strong> ven todas las obras activas.
+                          </p>
+                        ) : loadingEditUserObras ? (
+                          <p className="shell-text-muted">Cargando obras...</p>
+                        ) : editUserObras.length === 0 ? (
+                          <p className="shell-text-muted">No hay obras activas. Créelas en Configuración → Obras.</p>
+                        ) : (
+                          <>
+                            <div className="users-table-actions" style={{ marginBottom: '0.5rem' }}>
+                              <button
+                                type="button"
+                                onClick={() => setEditUserProjectIds(editUserObras.map((o) => o.id))}
+                              >
+                                Todas
+                              </button>
+                              <button type="button" onClick={() => setEditUserProjectIds([])}>
+                                Ninguna
+                              </button>
+                            </div>
+                            <div
+                              className="perms-grid"
+                              style={{
+                                maxHeight: '12rem',
+                                overflowY: 'auto',
+                                border: '1px solid var(--border, #ddd)',
+                                borderRadius: '6px',
+                                padding: '0.5rem 0.75rem',
+                              }}
+                            >
+                              {editUserObras.map((o) => (
+                                <label key={o.id} className="perms-check-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={editUserProjectIds.includes(o.id)}
+                                    onChange={() => toggleEditUserObra(o.id)}
+                                  />
+                                  <span className="perms-check-box" />
+                                  <span>
+                                    {o.code} · {o.name}
+                                  </span>
+                                </label>
+                              ))}
+                            </div>
+                            <p className="shell-text-muted" style={{ marginTop: '0.35rem', marginBottom: 0, fontSize: '0.85rem' }}>
+                              Solo las obras marcadas aparecerán en el combo del informe diario.
+                            </p>
+                          </>
+                        )}
+                      </div>
                       <div className="form-actions-row">
                         <button type="submit" className="btn-primary" disabled={savingUser}>
                           {savingUser ? 'Guardando...' : 'Guardar'}
@@ -11523,6 +11627,10 @@ export default function DashboardPage() {
             </label>
             {loadingObrasForInforme ? (
               <span className="shell-text-muted">Cargando obras...</span>
+            ) : obrasForInforme.length === 0 ? (
+              <span className="shell-text-muted">
+                Sin obras asignadas. Un administrador debe marcarlas en Usuarios → Administrar → Editar.
+              </span>
             ) : (
               <select
                 id="informe-obra-select"

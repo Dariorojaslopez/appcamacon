@@ -19,15 +19,18 @@ import {
   buildObraPdfBase,
   formatFechaEsPdf,
 } from '../../../../src/lib/registroBitacoraPdfBuild';
+import { authFromRequest, isAuthPayload, requireAccessibleProject } from '../../../../src/lib/requireProjectAccess';
 
 export async function GET(req: NextRequest) {
   try {
-    const authCookie = req.cookies.get('access_token')?.value;
-    if (!authCookie) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
-    verifyAccessToken(authCookie);
+    const auth = authFromRequest(req);
+    if (!isAuthPayload(auth)) return auth;
 
     const { searchParams, origin } = new URL(req.url);
     const projectId = searchParams.get('projectId')?.trim() ?? '';
+
+    const denied = await requireAccessibleProject(auth, projectId);
+    if (denied) return denied;
     const fechaDesdeStr =
       searchParams.get('fechaDesde')?.trim() ?? searchParams.get('fecha')?.trim() ?? '';
     const fechaHastaStr =

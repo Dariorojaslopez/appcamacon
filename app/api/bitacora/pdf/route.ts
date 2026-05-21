@@ -5,6 +5,7 @@ import { resolveJornadaCatalogoId } from '../../../../src/lib/informeDailyScope'
 import { syncBitacoraFromInforme } from '../../../../src/lib/bitacora';
 import { formatFranjasClimaTexto } from '../../../../src/lib/registroBitacoraClimaPdf';
 import { parseInformeDayUtc } from '../../../../src/lib/registroBitacoraFecha';
+import { authFromRequest, isAuthPayload, requireAccessibleProject } from '../../../../src/lib/requireProjectAccess';
 
 function esc(value: unknown): string {
   return String(value ?? '')
@@ -27,6 +28,9 @@ export async function GET(req: NextRequest) {
     if (!projectId || !dateStr) {
       return NextResponse.json({ error: 'projectId y date son requeridos' }, { status: 400 });
     }
+    const denied = await requireAccessibleProject(payload, projectId);
+    if (denied) return denied;
+
     const date = parseInformeDayUtc(dateStr);
     if (!date) return NextResponse.json({ error: 'Fecha no válida' }, { status: 400 });
     const jr = await resolveJornadaCatalogoId(jornadaId);

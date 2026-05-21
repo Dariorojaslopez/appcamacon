@@ -3,6 +3,7 @@ import { verifyAccessToken } from '../../../../src/infrastructure/auth/tokens';
 import prisma from '../../../../src/lib/prisma';
 import { normalizeReportDate, resolveJornadaCatalogoId } from '../../../../src/lib/informeDailyScope';
 import { informeCerradoJsonResponse } from '../../../../src/lib/informeCerrado';
+import { authFromRequest, isAuthPayload, requireAccessibleProject } from '../../../../src/lib/requireProjectAccess';
 
 async function getInformeScope(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -68,9 +69,8 @@ async function migrateLegacySuspensionIfNeeded(informe: {
 
 export async function GET(req: NextRequest) {
   try {
-    const authCookie = req.cookies.get('access_token')?.value;
-    if (!authCookie) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
-    verifyAccessToken(authCookie);
+    const auth = authFromRequest(req);
+    if (!isAuthPayload(auth)) return auth;
 
     const scope = await getInformeScope(req);
     if ('error' in scope) return scope.error;
@@ -140,9 +140,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const authCookie = req.cookies.get('access_token')?.value;
-    if (!authCookie) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
-    verifyAccessToken(authCookie);
+    const auth = authFromRequest(req);
+    if (!isAuthPayload(auth)) return auth;
 
     const body = (await req.json()) as {
       projectId?: string;
@@ -165,6 +164,9 @@ export async function POST(req: NextRequest) {
     if (!projectId || !dateStr) {
       return NextResponse.json({ error: 'projectId y date son requeridos' }, { status: 400 });
     }
+    const denied = await requireAccessibleProject(auth, projectId);
+    if (denied) return denied;
+
 
     const jr = await resolveJornadaCatalogoId(jornadaId);
     if (jr.valid === false) {

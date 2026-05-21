@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessToken } from '../../../src/infrastructure/auth/tokens';
+import { authFromRequest, isAuthPayload, requireAccessibleProject } from '../../../src/lib/requireProjectAccess';
 import prisma from '../../../src/lib/prisma';
 import {
   jsonRegistroBitacoraSchemaPendiente,
@@ -27,9 +28,8 @@ function asOptionalUrl(v: unknown): string | null {
 
 export async function GET(req: NextRequest) {
   try {
-    const authCookie = req.cookies.get('access_token')?.value;
-    if (!authCookie) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
-    verifyAccessToken(authCookie);
+    const auth = authFromRequest(req);
+    if (!isAuthPayload(auth)) return auth;
 
     const projectId = req.nextUrl.searchParams.get('projectId')?.trim() ?? '';
     const fechaStr = req.nextUrl.searchParams.get('fecha')?.trim() ?? '';
@@ -38,6 +38,9 @@ export async function GET(req: NextRequest) {
     }
     const fecha = parseYmdUtc(fechaStr);
     if (!fecha) return NextResponse.json({ error: 'Fecha no válida' }, { status: 400 });
+
+    const denied = await requireAccessibleProject(auth, projectId);
+    if (denied) return denied;
 
     const project = await prisma.project.findFirst({
       where: { id: projectId, isActive: true },
@@ -114,6 +117,9 @@ export async function POST(req: NextRequest) {
     }
     const fecha = parseYmdUtc(fechaStr);
     if (!fecha) return NextResponse.json({ error: 'Fecha no válida' }, { status: 400 });
+
+    const denied = await requireAccessibleProject(payload, projectId);
+    if (denied) return denied;
 
     const project = await prisma.project.findFirst({
       where: { id: projectId, isActive: true },

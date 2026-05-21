@@ -1,25 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '../../../../src/lib/prisma';
-import { verifyAccessToken } from '../../../../src/infrastructure/auth/tokens';
+import { authFromRequest, isAuthPayload, requireAccessibleProject } from '../../../../src/lib/requireProjectAccess';
 
 export async function GET(req: NextRequest) {
   try {
-    const authCookie = req.cookies.get('access_token')?.value;
-    if (!authCookie) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
-    verifyAccessToken(authCookie);
+    const auth = authFromRequest(req);
+    if (!isAuthPayload(auth)) return auth;
 
     const projectId = req.nextUrl.searchParams.get('projectId')?.trim();
-    if (!projectId) {
-      return NextResponse.json({ error: 'projectId es requerido' }, { status: 400 });
-    }
-
-    const project = await prisma.project.findFirst({
-      where: { id: projectId, isActive: true },
-      select: { id: true },
-    });
-    if (!project) {
-      return NextResponse.json({ error: 'Obra no encontrada o inactiva' }, { status: 400 });
-    }
+    const denied = await requireAccessibleProject(auth, projectId);
+    if (denied) return denied;
 
     const items = await prisma.contratistaCatalog.findMany({
       where: { projectId, isActive: true },

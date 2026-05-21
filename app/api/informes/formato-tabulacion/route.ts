@@ -3,6 +3,7 @@ import { verifyAccessToken } from '../../../../src/infrastructure/auth/tokens';
 import prisma from '../../../../src/lib/prisma';
 import { resolveJornadaCatalogoId } from '../../../../src/lib/informeDailyScope';
 import { buildFormatoTabulacionWorkbookBuffer } from '../../../../src/lib/formatoTabulacionExcel';
+import { authFromRequest, isAuthPayload, requireAccessibleProject } from '../../../../src/lib/requireProjectAccess';
 
 function normalizeDate(date: string): Date | null {
   const d = new Date(date);
@@ -20,12 +21,14 @@ function safeFilenamePart(s: string): string {
 
 export async function GET(req: NextRequest) {
   try {
-    const authCookie = req.cookies.get('access_token')?.value;
-    if (!authCookie) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
-    verifyAccessToken(authCookie);
+    const auth = authFromRequest(req);
+    if (!isAuthPayload(auth)) return auth;
 
     const { searchParams } = new URL(req.url);
     const projectId = searchParams.get('projectId')?.trim();
+
+    const denied = await requireAccessibleProject(auth, projectId);
+    if (denied) return denied;
     const dateStr = searchParams.get('date')?.trim();
     const jornadaId = searchParams.get('jornadaId')?.trim();
     if (!projectId || !dateStr || !jornadaId) {

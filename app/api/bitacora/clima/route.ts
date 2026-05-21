@@ -3,6 +3,7 @@ import { verifyAccessToken } from '../../../../src/infrastructure/auth/tokens';
 import prisma from '../../../../src/lib/prisma';
 import { resolveJornadaCatalogoId } from '../../../../src/lib/informeDailyScope';
 import { getBitacoraRequestContext, syncBitacoraFromInforme } from '../../../../src/lib/bitacora';
+import { authFromRequest, isAuthPayload, requireAccessibleProject } from '../../../../src/lib/requireProjectAccess';
 
 function normalizeDate(date: string): Date | null {
   const d = new Date(date);
@@ -13,9 +14,8 @@ function normalizeDate(date: string): Date | null {
 
 export async function GET(req: NextRequest) {
   try {
-    const authCookie = req.cookies.get('access_token')?.value;
-    if (!authCookie) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
-    verifyAccessToken(authCookie);
+    const auth = authFromRequest(req);
+    if (!isAuthPayload(auth)) return auth;
 
     const { searchParams } = new URL(req.url);
     const projectId = searchParams.get('projectId');
@@ -24,6 +24,9 @@ export async function GET(req: NextRequest) {
     if (!projectId || !dateStr) {
       return NextResponse.json({ error: 'projectId y date son requeridos' }, { status: 400 });
     }
+    const denied = await requireAccessibleProject(auth, projectId);
+    if (denied) return denied;
+
     const date = normalizeDate(dateStr);
     if (!date) return NextResponse.json({ error: 'Fecha no válida' }, { status: 400 });
     const jr = await resolveJornadaCatalogoId(jornadaId);

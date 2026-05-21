@@ -12,14 +12,17 @@ import {
   toYmdUtc,
 } from '../../../../src/lib/registroBitacoraFecha';
 import { findInformesDiariosEnRango } from '../../../../src/lib/registroBitacoraClimaPdf';
+import { authFromRequest, isAuthPayload, requireAccessibleProject } from '../../../../src/lib/requireProjectAccess';
 
 export async function GET(req: NextRequest) {
   try {
-    const authCookie = req.cookies.get('access_token')?.value;
-    if (!authCookie) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
-    verifyAccessToken(authCookie);
+    const auth = authFromRequest(req);
+    if (!isAuthPayload(auth)) return auth;
 
     const projectId = req.nextUrl.searchParams.get('projectId')?.trim() ?? '';
+
+    const denied = await requireAccessibleProject(auth, projectId);
+    if (denied) return denied;
     const fechaDesdeStr = req.nextUrl.searchParams.get('fechaDesde')?.trim() ?? '';
     const fechaHastaStr = req.nextUrl.searchParams.get('fechaHasta')?.trim() ?? '';
 

@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessToken } from '../../../../src/infrastructure/auth/tokens';
+import {
+  authFromRequest,
+  accessibleProjectIdsForUser,
+  isAuthPayload,
+  requireAccessibleProject,
+} from '../../../../src/lib/requireProjectAccess';
 import prisma from '../../../../src/lib/prisma';
 import {
   EVIDENCIA_FASES,
@@ -147,9 +153,8 @@ function etiquetaEstadoEquipo(v: string | null | undefined): string {
 
 export async function GET(req: NextRequest) {
   try {
-    const authCookie = req.cookies.get('access_token')?.value;
-    if (!authCookie) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
-    verifyAccessToken(authCookie);
+    const auth = authFromRequest(req);
+    if (!isAuthPayload(auth)) return auth;
 
     const { searchParams } = new URL(req.url);
     const dateFrom = searchParams.get('dateFrom')?.trim();
@@ -172,7 +177,14 @@ export async function GET(req: NextRequest) {
     };
 
     if (projectId && projectId !== 'all') {
+      const denied = await requireAccessibleProject(auth, projectId);
+      if (denied) return denied;
       where.projectId = projectId;
+    } else {
+      const allowedIds = await accessibleProjectIdsForUser(auth);
+      if (allowedIds !== null) {
+        where.projectId = allowedIds.length > 0 ? { in: allowedIds } : { in: ['__none__'] };
+      }
     }
 
     if (jornadaId && jornadaId !== 'all') {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessToken } from '../../../src/infrastructure/auth/tokens';
+import { requireAccessibleProject } from '../../../src/lib/requireProjectAccess';
 import prisma from '../../../src/lib/prisma';
 import { resolveJornadaCatalogoId } from '../../../src/lib/informeDailyScope';
 import { informeCerradoJsonResponse } from '../../../src/lib/informeCerrado';
@@ -161,12 +162,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const project = await prisma.project.findFirst({
-      where: { id: projectId, isActive: true },
-    });
-    if (!project) {
-      return NextResponse.json({ error: 'Obra no encontrada o inactiva' }, { status: 400 });
-    }
+    const denied = await requireAccessibleProject(payload, projectId);
+    if (denied) return denied;
 
     const reportDate = parseInformeDayUtc(String(date));
     if (!reportDate) {

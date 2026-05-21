@@ -3,6 +3,7 @@ import { verifyAccessToken } from '../../../../src/infrastructure/auth/tokens';
 import prisma from '../../../../src/lib/prisma';
 import { resolveJornadaCatalogoId } from '../../../../src/lib/informeDailyScope';
 import { syncBitacoraFromInforme } from '../../../../src/lib/bitacora';
+import { authFromRequest, isAuthPayload, requireAccessibleProject } from '../../../../src/lib/requireProjectAccess';
 
 function normalizeDate(date: string): Date | null {
   const d = new Date(date);
@@ -19,6 +20,9 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const projectId = searchParams.get('projectId');
+
+    const denied = await requireAccessibleProject(payload, projectId);
+    if (denied) return denied;
     const dateStr = searchParams.get('date');
     const jornadaId = searchParams.get('jornadaId');
     const includeReplaced = searchParams.get('includeReplaced') === 'true';

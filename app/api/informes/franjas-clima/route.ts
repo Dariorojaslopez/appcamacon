@@ -4,6 +4,7 @@ import prisma from '../../../../src/lib/prisma';
 import { resolveJornadaCatalogoId } from '../../../../src/lib/informeDailyScope';
 import { informeCerradoJsonResponse } from '../../../../src/lib/informeCerrado';
 import { parseInformeDayUtc } from '../../../../src/lib/registroBitacoraFecha';
+import { authFromRequest, isAuthPayload, requireAccessibleProject } from '../../../../src/lib/requireProjectAccess';
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,6 +27,9 @@ export async function POST(req: NextRequest) {
     if (!projectId || !dateStr) {
       return NextResponse.json({ error: 'projectId y date son requeridos' }, { status: 400 });
     }
+    const denied = await requireAccessibleProject(payload, projectId);
+    if (denied) return denied;
+
 
     const reportDate = parseInformeDayUtc(dateStr);
     if (!reportDate) return NextResponse.json({ error: 'Fecha no válida' }, { status: 400 });
