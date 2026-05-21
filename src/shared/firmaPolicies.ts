@@ -35,16 +35,32 @@ export const FIRMA_SLOT_LABELS: Record<FirmaSlotKey, string> = {
 const DEFAULT_ROLES_CON_TOKEN = new Set([
   'SUPER_ADMIN',
   'DIRECTOR',
+  'DIRECTOR_OBRA',
   'RESIDENTE_TECNICO',
+  'RESIDENTE_OBRA',
   'INSPECTOR_TECNICO',
   'INSPECTOR_SSTMA',
+  'RESPONSABLE_DILIGENCIAMIENTO',
+  'AUXILIAR_INGENIERIA',
 ]);
 
 const DEFAULT_FIRMA_ROLES_POR_SLOT: Record<FirmaSlotKey, readonly string[]> = {
-  responsableDiligenciamiento: ['INSPECTOR_TECNICO', 'INSPECTOR_SSTMA', 'SUPER_ADMIN', 'DIRECTOR'],
-  residenteObra: ['RESIDENTE_TECNICO', 'SUPER_ADMIN', 'DIRECTOR'],
-  auxiliarIngenieria: ['INSPECTOR_TECNICO', 'INSPECTOR_SSTMA', 'SUPER_ADMIN', 'DIRECTOR'],
-  vistoBuenoDirectorObra: ['DIRECTOR', 'SUPER_ADMIN'],
+  responsableDiligenciamiento: [
+    'RESPONSABLE_DILIGENCIAMIENTO',
+    'INSPECTOR_TECNICO',
+    'INSPECTOR_SSTMA',
+    'SUPER_ADMIN',
+    'DIRECTOR',
+  ],
+  residenteObra: ['RESIDENTE_OBRA', 'RESIDENTE_TECNICO', 'SUPER_ADMIN', 'DIRECTOR'],
+  auxiliarIngenieria: [
+    'AUXILIAR_INGENIERIA',
+    'INSPECTOR_TECNICO',
+    'INSPECTOR_SSTMA',
+    'SUPER_ADMIN',
+    'DIRECTOR',
+  ],
+  vistoBuenoDirectorObra: ['DIRECTOR_OBRA', 'DIRECTOR', 'SUPER_ADMIN'],
 };
 
 /** Fallback cuando no hay registros en BD para el rol */

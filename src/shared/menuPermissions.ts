@@ -44,6 +44,10 @@ export const ROLES = [
   'CONTRATISTA',
   'INTERVENTOR',
   'IDU',
+  'RESPONSABLE_DILIGENCIAMIENTO',
+  'RESIDENTE_OBRA',
+  'AUXILIAR_INGENIERIA',
+  'DIRECTOR_OBRA',
 ] as const;
 
 export const ROLE_LABELS: Record<(typeof ROLES)[number], string> = {
@@ -56,4 +60,8 @@ export const ROLE_LABELS: Record<(typeof ROLES)[number], string> = {
   CONTRATISTA: 'Contratista',
   INTERVENTOR: 'Interventor',
   IDU: 'IDU',
+  RESPONSABLE_DILIGENCIAMIENTO: 'Responsable de diligenciamiento',
+  RESIDENTE_OBRA: 'Residente de obra',
+  AUXILIAR_INGENIERIA: 'Auxiliar de ingeniería',
+  DIRECTOR_OBRA: 'Director de obra',
 };

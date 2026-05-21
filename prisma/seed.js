@@ -88,6 +88,30 @@ async function main() {
     { role: 'CONTRATISTA', label: 'Contratista' },
     { role: 'INTERVENTOR', label: 'Interventor' },
     { role: 'IDU', label: 'IDU' },
+    { role: 'RESPONSABLE_DILIGENCIAMIENTO', label: 'Responsable de diligenciamiento' },
+    { role: 'RESIDENTE_OBRA', label: 'Residente de obra' },
+    { role: 'AUXILIAR_INGENIERIA', label: 'Auxiliar de ingeniería' },
+    { role: 'DIRECTOR_OBRA', label: 'Director de obra' },
+  ];
+
+  const INFORME_MENU_KEYS = [
+    'home',
+    'datos',
+    'jornada',
+    'personal',
+    'equipos',
+    'actividades',
+    'calidad',
+    'evidencias',
+    'tabulacion',
+    'informeExportar',
+  ];
+
+  const FIRMA_ROLE_SLOTS = [
+    { role: 'RESPONSABLE_DILIGENCIAMIENTO', slot: 'responsableDiligenciamiento' },
+    { role: 'RESIDENTE_OBRA', slot: 'residenteObra' },
+    { role: 'AUXILIAR_INGENIERIA', slot: 'auxiliarIngenieria' },
+    { role: 'DIRECTOR_OBRA', slot: 'vistoBuenoDirectorObra' },
   ];
   for (const { role, label } of ROLE_LABELS) {
     await prisma.roleLabel.upsert({
@@ -95,6 +119,23 @@ async function main() {
       update: { label },
       create: { role, label },
     });
+  }
+
+  for (const { role, slot } of FIRMA_ROLE_SLOTS) {
+    for (const menuKey of INFORME_MENU_KEYS) {
+      await prisma.roleMenuPermission.upsert({
+        where: { role_menuKey: { role, menuKey } },
+        update: {},
+        create: { role, menuKey },
+      });
+    }
+    for (const permKey of ['token', slot]) {
+      await prisma.roleFirmaPermission.upsert({
+        where: { role_permKey: { role, permKey } },
+        update: {},
+        create: { role, permKey },
+      });
+    }
   }
 
   if (!(await prisma.jornadaCatalog.findFirst({ where: { nombre: 'Diurna' } }))) {
