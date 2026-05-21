@@ -58,6 +58,7 @@ import {
   REGISTRO_BITACORA_SLOT_LABELS,
 } from '../../src/shared/registroBitacoraPermissions';
 import { INFORME_CERRADO_MSG } from '../../src/lib/informeCerrado';
+import { InformeDiarioCalendario } from './InformeDiarioCalendario';
 import { normalizeObraCarpetaInput, obraCarpetaInputFromDb } from '../../src/lib/obraCarpetaNube';
 import { ITEM_CATALOG_UNIT_FALLBACK_OPTIONS } from '../../src/lib/itemCatalogUnits';
 import { UNIDAD_TIPO_CALCULO_LABELS, UNIDAD_TIPO_CALCULO_VALUES } from '../../src/lib/unidadCatalog';
@@ -11620,7 +11621,8 @@ export default function DashboardPage() {
         )}
 
         {isInformeSection && (
-          <div className="obra-selector-bar">
+          <div className="obra-selector-bar obra-selector-bar--informe">
+            <div className="obra-selector-row">
             <label htmlFor="informe-obra-select" className="obra-selector-label">
               Obra
             </label>
@@ -11666,6 +11668,17 @@ export default function DashboardPage() {
                 ))}
               </select>
             )}
+            </div>
+            {selectedObraId && selectedJornadaId ? (
+              <InformeDiarioCalendario
+                projectId={selectedObraId}
+                jornadaId={selectedJornadaId}
+                selectedDate={datosGeneralesForm.fechaReporte || new Date().toISOString().slice(0, 10)}
+                onSelectDate={(ymd) => {
+                  setDatosGeneralesForm((prev) => ({ ...prev, fechaReporte: ymd }));
+                }}
+              />
+            ) : null}
           </div>
         )}
 
@@ -11710,6 +11723,13 @@ export default function DashboardPage() {
                     className="form-input"
                     type="date"
                     required
+                    readOnly={informeBloqueado}
+                    aria-readonly={informeBloqueado}
+                    title={
+                      informeBloqueado
+                        ? 'Informe cerrado: cambie de fecha con el calendario superior (días en rojo)'
+                        : 'También puede cambiar la fecha aquí o en el calendario superior'
+                    }
                     value={datosGeneralesForm.fechaReporte}
                     onChange={(e) => setDatosGeneralesForm((f) => ({ ...f, fechaReporte: e.target.value }))}
                   />
