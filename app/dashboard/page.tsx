@@ -12009,8 +12009,8 @@ export default function DashboardPage() {
                   <table className="users-table informe-franja-clima-table">
                     <thead>
                       <tr>
-                        <th style={{ width: '28%' }}>Franja del día</th>
-                        <th>Tipo</th>
+                        <th className="informe-franja-clima-th-franja">Franja del día</th>
+                        <th className="informe-franja-clima-th-tipo">Tipo</th>
                       </tr>
                     </thead>
                     <tbody>

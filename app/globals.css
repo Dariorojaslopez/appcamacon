@@ -2954,20 +2954,78 @@ ul.informe-searchable-list {
   max-width: 100%;
 }
 
-/* Tabla corta (franjas clima): sin scroll forzado; overflow-x:auto hace que overflow-y pase a auto en muchos UAs */
+/* Tabla corta (franjas clima): ancho fluido; en móvil filas apiladas */
 .informe-franja-clima-wrap {
   margin-top: 0.75rem;
   margin-bottom: 1rem;
   max-width: 100%;
   border: 1px solid rgba(209, 213, 219, 0.9);
   border-radius: 12px;
-  overflow: visible;
+  overflow: hidden;
 }
 
-.informe-franja-clima-table {
+.informe-franja-clima-table.users-table {
   min-width: 0;
   width: 100%;
   table-layout: fixed;
+}
+
+.informe-franja-clima-table td {
+  overflow: hidden;
+  vertical-align: middle;
+}
+
+.informe-franja-clima-table td .informe-searchable {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.informe-franja-clima-table .informe-searchable-trigger {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.informe-franja-clima-th-franja {
+  width: 28%;
+}
+
+.informe-franja-clima-th-tipo {
+  width: 72%;
+}
+
+@media (max-width: 639px) {
+  .informe-franja-clima-table thead {
+    display: none;
+  }
+
+  .informe-franja-clima-table tbody tr {
+    display: block;
+    padding: 0.7rem 0.75rem 0.85rem;
+    border-bottom: 1px solid rgba(229, 231, 235, 0.9);
+  }
+
+  .informe-franja-clima-table tbody tr:last-child {
+    border-bottom: none;
+  }
+
+  .informe-franja-clima-table td {
+    display: block;
+    width: 100% !important;
+    padding: 0.2rem 0;
+    border-bottom: none;
+    overflow: visible;
+  }
+
+  .informe-franja-clima-table td:first-child {
+    padding-bottom: 0.4rem;
+    color: var(--camacon-azul);
+  }
+
+  .informe-franja-clima-table td:first-child strong {
+    font-size: 0.88rem;
+    font-weight: 700;
+  }
 }
 
 .users-table-wrap::after {
