@@ -1844,6 +1844,54 @@ body {
   font-weight: 400;
 }
 
+.informe-calendario-block {
+  width: 100%;
+  margin-top: 0.45rem;
+}
+
+.informe-calendario-toggle {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.6rem;
+  width: 100%;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--camacon-border-medium);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  color: var(--camacon-azul);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.informe-calendario-toggle:hover {
+  background: #eef2ff;
+  border-color: var(--color-primary);
+}
+
+.informe-calendario-toggle-icon {
+  font-size: 0.75rem;
+  line-height: 1;
+  color: var(--color-primary);
+}
+
+.informe-calendario-toggle-hint {
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.informe-calendario-nav:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.informe-calendario-nav:disabled:hover {
+  background: var(--surface-muted);
+}
+
 .informe-calendario {
   width: 100%;
   margin-top: 0.5rem;
