@@ -48,7 +48,7 @@ export async function notifyBitacoraSaveToOthers(params: {
   for (const savedSlot of params.savedSlots) {
     for (const otherSlot of BITACORA_NOTIFY_OTHER_SLOTS[savedSlot]) {
       const uid = projectNotifyUserIdForSlot(project, otherSlot);
-      if (uid && uid !== params.savedByUserId && !recipientIds.includes(uid)) {
+      if (uid && !recipientIds.includes(uid)) {
         recipientIds.push(uid);
       }
     }

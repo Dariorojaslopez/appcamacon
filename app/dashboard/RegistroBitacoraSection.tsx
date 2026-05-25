@@ -919,7 +919,7 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
         typeof data.notificacionesEnviadas === 'number' && data.notificacionesEnviadas > 0
           ? ` Se envió aviso por correo a ${data.notificacionesEnviadas} usuario(s).`
           : typeof data.notificacionesEnviadas === 'number'
-            ? ' No se envió correo a otros roles: en Configuración → Obras asigne los tres usuarios de notificación (y que no sean la misma cuenta que guarda).'
+            ? ' No se envió correo: en Configuración → Obras asigne los usuarios de notificación de bitácora para los otros roles.'
             : '';
       setMsg(
         firmaSubidaEnSave
