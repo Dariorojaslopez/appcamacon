@@ -3918,6 +3918,17 @@ ul.informe-searchable-list {
   font-size: 0.78rem;
 }
 
+.registro-bitacora-firma-preview-img {
+  display: block;
+  max-width: 100%;
+  width: 340px;
+  max-height: 120px;
+  object-fit: contain;
+  border: 1px solid var(--camacon-border-medium);
+  border-radius: 8px;
+  background: #fff;
+}
+
 .signature-pad-wrap {
   border: 1px solid var(--camacon-border-medium);
   border-radius: 10px;

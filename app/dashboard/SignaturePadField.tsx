@@ -2,6 +2,7 @@
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
 import type { PointerEvent } from 'react';
+import { firmaImageDisplaySrc } from '../../src/lib/firmaImageSrc';
 
 const CSS_W = 340;
 const CSS_H = 120;
@@ -71,13 +72,14 @@ export const SignaturePadField = forwardRef<SignaturePadFieldHandle, Record<stri
       layoutCanvas();
       const ctx = c.getContext('2d');
       if (!ctx) return false;
+      const src = firmaImageDisplaySrc(url) ?? url;
       try {
         const img = new Image();
         img.crossOrigin = 'anonymous';
         await new Promise<void>((resolve, reject) => {
           img.onload = () => resolve();
           img.onerror = () => reject(new Error('No se pudo cargar la imagen de firma'));
-          img.src = url;
+          img.src = src;
         });
         ctx.drawImage(img, 0, 0, CSS_W, CSS_H);
         hasInk.current = true;

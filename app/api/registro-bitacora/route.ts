@@ -9,11 +9,7 @@ import {
 import { fechaRegistroEnRangoObra, parseYmdUtc, toYmdUtc } from '../../../src/lib/registroBitacoraFecha';
 import { dbRegistroBitacoraSlotsForRole } from '../../../src/infrastructure/auth/registroBitacoraPermissionsResolver';
 import type { RegistroBitacoraSlotKey } from '../../../src/shared/registroBitacoraPermissions';
-import {
-  mergeLegacyFirmaUrl,
-  normalizeFirmaDocsForSave,
-  parseFirmaDocsJson,
-} from '../../../src/shared/registroBitacoraFirmaDocs';
+import { normalizeFirmaDocsForSave, parseFirmaDocsJson } from '../../../src/shared/registroBitacoraFirmaDocs';
 import { Prisma } from '@prisma/client';
 
 type SlotPayload = {
@@ -85,15 +81,9 @@ export async function GET(req: NextRequest) {
         ? {
             ...reg,
             fecha: toYmdUtc(reg.fecha),
-            contratistaFirmaDocs: mergeLegacyFirmaUrl(
-              reg.contratistaFirmaUrl,
-              parseFirmaDocsJson(reg.contratistaFirmaDocs),
-            ),
-            interventoriaFirmaDocs: mergeLegacyFirmaUrl(
-              reg.interventoriaFirmaUrl,
-              parseFirmaDocsJson(reg.interventoriaFirmaDocs),
-            ),
-            iduFirmaDocs: mergeLegacyFirmaUrl(reg.iduFirmaUrl, parseFirmaDocsJson(reg.iduFirmaDocs)),
+            contratistaFirmaDocs: parseFirmaDocsJson(reg.contratistaFirmaDocs),
+            interventoriaFirmaDocs: parseFirmaDocsJson(reg.interventoriaFirmaDocs),
+            iduFirmaDocs: parseFirmaDocsJson(reg.iduFirmaDocs),
           }
         : null,
     });
