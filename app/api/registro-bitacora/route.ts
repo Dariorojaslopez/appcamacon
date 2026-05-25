@@ -9,11 +9,18 @@ import {
 import { fechaRegistroEnRangoObra, parseYmdUtc, toYmdUtc } from '../../../src/lib/registroBitacoraFecha';
 import { dbRegistroBitacoraSlotsForRole } from '../../../src/infrastructure/auth/registroBitacoraPermissionsResolver';
 import type { RegistroBitacoraSlotKey } from '../../../src/shared/registroBitacoraPermissions';
+import {
+  mergeLegacyFirmaUrl,
+  normalizeFirmaDocsForSave,
+  parseFirmaDocsJson,
+} from '../../../src/shared/registroBitacoraFirmaDocs';
+import { Prisma } from '@prisma/client';
 
 type SlotPayload = {
   observaciones?: unknown;
   fotoUrl?: unknown;
   firmaUrl?: unknown;
+  firmaDocs?: unknown;
 };
 
 function asString(v: unknown): string {
@@ -60,12 +67,15 @@ export async function GET(req: NextRequest) {
         contratistaObservaciones: true,
         contratistaFotoUrl: true,
         contratistaFirmaUrl: true,
+        contratistaFirmaDocs: true,
         interventoriaObservaciones: true,
         interventoriaFotoUrl: true,
         interventoriaFirmaUrl: true,
+        interventoriaFirmaDocs: true,
         iduObservaciones: true,
         iduFotoUrl: true,
         iduFirmaUrl: true,
+        iduFirmaDocs: true,
         updatedAt: true,
       },
     });
@@ -75,6 +85,15 @@ export async function GET(req: NextRequest) {
         ? {
             ...reg,
             fecha: toYmdUtc(reg.fecha),
+            contratistaFirmaDocs: mergeLegacyFirmaUrl(
+              reg.contratistaFirmaUrl,
+              parseFirmaDocsJson(reg.contratistaFirmaDocs),
+            ),
+            interventoriaFirmaDocs: mergeLegacyFirmaUrl(
+              reg.interventoriaFirmaUrl,
+              parseFirmaDocsJson(reg.interventoriaFirmaDocs),
+            ),
+            iduFirmaDocs: mergeLegacyFirmaUrl(reg.iduFirmaUrl, parseFirmaDocsJson(reg.iduFirmaDocs)),
           }
         : null,
     });
@@ -160,6 +179,9 @@ export async function POST(req: NextRequest) {
         contratistaFirmaUrl: can('contratista')
           ? asOptionalUrl(c.firmaUrl)
           : (existing?.contratistaFirmaUrl ?? null),
+        contratistaFirmaDocs: can('contratista')
+          ? (normalizeFirmaDocsForSave(c.firmaDocs) as Prisma.InputJsonValue)
+          : ((existing?.contratistaFirmaDocs as Prisma.InputJsonValue) ?? []),
         interventoriaObservaciones: can('interventor')
           ? asString(i.observaciones)
           : (existing?.interventoriaObservaciones ?? ''),
@@ -169,9 +191,15 @@ export async function POST(req: NextRequest) {
         interventoriaFirmaUrl: can('interventor')
           ? asOptionalUrl(i.firmaUrl)
           : (existing?.interventoriaFirmaUrl ?? null),
+        interventoriaFirmaDocs: can('interventor')
+          ? (normalizeFirmaDocsForSave(i.firmaDocs) as Prisma.InputJsonValue)
+          : ((existing?.interventoriaFirmaDocs as Prisma.InputJsonValue) ?? []),
         iduObservaciones: can('idu') ? asString(d.observaciones) : (existing?.iduObservaciones ?? ''),
         iduFotoUrl: can('idu') ? asOptionalUrl(d.fotoUrl) : (existing?.iduFotoUrl ?? null),
         iduFirmaUrl: can('idu') ? asOptionalUrl(d.firmaUrl) : (existing?.iduFirmaUrl ?? null),
+        iduFirmaDocs: can('idu')
+          ? (normalizeFirmaDocsForSave(d.firmaDocs) as Prisma.InputJsonValue)
+          : ((existing?.iduFirmaDocs as Prisma.InputJsonValue) ?? []),
         franjaClimaMananaCodigo: existing?.franjaClimaMananaCodigo ?? null,
         franjaClimaTardeCodigo: existing?.franjaClimaTardeCodigo ?? null,
         franjaClimaNocheCodigo: existing?.franjaClimaNocheCodigo ?? null,

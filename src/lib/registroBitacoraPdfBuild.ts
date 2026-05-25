@@ -6,6 +6,7 @@ import { mapEquiposMaterialesParaPdf } from './registroBitacoraEquiposPdf';
 import { agruparPersonalPorCargo } from './registroBitacoraPersonalPdf';
 import type { RegistroBitacoraPdfDia, RegistroBitacoraPdfObra, RegistroBitacoraPdfSlot } from './registroBitacoraPdfHtml';
 import { REGISTRO_BITACORA_SLOT_LABELS } from '../shared/registroBitacoraPermissions';
+import { mergeLegacyFirmaUrl, parseFirmaDocsJson } from '../shared/registroBitacoraFirmaDocs';
 
 type ProjectPdf = {
   name: string;
@@ -69,6 +70,23 @@ function transcurridoDiasObra(project: ProjectPdf, fecha: Date): number | null {
   return diffInclusiveCalendarDaysUtc(project.startDate, fecha);
 }
 
+function mapFirmaDocsPdf(
+  origin: string,
+  firmaUrl: string | null,
+  rawDocs: unknown,
+): { firmaUrl: string; firmaDocs: RegistroBitacoraPdfSlot['firmaDocs'] } {
+  const merged = mergeLegacyFirmaUrl(firmaUrl, parseFirmaDocsJson(rawDocs));
+  const drawn = absMediaPdf(origin, firmaUrl);
+  const docs = merged.map((d) => ({
+    ...d,
+    url: absMediaPdf(origin, d.url),
+  }));
+  return {
+    firmaUrl: drawn && !docs.some((d) => d.url === drawn) ? drawn : '',
+    firmaDocs: docs,
+  };
+}
+
 function seccionesVaciasBitacora(): RegistroBitacoraPdfSlot[] {
   return [
     {
@@ -76,41 +94,50 @@ function seccionesVaciasBitacora(): RegistroBitacoraPdfSlot[] {
       observaciones: '',
       fotoUrl: '',
       firmaUrl: '',
+      firmaDocs: [],
     },
     {
       titulo: REGISTRO_BITACORA_SLOT_LABELS.interventor,
       observaciones: '',
       fotoUrl: '',
       firmaUrl: '',
+      firmaDocs: [],
     },
     {
       titulo: REGISTRO_BITACORA_SLOT_LABELS.idu,
       observaciones: '',
       fotoUrl: '',
       firmaUrl: '',
+      firmaDocs: [],
     },
   ];
 }
 
 function seccionesDesdeRegistro(origin: string, reg: RegistroWithUser): RegistroBitacoraPdfSlot[] {
+  const c = mapFirmaDocsPdf(origin, reg.contratistaFirmaUrl, reg.contratistaFirmaDocs);
+  const i = mapFirmaDocsPdf(origin, reg.interventoriaFirmaUrl, reg.interventoriaFirmaDocs);
+  const d = mapFirmaDocsPdf(origin, reg.iduFirmaUrl, reg.iduFirmaDocs);
   return [
     {
       titulo: REGISTRO_BITACORA_SLOT_LABELS.contratista,
       observaciones: reg.contratistaObservaciones,
       fotoUrl: absMediaPdf(origin, reg.contratistaFotoUrl),
-      firmaUrl: absMediaPdf(origin, reg.contratistaFirmaUrl),
+      firmaUrl: c.firmaUrl,
+      firmaDocs: c.firmaDocs,
     },
     {
       titulo: REGISTRO_BITACORA_SLOT_LABELS.interventor,
       observaciones: reg.interventoriaObservaciones,
       fotoUrl: absMediaPdf(origin, reg.interventoriaFotoUrl),
-      firmaUrl: absMediaPdf(origin, reg.interventoriaFirmaUrl),
+      firmaUrl: i.firmaUrl,
+      firmaDocs: i.firmaDocs,
     },
     {
       titulo: REGISTRO_BITACORA_SLOT_LABELS.idu,
       observaciones: reg.iduObservaciones,
       fotoUrl: absMediaPdf(origin, reg.iduFotoUrl),
-      firmaUrl: absMediaPdf(origin, reg.iduFirmaUrl),
+      firmaUrl: d.firmaUrl,
+      firmaDocs: d.firmaDocs,
     },
   ];
 }

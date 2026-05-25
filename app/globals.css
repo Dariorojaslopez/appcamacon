@@ -3876,6 +3876,48 @@ ul.informe-searchable-list {
   gap: 0.65rem;
 }
 
+.registro-bitacora-firma-docs-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-width: 100%;
+}
+
+.registro-bitacora-firma-doc-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.65rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--camacon-border-subtle);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  max-width: 100%;
+}
+
+.registro-bitacora-firma-doc-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.registro-bitacora-firma-doc-link {
+  font-size: 0.82rem;
+  color: var(--camacon-azul);
+  font-weight: 600;
+}
+
+.registro-bitacora-firma-doc-remove {
+  padding: 0.25rem 0.55rem;
+  font-size: 0.78rem;
+}
+
 .signature-pad-wrap {
   border: 1px solid var(--camacon-border-medium);
   border-radius: 10px;

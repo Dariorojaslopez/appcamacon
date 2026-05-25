@@ -10,8 +10,62 @@ import {
   REGISTRO_BITACORA_SLOT_LABELS,
   type RegistroBitacoraSlotKey,
 } from '../../src/shared/registroBitacoraPermissions';
+import {
+  MAX_REGISTRO_FIRMA_DOCS,
+  mergeLegacyFirmaUrl,
+  type RegistroBitacoraFirmaDoc,
+} from '../../src/shared/registroBitacoraFirmaDocs';
 
 const MAX_FILE = 10 * 1024 * 1024;
+
+const REGISTRO_DOC_ACCEPT =
+  'image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf,.doc,.docx,.xls,.xlsx';
+
+type FirmaDocRow = {
+  id: string;
+  name: string;
+  url: string | null;
+  file: File | null;
+};
+
+function newFirmaDocRowId(): string {
+  return `d-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function firmaRowsFromApi(
+  firmaUrl: string | null,
+  firmaDocs: RegistroBitacoraFirmaDoc[],
+): FirmaDocRow[] {
+  return mergeLegacyFirmaUrl(firmaUrl, firmaDocs).map((d, i) => ({
+    id: `saved-${i}-${d.url.slice(-16)}`,
+    name: d.name,
+    url: d.url,
+    file: null,
+  }));
+}
+
+function validateRegistroDoc(file: File): string | null {
+  const mime = (file.type || '').toLowerCase();
+  const allowedMime = [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-excel',
+  ];
+  const okMime = mime && allowedMime.includes(mime);
+  const okExt = /\.(jpe?g|png|gif|webp|pdf|doc|docx|xls|xlsx)$/i.test(file.name);
+  if (!okMime && !okExt) {
+    return 'Use imagen (JPG, PNG), PDF, Word (.doc, .docx) o Excel (.xls, .xlsx).';
+  }
+  if (file.size > MAX_FILE) return 'Cada archivo puede pesar como máximo 10 MB.';
+  return null;
+}
 
 function localYmd(d = new Date()): string {
   const y = d.getFullYear();
@@ -66,13 +120,42 @@ type ApiRegistro = {
   contratistaObservaciones: string;
   contratistaFotoUrl: string | null;
   contratistaFirmaUrl: string | null;
+  contratistaFirmaDocs?: RegistroBitacoraFirmaDoc[];
   interventoriaObservaciones: string;
   interventoriaFotoUrl: string | null;
   interventoriaFirmaUrl: string | null;
+  interventoriaFirmaDocs?: RegistroBitacoraFirmaDoc[];
   iduObservaciones: string;
   iduFotoUrl: string | null;
   iduFirmaUrl: string | null;
+  iduFirmaDocs?: RegistroBitacoraFirmaDoc[];
 };
+
+async function uploadRegistroDocumento(file: File, projectId: string): Promise<RegistroBitacoraFirmaDoc> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('projectId', projectId);
+  const res = await fetch('/api/uploads/registro-documento', {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
+  const data = (await res.json()) as {
+    url?: string;
+    previewUrl?: string;
+    name?: string;
+    contentType?: string;
+    error?: string;
+  };
+  if (!res.ok) throw new Error(data.error ?? 'Error al subir documento');
+  const url = data.previewUrl || data.url;
+  if (!url) throw new Error('Respuesta sin URL');
+  return {
+    url: String(url),
+    name: data.name || file.name,
+    contentType: data.contentType || file.type || undefined,
+  };
+}
 
 async function uploadEvidenciaFoto(file: File, projectId: string): Promise<string> {
   const formData = new FormData();
@@ -98,9 +181,11 @@ type SlotProps = {
   fotoLabel: string;
   onPickFoto: (file: File | null) => void;
   sigRef: RefObject<SignaturePadFieldHandle | null>;
-  firmaImagenLabel: string;
-  onPickFirmaImagen: (file: File | null) => void;
-  onLimpiarFirma: () => void;
+  firmaDocRows: FirmaDocRow[];
+  onAddFirmaDocs: (files: FileList | null) => void;
+  onRemoveFirmaDoc: (id: string) => void;
+  onLimpiarFirmaDibujo: () => void;
+  onQuitarTodosDocumentos: () => void;
 };
 
 function SlotBlock({
@@ -111,12 +196,14 @@ function SlotBlock({
   fotoLabel,
   onPickFoto,
   sigRef,
-  firmaImagenLabel,
-  onPickFirmaImagen,
-  onLimpiarFirma,
+  firmaDocRows,
+  onAddFirmaDocs,
+  onRemoveFirmaDoc,
+  onLimpiarFirmaDibujo,
+  onQuitarTodosDocumentos,
 }: SlotProps) {
   const fotoInputRef = useRef<HTMLInputElement>(null);
-  const firmaFileRef = useRef<HTMLInputElement>(null);
+  const firmaDocsInputRef = useRef<HTMLInputElement>(null);
   return (
     <div className="registro-bitacora-slot">
       <h2 className="section-title" style={{ marginTop: 0 }}>
@@ -165,34 +252,70 @@ function SlotBlock({
         </div>
       </div>
       <div className="form-field">
-        <label className="form-label">Firma</label>
+        <label className="form-label">Firma y documentos</label>
         <p className="informe-label-hint" style={{ marginTop: 0 }}>
-          Dibuje en el recuadro o cargue una imagen de la firma (JPG o PNG, máx. 10 MB).
+          Puede dibujar la firma, adjuntar varios documentos (imagen, PDF, Word, Excel; máx. 10 MB c/u, hasta{' '}
+          {MAX_REGISTRO_FIRMA_DOCS} archivos).
         </p>
         <input
-          ref={firmaFileRef}
+          ref={firmaDocsInputRef}
           type="file"
-          accept="image/jpeg,image/jpg,image/png"
+          accept={REGISTRO_DOC_ACCEPT}
+          multiple
           className="sr-only"
           onChange={(e) => {
-            const f = e.target.files?.[0] ?? null;
-            onPickFirmaImagen(f);
+            onAddFirmaDocs(e.target.files);
             e.target.value = '';
           }}
         />
         <div className="registro-bitacora-foto-row">
-          <button type="button" className="btn-secondary" onClick={() => firmaFileRef.current?.click()}>
-            Cargar firma (imagen)
+          <button type="button" className="btn-secondary" onClick={() => firmaDocsInputRef.current?.click()}>
+            Agregar documentos
           </button>
-          <span className="shell-text-muted" style={{ fontSize: '0.85rem' }}>
-            {firmaImagenLabel || 'Opcional si ya dibujó arriba'}
-          </span>
+          {firmaDocRows.length > 0 ? (
+            <button type="button" className="btn-secondary" onClick={onQuitarTodosDocumentos}>
+              Quitar todos los documentos
+            </button>
+          ) : null}
         </div>
+        {firmaDocRows.length > 0 ? (
+          <ul className="registro-bitacora-firma-docs-list">
+            {firmaDocRows.map((row) => (
+              <li key={row.id} className="registro-bitacora-firma-doc-item">
+                <span className="registro-bitacora-firma-doc-name" title={row.name}>
+                  {row.name}
+                  {row.file ? ' (nuevo)' : ''}
+                </span>
+                {row.url ? (
+                  <a
+                    href={row.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="registro-bitacora-firma-doc-link"
+                  >
+                    Ver
+                  </a>
+                ) : null}
+                <button
+                  type="button"
+                  className="btn-secondary registro-bitacora-firma-doc-remove"
+                  onClick={() => onRemoveFirmaDoc(row.id)}
+                >
+                  Quitar
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="shell-text-muted" style={{ fontSize: '0.85rem', margin: '0.35rem 0 0' }}>
+            Sin documentos adjuntos.
+          </p>
+        )}
         <div className="signature-pad-wrap" style={{ marginTop: '0.65rem' }}>
           <SignaturePadField ref={sigRef} />
         </div>
-        <button type="button" className="btn-secondary" style={{ marginTop: '0.5rem' }} onClick={onLimpiarFirma}>
-          Borrar firma (dibujo e imagen)
+        <button type="button" className="btn-secondary" style={{ marginTop: '0.5rem' }} onClick={onLimpiarFirmaDibujo}>
+          Borrar firma dibujada
         </button>
       </div>
     </div>
@@ -228,12 +351,9 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
   const [labelC, setLabelC] = useState('');
   const [labelI, setLabelI] = useState('');
   const [labelD, setLabelD] = useState('');
-  const [firmaCFile, setFirmaCFile] = useState<File | null>(null);
-  const [firmaIFile, setFirmaIFile] = useState<File | null>(null);
-  const [firmaDFile, setFirmaDFile] = useState<File | null>(null);
-  const [firmaCLabel, setFirmaCLabel] = useState('');
-  const [firmaILabel, setFirmaILabel] = useState('');
-  const [firmaDLabel, setFirmaDLabel] = useState('');
+  const [firmaRowsC, setFirmaRowsC] = useState<FirmaDocRow[]>([]);
+  const [firmaRowsI, setFirmaRowsI] = useState<FirmaDocRow[]>([]);
+  const [firmaRowsD, setFirmaRowsD] = useState<FirmaDocRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -348,12 +468,9 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
       setLabelC('');
       setLabelI('');
       setLabelD('');
-      setFirmaCFile(null);
-      setFirmaIFile(null);
-      setFirmaDFile(null);
-      setFirmaCLabel('');
-      setFirmaILabel('');
-      setFirmaDLabel('');
+      setFirmaRowsC([]);
+      setFirmaRowsI([]);
+      setFirmaRowsD([]);
       sigC.current?.clear();
       sigI.current?.clear();
       sigD.current?.clear();
@@ -377,12 +494,9 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
     setLabelC(r.contratistaFotoUrl ? 'Imagen guardada' : '');
     setLabelI(r.interventoriaFotoUrl ? 'Imagen guardada' : '');
     setLabelD(r.iduFotoUrl ? 'Imagen guardada' : '');
-    setFirmaCFile(null);
-    setFirmaIFile(null);
-    setFirmaDFile(null);
-    setFirmaCLabel(r.contratistaFirmaUrl ? 'Firma guardada' : '');
-    setFirmaILabel(r.interventoriaFirmaUrl ? 'Firma guardada' : '');
-    setFirmaDLabel(r.iduFirmaUrl ? 'Firma guardada' : '');
+    setFirmaRowsC(firmaRowsFromApi(r.contratistaFirmaUrl, r.contratistaFirmaDocs ?? []));
+    setFirmaRowsI(firmaRowsFromApi(r.interventoriaFirmaUrl, r.interventoriaFirmaDocs ?? []));
+    setFirmaRowsD(firmaRowsFromApi(r.iduFirmaUrl, r.iduFirmaDocs ?? []));
     sigC.current?.clear();
     sigI.current?.clear();
     sigD.current?.clear();
@@ -473,19 +587,6 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
     if (!fotoD && !persisted.iduFotoUrl) setLabelD('');
   }, [fotoD, persisted.iduFotoUrl]);
 
-  useEffect(() => {
-    if (!firmaCFile && persisted.contratistaFirmaUrl) setFirmaCLabel('Firma guardada');
-    if (!firmaCFile && !persisted.contratistaFirmaUrl) setFirmaCLabel('');
-  }, [firmaCFile, persisted.contratistaFirmaUrl]);
-  useEffect(() => {
-    if (!firmaIFile && persisted.interventoriaFirmaUrl) setFirmaILabel('Firma guardada');
-    if (!firmaIFile && !persisted.interventoriaFirmaUrl) setFirmaILabel('');
-  }, [firmaIFile, persisted.interventoriaFirmaUrl]);
-  useEffect(() => {
-    if (!firmaDFile && persisted.iduFirmaUrl) setFirmaDLabel('Firma guardada');
-    if (!firmaDFile && !persisted.iduFirmaUrl) setFirmaDLabel('');
-  }, [firmaDFile, persisted.iduFirmaUrl]);
-
   const validateFoto = useCallback((file: File | null, setLabel: (s: string) => void): boolean => {
     if (!file) return true;
     if (!['image/jpeg', 'image/jpg', 'image/png'].includes(file.type)) {
@@ -528,23 +629,36 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
     if (!f) setLabelD('');
   };
 
-  const onPickFirmaC = (f: File | null) => {
-    setErr(null);
-    if (f && !validateFoto(f, setFirmaCLabel)) return;
-    setFirmaCFile(f);
-    if (!f) setFirmaCLabel('');
-  };
-  const onPickFirmaI = (f: File | null) => {
-    setErr(null);
-    if (f && !validateFoto(f, setFirmaILabel)) return;
-    setFirmaIFile(f);
-    if (!f) setFirmaILabel('');
-  };
-  const onPickFirmaD = (f: File | null) => {
-    setErr(null);
-    if (f && !validateFoto(f, setFirmaDLabel)) return;
-    setFirmaDFile(f);
-    if (!f) setFirmaDLabel('');
+  const addFirmaDocs = useCallback(
+    (files: FileList | null, setRows: Dispatch<SetStateAction<FirmaDocRow[]>>) => {
+      if (!files?.length) return;
+      setErr(null);
+      const added: FirmaDocRow[] = [];
+      for (let i = 0; i < files.length; i += 1) {
+        const f = files[i];
+        const vErr = validateRegistroDoc(f);
+        if (vErr) {
+          setErr(vErr);
+          continue;
+        }
+        added.push({ id: newFirmaDocRowId(), name: f.name, url: null, file: f });
+      }
+      if (added.length === 0) return;
+      setRows((prev) => [...prev, ...added].slice(0, MAX_REGISTRO_FIRMA_DOCS));
+    },
+    [],
+  );
+
+  const rowsToFirmaDocs = async (rows: FirmaDocRow[], pid: string): Promise<RegistroBitacoraFirmaDoc[]> => {
+    const out: RegistroBitacoraFirmaDoc[] = [];
+    for (const row of rows) {
+      if (row.file) {
+        out.push(await uploadRegistroDocumento(row.file, pid));
+      } else if (row.url) {
+        out.push({ url: row.url, name: row.name });
+      }
+    }
+    return out;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -570,9 +684,24 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
       const body: {
         projectId: string;
         fecha: string;
-        contratista?: { observaciones: string; fotoUrl: string | null; firmaUrl: string | null };
-        interventoria?: { observaciones: string; fotoUrl: string | null; firmaUrl: string | null };
-        idu?: { observaciones: string; fotoUrl: string | null; firmaUrl: string | null };
+        contratista?: {
+          observaciones: string;
+          fotoUrl: string | null;
+          firmaUrl: string | null;
+          firmaDocs: RegistroBitacoraFirmaDoc[];
+        };
+        interventoria?: {
+          observaciones: string;
+          fotoUrl: string | null;
+          firmaUrl: string | null;
+          firmaDocs: RegistroBitacoraFirmaDoc[];
+        };
+        idu?: {
+          observaciones: string;
+          fotoUrl: string | null;
+          firmaUrl: string | null;
+          firmaDocs: RegistroBitacoraFirmaDoc[];
+        };
       } = { projectId, fecha: fechaDia };
 
       if (canSlot('contratista')) {
@@ -580,13 +709,16 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
         let urlFirmaC: string | null = null;
         if (fotoC) urlFotoC = await uploadEvidenciaFoto(fotoC, projectId);
         else urlFotoC = persisted.contratistaFotoUrl;
-        if (firmaCFile) urlFirmaC = await uploadEvidenciaFoto(firmaCFile, projectId);
-        else {
-          const fc = sigC.current?.toPngFile() ?? null;
-          if (fc) urlFirmaC = await uploadEvidenciaFoto(fc, projectId);
-          else urlFirmaC = persisted.contratistaFirmaUrl;
-        }
-        body.contratista = { observaciones: obsC, fotoUrl: urlFotoC, firmaUrl: urlFirmaC };
+        const fc = sigC.current?.toPngFile() ?? null;
+        if (fc) urlFirmaC = await uploadEvidenciaFoto(fc, projectId);
+        else urlFirmaC = persisted.contratistaFirmaUrl;
+        const firmaDocsC = await rowsToFirmaDocs(firmaRowsC, projectId);
+        body.contratista = {
+          observaciones: obsC,
+          fotoUrl: urlFotoC,
+          firmaUrl: urlFirmaC,
+          firmaDocs: firmaDocsC,
+        };
       }
 
       if (canSlot('interventor')) {
@@ -594,13 +726,16 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
         let urlFirmaI: string | null = null;
         if (fotoI) urlFotoI = await uploadEvidenciaFoto(fotoI, projectId);
         else urlFotoI = persisted.interventoriaFotoUrl;
-        if (firmaIFile) urlFirmaI = await uploadEvidenciaFoto(firmaIFile, projectId);
-        else {
-          const fi = sigI.current?.toPngFile() ?? null;
-          if (fi) urlFirmaI = await uploadEvidenciaFoto(fi, projectId);
-          else urlFirmaI = persisted.interventoriaFirmaUrl;
-        }
-        body.interventoria = { observaciones: obsI, fotoUrl: urlFotoI, firmaUrl: urlFirmaI };
+        const fi = sigI.current?.toPngFile() ?? null;
+        if (fi) urlFirmaI = await uploadEvidenciaFoto(fi, projectId);
+        else urlFirmaI = persisted.interventoriaFirmaUrl;
+        const firmaDocsI = await rowsToFirmaDocs(firmaRowsI, projectId);
+        body.interventoria = {
+          observaciones: obsI,
+          fotoUrl: urlFotoI,
+          firmaUrl: urlFirmaI,
+          firmaDocs: firmaDocsI,
+        };
       }
 
       if (canSlot('idu')) {
@@ -608,13 +743,16 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
         let urlFirmaD: string | null = null;
         if (fotoD) urlFotoD = await uploadEvidenciaFoto(fotoD, projectId);
         else urlFotoD = persisted.iduFotoUrl;
-        if (firmaDFile) urlFirmaD = await uploadEvidenciaFoto(firmaDFile, projectId);
-        else {
-          const fd = sigD.current?.toPngFile() ?? null;
-          if (fd) urlFirmaD = await uploadEvidenciaFoto(fd, projectId);
-          else urlFirmaD = persisted.iduFirmaUrl;
-        }
-        body.idu = { observaciones: obsD, fotoUrl: urlFotoD, firmaUrl: urlFirmaD };
+        const fd = sigD.current?.toPngFile() ?? null;
+        if (fd) urlFirmaD = await uploadEvidenciaFoto(fd, projectId);
+        else urlFirmaD = persisted.iduFirmaUrl;
+        const firmaDocsD = await rowsToFirmaDocs(firmaRowsD, projectId);
+        body.idu = {
+          observaciones: obsD,
+          fotoUrl: urlFotoD,
+          firmaUrl: urlFirmaD,
+          firmaDocs: firmaDocsD,
+        };
       }
 
       const res = await fetch('/api/registro-bitacora', {
@@ -856,14 +994,14 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
               fotoLabel={labelC}
               onPickFoto={onPickC}
               sigRef={sigC}
-              firmaImagenLabel={firmaCLabel}
-              onPickFirmaImagen={onPickFirmaC}
-              onLimpiarFirma={() => {
+              firmaDocRows={firmaRowsC}
+              onAddFirmaDocs={(files) => addFirmaDocs(files, setFirmaRowsC)}
+              onRemoveFirmaDoc={(id) => setFirmaRowsC((rows) => rows.filter((r) => r.id !== id))}
+              onLimpiarFirmaDibujo={() => {
                 sigC.current?.clear();
-                setFirmaCFile(null);
-                setFirmaCLabel('');
                 setPersisted((p) => ({ ...p, contratistaFirmaUrl: null }));
               }}
+              onQuitarTodosDocumentos={() => setFirmaRowsC([])}
             />
             <div className="section-divider" />
           </>
@@ -879,14 +1017,14 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
               fotoLabel={labelI}
               onPickFoto={onPickI}
               sigRef={sigI}
-              firmaImagenLabel={firmaILabel}
-              onPickFirmaImagen={onPickFirmaI}
-              onLimpiarFirma={() => {
+              firmaDocRows={firmaRowsI}
+              onAddFirmaDocs={(files) => addFirmaDocs(files, setFirmaRowsI)}
+              onRemoveFirmaDoc={(id) => setFirmaRowsI((rows) => rows.filter((r) => r.id !== id))}
+              onLimpiarFirmaDibujo={() => {
                 sigI.current?.clear();
-                setFirmaIFile(null);
-                setFirmaILabel('');
                 setPersisted((p) => ({ ...p, interventoriaFirmaUrl: null }));
               }}
+              onQuitarTodosDocumentos={() => setFirmaRowsI([])}
             />
             <div className="section-divider" />
           </>
@@ -902,14 +1040,14 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
               fotoLabel={labelD}
               onPickFoto={onPickD}
               sigRef={sigD}
-              firmaImagenLabel={firmaDLabel}
-              onPickFirmaImagen={onPickFirmaD}
-              onLimpiarFirma={() => {
+              firmaDocRows={firmaRowsD}
+              onAddFirmaDocs={(files) => addFirmaDocs(files, setFirmaRowsD)}
+              onRemoveFirmaDoc={(id) => setFirmaRowsD((rows) => rows.filter((r) => r.id !== id))}
+              onLimpiarFirmaDibujo={() => {
                 sigD.current?.clear();
-                setFirmaDFile(null);
-                setFirmaDLabel('');
                 setPersisted((p) => ({ ...p, iduFirmaUrl: null }));
               }}
+              onQuitarTodosDocumentos={() => setFirmaRowsD([])}
             />
             <div className="section-divider" />
           </>

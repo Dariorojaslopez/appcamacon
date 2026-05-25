@@ -1,10 +1,14 @@
 /** HTML imprimible del registro de bitácora (vista previa / PDF). */
 
+import type { RegistroBitacoraFirmaDoc } from '../shared/registroBitacoraFirmaDocs';
+import { isImageContentType } from '../shared/registroBitacoraFirmaDocs';
+
 export type RegistroBitacoraPdfSlot = {
   titulo: string;
   observaciones: string;
   fotoUrl: string;
   firmaUrl: string;
+  firmaDocs: RegistroBitacoraFirmaDoc[];
 };
 
 export type RegistroBitacoraPdfClimaFranja = {
@@ -575,9 +579,26 @@ function buildSeccionesHtml(secciones: RegistroBitacoraPdfSlot[]): string {
       const foto = s.fotoUrl
         ? `<img class="evidencia-img" src="${esc(s.fotoUrl)}" alt="" />`
         : '<span class="muted">Sin foto</span>';
-      const firma = s.firmaUrl
-        ? `<img class="firma-img" src="${esc(s.firmaUrl)}" alt="" />`
-        : '<span class="muted">Sin firma</span>';
+      const firmaParts: string[] = [];
+      if (s.firmaUrl) {
+        firmaParts.push(`<img class="firma-img" src="${esc(s.firmaUrl)}" alt="Firma dibujada" />`);
+      }
+      for (const doc of s.firmaDocs ?? []) {
+        const abs = doc.url.startsWith('http') ? doc.url : doc.url;
+        if (isImageContentType(doc.contentType) || /\.(jpe?g|png|gif|webp)(\?|$)/i.test(doc.url)) {
+          firmaParts.push(
+            `<div class="firma-doc-block"><div class="firma-doc-name">${esc(doc.name)}</div><img class="firma-img" src="${esc(abs)}" alt="" /></div>`,
+          );
+        } else {
+          firmaParts.push(
+            `<div class="firma-doc-block"><a class="firma-doc-link" href="${esc(abs)}" target="_blank" rel="noopener">${esc(doc.name)}</a></div>`,
+          );
+        }
+      }
+      const firma =
+        firmaParts.length > 0
+          ? `<div class="firma-docs-wrap">${firmaParts.join('')}</div>`
+          : '<span class="muted">Sin firma ni documentos</span>';
       return `<table ${SECCION_TABLE_ATTRS}>
         <tr><th class="seccion-titulo" colspan="2">${esc(s.titulo)}</th></tr>
         <tr>

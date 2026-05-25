@@ -630,15 +630,18 @@ model RegistroBitacoraObra {
 
   contratistaObservaciones String  @default("")
   contratistaFotoUrl       String?
-  contratistaFirmaUrl     String?
+  contratistaFirmaUrl      String?
+  contratistaFirmaDocs     Json    @default("[]")
 
   interventoriaObservaciones String  @default("")
   interventoriaFotoUrl       String?
   interventoriaFirmaUrl      String?
+  interventoriaFirmaDocs     Json    @default("[]")
 
   iduObservaciones String  @default("")
   iduFotoUrl       String?
   iduFirmaUrl      String?
+  iduFirmaDocs     Json    @default("[]")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
