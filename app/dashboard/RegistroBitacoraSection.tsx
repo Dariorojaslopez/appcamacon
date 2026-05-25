@@ -43,12 +43,12 @@ function firmaRowsFromDocs(firmaUrl: string | null, firmaDocs: RegistroBitacoraF
   }));
 }
 
-function findFirmaDibujadaUrl(
-  firmaUrl: string | null,
-  rows: FirmaDocRow[],
-): string | null {
-  const fromRow = rows.find((r) => r.name === 'Firma dibujada' && r.url)?.url;
-  if (fromRow) return fromRow;
+/** URL de la firma dibujada guardada (lista o campo legacy firmaUrl). */
+function findFirmaVisualUrl(firmaUrl: string | null, rows: FirmaDocRow[]): string | null {
+  for (const name of ['Firma dibujada', 'Firma (imagen)']) {
+    const hit = rows.find((r) => r.name === name && r.url)?.url;
+    if (hit) return hit;
+  }
   return firmaUrl?.trim() || null;
 }
 
@@ -207,7 +207,6 @@ type SlotProps = {
   onLimpiarFirmaDibujo: () => void;
   onQuitarTodosDocumentos: () => void;
   firmaGuardadaUrl: string | null;
-  firmaPadCargada: boolean;
 };
 
 function SlotBlock({
@@ -224,7 +223,6 @@ function SlotBlock({
   onLimpiarFirmaDibujo,
   onQuitarTodosDocumentos,
   firmaGuardadaUrl,
-  firmaPadCargada,
 }: SlotProps) {
   const firmaPreviewSrc = firmaGuardadaUrl ? firmaImageDisplaySrc(firmaGuardadaUrl) : null;
   const fotoInputRef = useRef<HTMLInputElement>(null);
@@ -336,22 +334,20 @@ function SlotBlock({
             Sin documentos adjuntos.
           </p>
         )}
-        <div className="signature-pad-wrap" style={{ marginTop: '0.65rem' }}>
-          <SignaturePadField ref={sigRef} />
-        </div>
-        {firmaPreviewSrc && !firmaPadCargada ? (
-          <div className="registro-bitacora-firma-preview">
-            <p className="shell-text-muted" style={{ fontSize: '0.8rem', margin: '0.45rem 0 0.25rem' }}>
-              Firma guardada (vista previa). Si no aparece en el recuadro, use «Ver» en la lista o dibuje de nuevo.
+        {firmaPreviewSrc ? (
+          <div className="registro-bitacora-firma-preview" style={{ marginTop: '0.65rem' }}>
+            <p className="form-label" style={{ marginBottom: '0.35rem' }}>
+              Firma guardada
             </p>
             <img src={firmaPreviewSrc} alt="Firma guardada" className="registro-bitacora-firma-preview-img" />
           </div>
         ) : null}
-        {firmaGuardadaUrl && firmaPadCargada ? (
-          <p className="feedback feedback-success" style={{ marginTop: '0.45rem', fontSize: '0.82rem' }}>
-            Firma guardada cargada en el recuadro.
-          </p>
-        ) : null}
+        <p className="form-label" style={{ marginTop: '0.75rem', marginBottom: '0.35rem' }}>
+          {firmaPreviewSrc ? 'Dibujar nueva firma (reemplaza la anterior al guardar)' : 'Dibujar firma'}
+        </p>
+        <div className="signature-pad-wrap">
+          <SignaturePadField ref={sigRef} />
+        </div>
         <button
           type="button"
           className="btn-secondary"
@@ -400,9 +396,6 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
   const [firmaRowsC, setFirmaRowsC] = useState<FirmaDocRow[]>([]);
   const [firmaRowsI, setFirmaRowsI] = useState<FirmaDocRow[]>([]);
   const [firmaRowsD, setFirmaRowsD] = useState<FirmaDocRow[]>([]);
-  const [firmaPadOkC, setFirmaPadOkC] = useState(false);
-  const [firmaPadOkI, setFirmaPadOkI] = useState(false);
-  const [firmaPadOkD, setFirmaPadOkD] = useState(false);
   const [firmaClearedC, setFirmaClearedC] = useState(false);
   const [firmaClearedI, setFirmaClearedI] = useState(false);
   const [firmaClearedD, setFirmaClearedD] = useState(false);
@@ -523,9 +516,6 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
       setFirmaRowsC([]);
       setFirmaRowsI([]);
       setFirmaRowsD([]);
-      setFirmaPadOkC(false);
-      setFirmaPadOkI(false);
-      setFirmaPadOkD(false);
       setFirmaClearedC(false);
       setFirmaClearedI(false);
       setFirmaClearedD(false);
@@ -561,9 +551,9 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
     setFirmaClearedC(false);
     setFirmaClearedI(false);
     setFirmaClearedD(false);
-    void restoreFirmaPad(sigC, findFirmaDibujadaUrl(r.contratistaFirmaUrl, rowsC)).then(setFirmaPadOkC);
-    void restoreFirmaPad(sigI, findFirmaDibujadaUrl(r.interventoriaFirmaUrl, rowsI)).then(setFirmaPadOkI);
-    void restoreFirmaPad(sigD, findFirmaDibujadaUrl(r.iduFirmaUrl, rowsD)).then(setFirmaPadOkD);
+    void restoreFirmaPad(sigC, findFirmaVisualUrl(r.contratistaFirmaUrl, rowsC));
+    void restoreFirmaPad(sigI, findFirmaVisualUrl(r.interventoriaFirmaUrl, rowsI));
+    void restoreFirmaPad(sigD, findFirmaVisualUrl(r.iduFirmaUrl, rowsD));
   }, []);
 
   useEffect(() => {
@@ -781,12 +771,23 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
         let urlFirma = firmaPersisted;
         let firmaDocs = await rowsToFirmaDocs(firmaRows, projectId);
         const prevUrl = firmaPersisted?.trim() ?? '';
+        const padHasInk = sigRef.current ? !sigRef.current.isEmpty() : false;
         const drawn = sigRef.current?.toPngFile() ?? null;
+        if (padHasInk && !drawn) {
+          throw new Error(
+            'No se pudo leer la firma del recuadro. Vuelva a dibujarla (mantenga el clic y arrastre) y guarde de nuevo.',
+          );
+        }
         if (drawn) {
           const uploaded = await uploadEvidenciaFoto(drawn, projectId);
           urlFirma = uploaded;
           firmaDocs = dedupeFirmaDocs([
-            ...firmaDocs.filter((d) => d.url !== prevUrl && d.name !== 'Firma dibujada'),
+            ...firmaDocs.filter(
+              (d) =>
+                d.url !== prevUrl &&
+                d.name !== 'Firma dibujada' &&
+                d.name !== 'Firma (imagen)',
+            ),
             { url: uploaded, name: 'Firma dibujada', contentType: 'image/png' },
           ]);
         } else if (firmaCleared) {
@@ -798,11 +799,14 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
           fotoUrl: urlFoto,
           firmaUrl: urlFirma,
           firmaDocs,
+          firmaSubida: Boolean(drawn),
         };
       };
 
+      let firmaSubidaEnSave = false;
+
       if (canSlot('contratista')) {
-        body.contratista = await buildSlotPayload(
+        const slot = await buildSlotPayload(
           fotoC,
           persisted.contratistaFotoUrl,
           sigC,
@@ -811,10 +815,17 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
           obsC,
           firmaClearedC,
         );
+        body.contratista = {
+          observaciones: slot.observaciones,
+          fotoUrl: slot.fotoUrl,
+          firmaUrl: slot.firmaUrl,
+          firmaDocs: slot.firmaDocs,
+        };
+        if (slot.firmaSubida) firmaSubidaEnSave = true;
       }
 
       if (canSlot('interventor')) {
-        body.interventoria = await buildSlotPayload(
+        const slot = await buildSlotPayload(
           fotoI,
           persisted.interventoriaFotoUrl,
           sigI,
@@ -823,10 +834,17 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
           obsI,
           firmaClearedI,
         );
+        body.interventoria = {
+          observaciones: slot.observaciones,
+          fotoUrl: slot.fotoUrl,
+          firmaUrl: slot.firmaUrl,
+          firmaDocs: slot.firmaDocs,
+        };
+        if (slot.firmaSubida) firmaSubidaEnSave = true;
       }
 
       if (canSlot('idu')) {
-        body.idu = await buildSlotPayload(
+        const slot = await buildSlotPayload(
           fotoD,
           persisted.iduFotoUrl,
           sigD,
@@ -835,6 +853,13 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
           obsD,
           firmaClearedD,
         );
+        body.idu = {
+          observaciones: slot.observaciones,
+          fotoUrl: slot.fotoUrl,
+          firmaUrl: slot.firmaUrl,
+          firmaDocs: slot.firmaDocs,
+        };
+        if (slot.firmaSubida) firmaSubidaEnSave = true;
       }
 
       const res = await fetch('/api/registro-bitacora', {
@@ -846,7 +871,13 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
       const data = (await res.json()) as { error?: string; consecutivo?: number };
       if (!res.ok) throw new Error(data.error ?? 'No se pudo guardar');
 
-      setMsg(res.status === 201 ? 'Registro creado correctamente.' : 'Registro actualizado correctamente.');
+      const baseMsg =
+        res.status === 201 ? 'Registro creado correctamente.' : 'Registro actualizado correctamente.';
+      setMsg(
+        firmaSubidaEnSave
+          ? `${baseMsg} Revise la imagen en «Firma guardada» debajo del recuadro.`
+          : baseMsg,
+      );
       if (typeof data.consecutivo === 'number') setConsecutivo(data.consecutivo);
 
       const reload = await fetch(
@@ -1082,7 +1113,6 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
               onLimpiarFirmaDibujo={() => {
                 const prev = persisted.contratistaFirmaUrl;
                 sigC.current?.clear();
-                setFirmaPadOkC(false);
                 setFirmaClearedC(true);
                 setPersisted((p) => ({ ...p, contratistaFirmaUrl: null }));
                 setFirmaRowsC((rows) =>
@@ -1090,8 +1120,7 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
                 );
               }}
               onQuitarTodosDocumentos={() => setFirmaRowsC([])}
-              firmaGuardadaUrl={findFirmaDibujadaUrl(persisted.contratistaFirmaUrl, firmaRowsC)}
-              firmaPadCargada={firmaPadOkC}
+              firmaGuardadaUrl={findFirmaVisualUrl(persisted.contratistaFirmaUrl, firmaRowsC)}
             />
             <div className="section-divider" />
           </>
@@ -1113,7 +1142,6 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
               onLimpiarFirmaDibujo={() => {
                 const prev = persisted.interventoriaFirmaUrl;
                 sigI.current?.clear();
-                setFirmaPadOkI(false);
                 setFirmaClearedI(true);
                 setPersisted((p) => ({ ...p, interventoriaFirmaUrl: null }));
                 setFirmaRowsI((rows) =>
@@ -1121,8 +1149,7 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
                 );
               }}
               onQuitarTodosDocumentos={() => setFirmaRowsI([])}
-              firmaGuardadaUrl={findFirmaDibujadaUrl(persisted.interventoriaFirmaUrl, firmaRowsI)}
-              firmaPadCargada={firmaPadOkI}
+              firmaGuardadaUrl={findFirmaVisualUrl(persisted.interventoriaFirmaUrl, firmaRowsI)}
             />
             <div className="section-divider" />
           </>
@@ -1144,7 +1171,6 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
               onLimpiarFirmaDibujo={() => {
                 const prev = persisted.iduFirmaUrl;
                 sigD.current?.clear();
-                setFirmaPadOkD(false);
                 setFirmaClearedD(true);
                 setPersisted((p) => ({ ...p, iduFirmaUrl: null }));
                 setFirmaRowsD((rows) =>
@@ -1152,8 +1178,7 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
                 );
               }}
               onQuitarTodosDocumentos={() => setFirmaRowsD([])}
-              firmaGuardadaUrl={findFirmaDibujadaUrl(persisted.iduFirmaUrl, firmaRowsD)}
-              firmaPadCargada={firmaPadOkD}
+              firmaGuardadaUrl={findFirmaVisualUrl(persisted.iduFirmaUrl, firmaRowsD)}
             />
             <div className="section-divider" />
           </>

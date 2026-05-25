@@ -112,6 +112,7 @@ export const SignaturePadField = forwardRef<SignaturePadFieldHandle, Record<stri
         drawing.current = true;
         const p = pos(e);
         last.current = p;
+        drawSegment(p.x, p.y, p.x, p.y);
       }}
       onPointerMove={(e) => {
         if (!drawing.current || !last.current) return;
