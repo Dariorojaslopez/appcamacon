@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessToken } from '../../../../../src/infrastructure/auth/tokens';
 import prisma from '../../../../../src/lib/prisma';
+import { adminObraInclude, serializeAdminObra } from '../../../../../src/lib/adminObraSerialize';
+import { buildObraNotifyDataFromBody } from '../../../../../src/lib/adminObraNotifyBody';
 
 export async function PATCH(
   req: NextRequest,
@@ -25,8 +27,15 @@ export async function PATCH(
       evidenciasOnedriveShareUrl?: string | null;
       evidenciasGoogleDriveFolderId?: string | null;
       logoUrl?: string | null;
+      bitacoraNotifyContratistaUserId?: unknown;
+      bitacoraNotifyInterventorUserId?: unknown;
+      bitacoraNotifyIduUserId?: unknown;
     };
-    const data: Record<string, unknown> = {};
+    const notifyData = await buildObraNotifyDataFromBody(body);
+    if ('error' in notifyData) {
+      return NextResponse.json({ error: notifyData.error }, { status: 400 });
+    }
+    const data: Record<string, unknown> = { ...notifyData };
     if (body.name !== undefined) data.name = body.name.trim();
     if (body.description !== undefined) data.description = body.description?.trim() || null;
     if (body.startDate !== undefined) data.startDate = body.startDate ? new Date(body.startDate) : null;
@@ -50,24 +59,9 @@ export async function PATCH(
     const obra = await prisma.project.update({
       where: { id },
       data: data as any,
+      include: adminObraInclude,
     });
-    return NextResponse.json({
-      obra: {
-        id: obra.id,
-        consecutivo: obra.consecutivo,
-        name: obra.name,
-        description: obra.description,
-        code: obra.code,
-        startDate: obra.startDate,
-        endDate: obra.endDate,
-        evidenciasOnedriveShareUrl: obra.evidenciasOnedriveShareUrl,
-        evidenciasGoogleDriveFolderId: obra.evidenciasGoogleDriveFolderId,
-        logoUrl: obra.logoUrl,
-        isActive: obra.isActive,
-        createdAt: obra.createdAt,
-        updatedAt: obra.updatedAt,
-      },
-    });
+    return NextResponse.json({ obra: serializeAdminObra(obra) });
   } catch (error: unknown) {
     const err = error as { name?: string; code?: string };
     if (err.name === 'TokenExpiredError' || err.name === 'JsonWebTokenError') {

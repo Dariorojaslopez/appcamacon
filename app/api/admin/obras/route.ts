@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessToken } from '../../../../src/infrastructure/auth/tokens';
 import prisma from '../../../../src/lib/prisma';
 import { ensureDefaultBudgetHierarchy } from '../../../../src/lib/budgetHierarchy';
+import { adminObraInclude, serializeAdminObra } from '../../../../src/lib/adminObraSerialize';
+import { buildObraNotifyDataFromBody } from '../../../../src/lib/adminObraNotifyBody';
 
 export async function GET(req: NextRequest) {
   try {
@@ -15,23 +17,10 @@ export async function GET(req: NextRequest) {
     }
     const obras = await prisma.project.findMany({
       orderBy: [{ consecutivo: 'asc' }, { createdAt: 'desc' }],
+      include: adminObraInclude,
     });
     return NextResponse.json({
-      obras: obras.map((o) => ({
-        id: o.id,
-        consecutivo: o.consecutivo,
-        name: o.name,
-        description: o.description,
-        code: o.code,
-        startDate: o.startDate,
-        endDate: o.endDate,
-        evidenciasOnedriveShareUrl: o.evidenciasOnedriveShareUrl,
-        evidenciasGoogleDriveFolderId: o.evidenciasGoogleDriveFolderId,
-        logoUrl: o.logoUrl,
-        isActive: o.isActive,
-        createdAt: o.createdAt,
-        updatedAt: o.updatedAt,
-      })),
+      obras: obras.map(serializeAdminObra),
     });
   } catch (error: unknown) {
     const err = error as { name?: string };
@@ -61,9 +50,16 @@ export async function POST(req: NextRequest) {
       evidenciasOnedriveShareUrl?: string | null;
       evidenciasGoogleDriveFolderId?: string | null;
       logoUrl?: string | null;
+      bitacoraNotifyContratistaUserId?: unknown;
+      bitacoraNotifyInterventorUserId?: unknown;
+      bitacoraNotifyIduUserId?: unknown;
     };
     const { name, description, startDate, endDate, evidenciasOnedriveShareUrl, evidenciasGoogleDriveFolderId } =
       body;
+    const notifyData = await buildObraNotifyDataFromBody(body);
+    if ('error' in notifyData) {
+      return NextResponse.json({ error: notifyData.error }, { status: 400 });
+    }
     if (!name || typeof name !== 'string' || !name.trim()) {
       return NextResponse.json({ error: 'El nombre de la obra es requerido' }, { status: 400 });
     }
@@ -88,31 +84,14 @@ export async function POST(req: NextRequest) {
           evidenciasGoogleDriveFolderId != null && String(evidenciasGoogleDriveFolderId).trim()
             ? String(evidenciasGoogleDriveFolderId).trim()
             : null,
+        ...notifyData,
       },
+      include: adminObraInclude,
     });
 
     await ensureDefaultBudgetHierarchy(prisma, obra.id);
 
-    return NextResponse.json(
-      {
-        obra: {
-          id: obra.id,
-          consecutivo: obra.consecutivo,
-          name: obra.name,
-          description: obra.description,
-          code: obra.code,
-          startDate: obra.startDate,
-          endDate: obra.endDate,
-          evidenciasOnedriveShareUrl: obra.evidenciasOnedriveShareUrl,
-          evidenciasGoogleDriveFolderId: obra.evidenciasGoogleDriveFolderId,
-          logoUrl: obra.logoUrl,
-          isActive: obra.isActive,
-          createdAt: obra.createdAt,
-          updatedAt: obra.updatedAt,
-        },
-      },
-      { status: 201 },
-    );
+    return NextResponse.json({ obra: serializeAdminObra(obra) }, { status: 201 });
   } catch (error: unknown) {
     const err = error as { name?: string };
     if (err.name === 'TokenExpiredError' || err.name === 'JsonWebTokenError') {

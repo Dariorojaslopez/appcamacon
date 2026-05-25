@@ -8,7 +8,11 @@ import {
 } from '../../../src/lib/prismaRegistroBitacoraSchema';
 import { fechaRegistroEnRangoObra, parseYmdUtc, toYmdUtc } from '../../../src/lib/registroBitacoraFecha';
 import { dbRegistroBitacoraSlotsForRole } from '../../../src/infrastructure/auth/registroBitacoraPermissionsResolver';
-import type { RegistroBitacoraSlotKey } from '../../../src/shared/registroBitacoraPermissions';
+import {
+  REGISTRO_BITACORA_SLOT_KEYS,
+  type RegistroBitacoraSlotKey,
+} from '../../../src/shared/registroBitacoraPermissions';
+import { notifyBitacoraSaveToOthers } from '../../../src/lib/registroBitacoraNotify';
 import { normalizeFirmaDocsForSave, parseFirmaDocsJson } from '../../../src/shared/registroBitacoraFirmaDocs';
 import { Prisma } from '@prisma/client';
 
@@ -246,6 +250,15 @@ export async function POST(req: NextRequest) {
       });
       return { row: createdRow, created: true };
     });
+
+    const savedSlots = REGISTRO_BITACORA_SLOT_KEYS.filter((slot) => can(slot));
+    void notifyBitacoraSaveToOthers({
+      projectId,
+      fechaYmd: fechaStr,
+      savedSlots,
+      savedByUserId: userId,
+      savedByName: guardadoPorNombre,
+    }).catch((err) => console.error('notifyBitacoraSaveToOthers', err));
 
     return NextResponse.json(
       { ok: true, id: row.id, consecutivo: row.consecutivo, fecha: toYmdUtc(row.fecha) },
