@@ -28,15 +28,18 @@ export function projectNotifyUserIdForSlot(
   }
 }
 
-/** Al guardar un slot, notificar a los otros dos roles configurados en la obra. */
-export const BITACORA_NOTIFY_OTHER_SLOTS: Record<
-  RegistroBitacoraSlotKey,
-  readonly RegistroBitacoraSlotKey[]
-> = {
-  contratista: ['interventor', 'idu'],
-  interventor: ['contratista', 'idu'],
-  idu: ['contratista', 'interventor'],
-};
+/** Todos los usuarios asignados en la obra para notificación (sin duplicar id). */
+export function allBitacoraNotifyRecipientIds(project: ProjectBitacoraNotifyUserIds): string[] {
+  const ids: string[] = [];
+  for (const id of [
+    project.bitacoraNotifyContratistaUserId,
+    project.bitacoraNotifyInterventorUserId,
+    project.bitacoraNotifyIduUserId,
+  ]) {
+    if (id && !ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
 
 export function parseOptionalNotifyUserId(v: unknown): string | null | undefined {
   if (v === undefined) return undefined;

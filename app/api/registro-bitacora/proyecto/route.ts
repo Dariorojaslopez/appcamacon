@@ -3,6 +3,8 @@ import { verifyAccessToken } from '../../../../src/infrastructure/auth/tokens';
 import prisma from '../../../../src/lib/prisma';
 import { toYmdUtc } from '../../../../src/lib/registroBitacoraFecha';
 import { authFromRequest, isAuthPayload, requireAccessibleProject } from '../../../../src/lib/requireProjectAccess';
+import { loadProjectBitacoraNotify } from '../../../../src/lib/loadProjectBitacoraNotify';
+import { allBitacoraNotifyRecipientIds } from '../../../../src/lib/projectBitacoraNotifyUsers';
 
 export async function GET(req: NextRequest) {
   try {
@@ -31,6 +33,24 @@ export async function GET(req: NextRequest) {
     });
     if (!p) return NextResponse.json({ error: 'Obra no encontrada o inactiva' }, { status: 404 });
 
+    const notifyRow = await loadProjectBitacoraNotify(projectId);
+    const notifyUserIds = notifyRow ? allBitacoraNotifyRecipientIds(notifyRow) : [];
+    let notifyEmails: string[] = [];
+    if (notifyUserIds.length > 0) {
+      const users = await prisma.user.findMany({
+        where: { id: { in: notifyUserIds }, isActive: true },
+        select: { email: true },
+      });
+      const seen = new Set<string>();
+      for (const u of users) {
+        const e = u.email?.trim().toLowerCase();
+        if (e && !seen.has(e)) {
+          seen.add(e);
+          notifyEmails.push(u.email.trim());
+        }
+      }
+    }
+
     return NextResponse.json({
       id: p.id,
       name: p.name,
@@ -41,6 +61,8 @@ export async function GET(req: NextRequest) {
       fechaMax: p.endDate ? toYmdUtc(p.endDate) : null,
       logoUrl: p.logoUrl,
       consecutivoObra: p.consecutivo,
+      bitacoraNotifyConfigurado: notifyEmails.length > 0,
+      bitacoraNotifyEmails: notifyEmails,
     });
   } catch (error: unknown) {
     const err = error as { name?: string };

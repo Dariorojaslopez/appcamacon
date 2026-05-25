@@ -116,6 +116,8 @@ type ProyectoMeta = {
 
 type ProyectoApiResponse = ProyectoMeta & {
   error?: string;
+  bitacoraNotifyConfigurado?: boolean;
+  bitacoraNotifyEmails?: string[];
 };
 
 type PersistedUrls = {
@@ -394,6 +396,7 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
   const [rangoResumen, setRangoResumen] = useState<RangoResumen | null>(null);
   const [loadingRango, setLoadingRango] = useState(false);
   const [proyectoMeta, setProyectoMeta] = useState<ProyectoMeta | null>(null);
+  const [bitacoraNotifyEmails, setBitacoraNotifyEmails] = useState<string[]>([]);
   const [loadingMeta, setLoadingMeta] = useState(false);
   const [loadingRegistro, setLoadingRegistro] = useState(false);
   const [consecutivo, setConsecutivo] = useState<number | null>(null);
@@ -475,6 +478,7 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
   useEffect(() => {
     if (!projectId) {
       setProyectoMeta(null);
+      setBitacoraNotifyEmails([]);
       return;
     }
     let cancelled = false;
@@ -490,6 +494,7 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
         if (!res.ok) {
           setErr(data.error ?? 'No se pudo cargar la obra');
           setProyectoMeta(null);
+          setBitacoraNotifyEmails([]);
           return;
         }
         setProyectoMeta({
@@ -498,6 +503,9 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
           name: data.name,
           code: data.code,
         });
+        setBitacoraNotifyEmails(
+          Array.isArray(data.bitacoraNotifyEmails) ? data.bitacoraNotifyEmails : [],
+        );
         const min = data.fechaMin ?? null;
         const max = data.fechaMax ?? null;
         setFechaDia((prev) => clampYmd(prev, min, max));
@@ -910,16 +918,30 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
         error?: string;
         consecutivo?: number;
         notificacionesEnviadas?: number;
+        notificacionesSkipReason?: string;
       };
       if (!res.ok) throw new Error(data.error ?? 'No se pudo guardar');
 
       const baseMsg =
         res.status === 201 ? 'Registro creado correctamente.' : 'Registro actualizado correctamente.';
+      const notifySkipHints: Record<string, string> = {
+        smtp_no_configurado:
+          ' No se envió correo: el servidor no tiene SMTP configurado (revise SMTP_HOST, SMTP_USER, SMTP_PASS en el servidor).',
+        sin_seccion_guardada:
+          ' No se envió correo: su rol no tiene sección de bitácora asignada.',
+        obra_sin_destinatarios:
+          ' No se envió correo: abra Configuración → Obras → Editar esta obra, asigne los tres usuarios en «Notificaciones de bitácora» y pulse Guardar.',
+        sin_correo_destinatario:
+          ' No se envió correo: los usuarios asignados no tienen correo válido en el sistema.',
+        error_envio:
+          ' No se pudo enviar el correo (revise la configuración SMTP del servidor).',
+      };
       const notifyMsg =
         typeof data.notificacionesEnviadas === 'number' && data.notificacionesEnviadas > 0
-          ? ` Se envió aviso por correo a ${data.notificacionesEnviadas} usuario(s).`
-          : typeof data.notificacionesEnviadas === 'number'
-            ? ' No se envió correo: en Configuración → Obras asigne los usuarios de notificación de bitácora para los otros roles.'
+          ? ` Se envió aviso por correo a ${data.notificacionesEnviadas} destinatario(s).`
+          : data.notificacionesSkipReason
+            ? notifySkipHints[data.notificacionesSkipReason] ??
+              ' No se envió correo de notificación.'
             : '';
       setMsg(
         firmaSubidaEnSave
@@ -1000,6 +1022,18 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
             />
           )}
         </div>
+
+        {!loadingMeta && projectId && bitacoraNotifyEmails.length === 0 && (
+          <p className="feedback feedback-error" role="status">
+            Esta obra no tiene usuarios de notificación guardados. Vaya a Configuración → Obras → Editar, asigne
+            contratista, interventoría e IDU en «Notificaciones de bitácora» y pulse <strong>Guardar</strong>.
+          </p>
+        )}
+        {!loadingMeta && projectId && bitacoraNotifyEmails.length > 0 && (
+          <p className="informe-label-hint" style={{ marginBottom: '0.75rem' }}>
+            Correos de aviso al guardar: {bitacoraNotifyEmails.join(', ')}
+          </p>
+        )}
 
         <div className="form-field">
           <label className="form-label" htmlFor="rb-fecha">

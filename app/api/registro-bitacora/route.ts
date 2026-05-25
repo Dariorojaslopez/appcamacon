@@ -251,8 +251,18 @@ export async function POST(req: NextRequest) {
       return { row: createdRow, created: true };
     });
 
-    const savedSlots = REGISTRO_BITACORA_SLOT_KEYS.filter((slot) => can(slot));
+    let savedSlots = REGISTRO_BITACORA_SLOT_KEYS.filter((slot) => {
+      if (!can(slot)) return false;
+      if (slot === 'contratista') return body.contratista != null;
+      if (slot === 'interventor') return body.interventoria != null;
+      return body.idu != null;
+    });
+    if (savedSlots.length === 0) {
+      savedSlots = REGISTRO_BITACORA_SLOT_KEYS.filter((slot) => can(slot));
+    }
+
     let notificacionesEnviadas = 0;
+    let notificacionesSkipReason: string | undefined;
     try {
       const notifyResult = await notifyBitacoraSaveToOthers({
         projectId,
@@ -262,6 +272,7 @@ export async function POST(req: NextRequest) {
         savedByName: guardadoPorNombre,
       });
       notificacionesEnviadas = notifyResult.emailsSent;
+      notificacionesSkipReason = notifyResult.skipReason;
       if (notifyResult.skipReason) {
         console.info('POST /api/registro-bitacora notificaciones', {
           projectId,
@@ -271,6 +282,7 @@ export async function POST(req: NextRequest) {
       }
     } catch (err) {
       console.error('notifyBitacoraSaveToOthers', err);
+      notificacionesSkipReason = 'error_envio';
     }
 
     return NextResponse.json(
@@ -280,6 +292,7 @@ export async function POST(req: NextRequest) {
         consecutivo: row.consecutivo,
         fecha: toYmdUtc(row.fecha),
         notificacionesEnviadas,
+        notificacionesSkipReason,
       },
       { status: created ? 201 : 200 },
     );

@@ -3988,7 +3988,16 @@ export default function DashboardPage() {
       setObrasList((prev) => prev.map((x) => (x.id === editObra.id ? { ...x, ...data.obra } : x)));
       setEditObra(null);
       setObraEditLogoPickLabel(null);
-      setObraMessage('Obra actualizada.');
+      const notifyCount = [
+        data.obra?.bitacoraNotifyContratistaUserId,
+        data.obra?.bitacoraNotifyInterventorUserId,
+        data.obra?.bitacoraNotifyIduUserId,
+      ].filter(Boolean).length;
+      setObraMessage(
+        notifyCount > 0
+          ? `Obra actualizada. Notificaciones de bitácora: ${notifyCount} rol(es) asignado(s).`
+          : 'Obra actualizada. Asigne usuarios en «Notificaciones de bitácora» para enviar correos.',
+      );
       setTimeout(() => setObraMessage(null), 3000);
     } catch {
       setObraError('Error de conexión.');

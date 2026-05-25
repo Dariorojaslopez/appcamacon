@@ -1,18 +1,22 @@
 import prisma from './prisma';
-import {
-  BITACORA_NOTIFY_OTHER_SLOTS,
-  projectNotifyUserIdForSlot,
-} from './projectBitacoraNotifyUsers';
+import { allBitacoraNotifyRecipientIds } from './projectBitacoraNotifyUsers';
+import { loadProjectBitacoraNotify } from './loadProjectBitacoraNotify';
 import { sendRegistroBitacoraNotifyEmail, isEmailConfigured } from '../infrastructure/email/mailer';
 import {
   REGISTRO_BITACORA_SLOT_LABELS,
   type RegistroBitacoraSlotKey,
 } from '../shared/registroBitacoraPermissions';
 
+export type BitacoraNotifySkipReason =
+  | 'smtp_no_configurado'
+  | 'sin_seccion_guardada'
+  | 'obra_sin_destinatarios'
+  | 'sin_correo_destinatario'
+  | 'error_envio';
+
 export type BitacoraNotifyResult = {
   emailsSent: number;
-  /** Motivo cuando no se envió ningún correo (diagnóstico en logs / API). */
-  skipReason?: 'smtp_no_configurado' | 'sin_seccion_guardada' | 'obra_sin_destinatarios' | 'sin_correo_destinatario';
+  skipReason?: BitacoraNotifySkipReason;
 };
 
 export async function notifyBitacoraSaveToOthers(params: {
@@ -30,34 +34,16 @@ export async function notifyBitacoraSaveToOthers(params: {
     return { emailsSent: 0, skipReason: 'sin_seccion_guardada' };
   }
 
-  const project = await prisma.project.findUnique({
-    where: { id: params.projectId },
-    select: {
-      name: true,
-      code: true,
-      bitacoraNotifyContratistaUserId: true,
-      bitacoraNotifyInterventorUserId: true,
-      bitacoraNotifyIduUserId: true,
-    },
-  });
+  const project = await loadProjectBitacoraNotify(params.projectId);
   if (!project) {
     return { emailsSent: 0, skipReason: 'obra_sin_destinatarios' };
   }
 
-  const recipientIds: string[] = [];
-  for (const savedSlot of params.savedSlots) {
-    for (const otherSlot of BITACORA_NOTIFY_OTHER_SLOTS[savedSlot]) {
-      const uid = projectNotifyUserIdForSlot(project, otherSlot);
-      if (uid && !recipientIds.includes(uid)) {
-        recipientIds.push(uid);
-      }
-    }
-  }
+  const recipientIds = allBitacoraNotifyRecipientIds(project);
   if (recipientIds.length === 0) {
-    console.warn('notifyBitacoraSaveToOthers: obra sin otros usuarios asignados para notificar', {
+    console.warn('notifyBitacoraSaveToOthers: obra sin usuarios de notificación en BD', {
       projectId: params.projectId,
-      savedSlots: params.savedSlots,
-      savedByUserId: params.savedByUserId,
+      code: project.code,
     });
     return { emailsSent: 0, skipReason: 'obra_sin_destinatarios' };
   }
@@ -74,13 +60,24 @@ export async function notifyBitacoraSaveToOthers(params: {
     (process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '') ||
     '';
 
-  let emailsSent = 0;
+  const byEmail = new Map<string, { email: string; name: string }>();
   for (const u of users) {
     const email = u.email?.trim();
     if (!email) continue;
+    if (!byEmail.has(email.toLowerCase())) {
+      byEmail.set(email.toLowerCase(), { email, name: u.name });
+    }
+  }
+
+  if (byEmail.size === 0) {
+    return { emailsSent: 0, skipReason: 'sin_correo_destinatario' };
+  }
+
+  let emailsSent = 0;
+  for (const { email, name } of Array.from(byEmail.values())) {
     await sendRegistroBitacoraNotifyEmail({
       to: email,
-      recipientName: u.name,
+      recipientName: name,
       obraName: project.name,
       obraCode: project.code,
       fechaYmd: params.fechaYmd,
@@ -89,10 +86,6 @@ export async function notifyBitacoraSaveToOthers(params: {
       appUrl: appBase ? `${appBase}/dashboard` : undefined,
     });
     emailsSent += 1;
-  }
-
-  if (emailsSent === 0) {
-    return { emailsSent: 0, skipReason: 'sin_correo_destinatario' };
   }
 
   return { emailsSent };
