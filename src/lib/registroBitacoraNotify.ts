@@ -19,6 +19,11 @@ export type BitacoraNotifyResult = {
   skipReason?: BitacoraNotifySkipReason;
 };
 
+function smtpErrorHint(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.slice(0, 200);
+}
+
 export async function notifyBitacoraSaveToOthers(params: {
   projectId: string;
   fechaYmd: string;
@@ -60,32 +65,46 @@ export async function notifyBitacoraSaveToOthers(params: {
     (process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '') ||
     '';
 
-  const byEmail = new Map<string, { email: string; name: string }>();
+  const byEmail: Record<string, { email: string; name: string }> = {};
   for (const u of users) {
     const email = u.email?.trim();
     if (!email) continue;
-    if (!byEmail.has(email.toLowerCase())) {
-      byEmail.set(email.toLowerCase(), { email, name: u.name });
+    const key = email.toLowerCase();
+    if (!byEmail[key]) {
+      byEmail[key] = { email, name: u.name };
     }
   }
 
-  if (byEmail.size === 0) {
+  const recipients = Object.keys(byEmail).map((k) => byEmail[k]);
+  if (recipients.length === 0) {
     return { emailsSent: 0, skipReason: 'sin_correo_destinatario' };
   }
 
   let emailsSent = 0;
-  for (const { email, name } of Array.from(byEmail.values())) {
-    await sendRegistroBitacoraNotifyEmail({
-      to: email,
-      recipientName: name,
-      obraName: project.name,
-      obraCode: project.code,
-      fechaYmd: params.fechaYmd,
-      savedByName: params.savedByName,
-      savedSectionLabel: savedSlotLabels,
-      appUrl: appBase ? `${appBase}/dashboard` : undefined,
-    });
-    emailsSent += 1;
+  let lastSmtpError: string | undefined;
+
+  for (const { email, name } of recipients) {
+    try {
+      await sendRegistroBitacoraNotifyEmail({
+        to: email,
+        recipientName: name,
+        obraName: project.name,
+        obraCode: project.code,
+        fechaYmd: params.fechaYmd,
+        savedByName: params.savedByName,
+        savedSectionLabel: savedSlotLabels,
+        appUrl: appBase ? `${appBase}/dashboard` : undefined,
+      });
+      emailsSent += 1;
+    } catch (err) {
+      lastSmtpError = smtpErrorHint(err);
+      console.error('notifyBitacoraSaveToOthers: fallo envío a', email, err);
+    }
+  }
+
+  if (emailsSent === 0) {
+    console.error('notifyBitacoraSaveToOthers: ningún correo enviado', lastSmtpError);
+    return { emailsSent: 0, skipReason: 'error_envio' };
   }
 
   return { emailsSent };

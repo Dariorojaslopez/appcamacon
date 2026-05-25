@@ -934,7 +934,7 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
         sin_correo_destinatario:
           ' No se envió correo: los usuarios asignados no tienen correo válido en el sistema.',
         error_envio:
-          ' No se pudo enviar el correo (revise la configuración SMTP del servidor).',
+          ' No se pudo enviar el correo (mismo SMTP que «olvidé contraseña»; si ese sí funciona, despliegue la última versión o revise logs del servidor).',
       };
       const notifyMsg =
         typeof data.notificacionesEnviadas === 'number' && data.notificacionesEnviadas > 0

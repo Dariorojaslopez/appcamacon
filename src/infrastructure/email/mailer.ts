@@ -10,15 +10,39 @@ export function isEmailConfigured() {
   return Boolean(smtpHost && smtpUser && smtpPass && fromEmail);
 }
 
+function mailFromHeader(): string {
+  const addr = fromEmail!.trim();
+  if (addr.includes('<')) return addr;
+  return `"SIGOCC Camacon" <${addr}>`;
+}
+
 function createMailTransporter() {
+  const port = smtpPort;
   return nodemailer.createTransport({
     host: smtpHost,
-    port: smtpPort,
-    secure: smtpPort === 465,
+    port,
+    secure: port === 465,
+    requireTLS: port === 587,
     auth: {
       user: smtpUser,
       pass: smtpPass,
     },
+  });
+}
+
+/** Mismo envío que usa «olvidé contraseña» y las notificaciones de bitácora. */
+export async function sendPlainTextEmail(params: { to: string; subject: string; text: string }) {
+  if (!isEmailConfigured()) {
+    console.warn('SMTP no está configurado.');
+    return;
+  }
+
+  const transporter = createMailTransporter();
+  await transporter.sendMail({
+    from: mailFromHeader(),
+    to: params.to,
+    subject: params.subject,
+    text: params.text,
   });
 }
 
@@ -27,14 +51,6 @@ export async function sendPasswordResetEmail(params: {
   name: string;
   temporaryPassword: string;
 }) {
-  if (!isEmailConfigured()) {
-    console.warn('SMTP no está configurado. No se envió el correo de restablecimiento.');
-    return;
-  }
-
-  const transporter = createMailTransporter();
-
-  const subject = 'SIGOCC Camacon - Nueva contraseña temporal';
   const text = [
     `Hola ${params.name},`,
     '',
@@ -48,10 +64,9 @@ export async function sendPasswordResetEmail(params: {
     'Si no solicitaste este cambio, ignora este correo.',
   ].join('\n');
 
-  await transporter.sendMail({
-    from: fromEmail,
+  await sendPlainTextEmail({
     to: params.to,
-    subject,
+    subject: 'SIGOCC Camacon - Nueva contraseña temporal',
     text,
   });
 }
@@ -66,34 +81,24 @@ export async function sendRegistroBitacoraNotifyEmail(params: {
   savedSectionLabel: string;
   appUrl?: string;
 }) {
-  if (!isEmailConfigured()) {
-    console.warn('SMTP no está configurado. No se envió la notificación de bitácora.');
-    return;
-  }
-
-  const transporter = createMailTransporter();
-
-  const subject = `SIGOCC Camacon - Bitácora actualizada (${params.obraCode})`;
   const lines = [
     `Hola ${params.recipientName},`,
     '',
-    `Se actualizó el registro de bitácora de la obra «${params.obraName}» (${params.obraCode}).`,
+    `Se actualizo el registro de bitacora de la obra "${params.obraName}" (${params.obraCode}).`,
     `Fecha del registro: ${params.fechaYmd}.`,
-    `Sección actualizada: ${params.savedSectionLabel}.`,
+    `Seccion actualizada: ${params.savedSectionLabel}.`,
     `Registrado por: ${params.savedByName}.`,
     '',
-    'Como usted está asignado a esta obra para seguimiento de bitácora, le notificamos para que revise y complete su sección si corresponde.',
+    'Le notificamos para que revise y complete su seccion en el registro de bitacora si corresponde.',
   ];
   if (params.appUrl) {
     lines.push('', `Ingrese al sistema: ${params.appUrl}`);
   }
-  lines.push('', 'Este es un mensaje automático. No responda a este correo.');
+  lines.push('', 'Este es un mensaje automatico. No responda a este correo.');
 
-  await transporter.sendMail({
-    from: fromEmail,
+  await sendPlainTextEmail({
     to: params.to,
-    subject,
+    subject: `SIGOCC Camacon - Bitacora actualizada (${params.obraCode})`,
     text: lines.join('\n'),
   });
 }
-

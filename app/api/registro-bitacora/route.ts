@@ -261,28 +261,21 @@ export async function POST(req: NextRequest) {
       savedSlots = REGISTRO_BITACORA_SLOT_KEYS.filter((slot) => can(slot));
     }
 
-    let notificacionesEnviadas = 0;
-    let notificacionesSkipReason: string | undefined;
-    try {
-      const notifyResult = await notifyBitacoraSaveToOthers({
+    const notifyResult = await notifyBitacoraSaveToOthers({
+      projectId,
+      fechaYmd: fechaStr,
+      savedSlots,
+      savedByUserId: userId,
+      savedByName: guardadoPorNombre,
+    });
+    const notificacionesEnviadas = notifyResult.emailsSent;
+    const notificacionesSkipReason = notifyResult.skipReason;
+    if (notifyResult.skipReason) {
+      console.info('POST /api/registro-bitacora notificaciones', {
         projectId,
-        fechaYmd: fechaStr,
         savedSlots,
-        savedByUserId: userId,
-        savedByName: guardadoPorNombre,
+        skipReason: notifyResult.skipReason,
       });
-      notificacionesEnviadas = notifyResult.emailsSent;
-      notificacionesSkipReason = notifyResult.skipReason;
-      if (notifyResult.skipReason) {
-        console.info('POST /api/registro-bitacora notificaciones', {
-          projectId,
-          savedSlots,
-          skipReason: notifyResult.skipReason,
-        });
-      }
-    } catch (err) {
-      console.error('notifyBitacoraSaveToOthers', err);
-      notificacionesSkipReason = 'error_envio';
     }
 
     return NextResponse.json(
