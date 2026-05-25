@@ -17,6 +17,7 @@ import {
   type RegistroBitacoraFirmaDoc,
 } from '../../src/shared/registroBitacoraFirmaDocs';
 import { firmaImageDisplaySrc } from '../../src/lib/firmaImageSrc';
+import { formatRegistroBitacoraGuardado } from '../../src/lib/registroBitacoraSlotMeta';
 
 const MAX_FILE = 10 * 1024 * 1024;
 
@@ -149,6 +150,12 @@ type ApiRegistro = {
   iduFotoUrl: string | null;
   iduFirmaUrl: string | null;
   iduFirmaDocs?: RegistroBitacoraFirmaDoc[];
+  contratistaGuardadoPor?: string | null;
+  contratistaGuardadoEn?: string | null;
+  interventoriaGuardadoPor?: string | null;
+  interventoriaGuardadoEn?: string | null;
+  iduGuardadoPor?: string | null;
+  iduGuardadoEn?: string | null;
 };
 
 async function uploadRegistroDocumento(file: File, projectId: string): Promise<RegistroBitacoraFirmaDoc> {
@@ -207,6 +214,7 @@ type SlotProps = {
   onLimpiarFirmaDibujo: () => void;
   onQuitarTodosDocumentos: () => void;
   firmaGuardadaUrl: string | null;
+  guardadoMeta: string | null;
 };
 
 function SlotBlock({
@@ -223,6 +231,7 @@ function SlotBlock({
   onLimpiarFirmaDibujo,
   onQuitarTodosDocumentos,
   firmaGuardadaUrl,
+  guardadoMeta,
 }: SlotProps) {
   const firmaPreviewSrc = firmaGuardadaUrl ? firmaImageDisplaySrc(firmaGuardadaUrl) : null;
   const fotoInputRef = useRef<HTMLInputElement>(null);
@@ -232,6 +241,11 @@ function SlotBlock({
       <h2 className="section-title" style={{ marginTop: 0 }}>
         {title}
       </h2>
+      {guardadoMeta ? (
+        <p className="registro-bitacora-slot-meta" role="status">
+          {guardadoMeta}
+        </p>
+      ) : null}
       <div className="form-field">
         <label className="form-label">Observaciones</label>
         <div className="informe-input-wrap registro-bitacora-obs-wrap">
@@ -399,6 +413,9 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
   const [firmaClearedC, setFirmaClearedC] = useState(false);
   const [firmaClearedI, setFirmaClearedI] = useState(false);
   const [firmaClearedD, setFirmaClearedD] = useState(false);
+  const [metaC, setMetaC] = useState<string | null>(null);
+  const [metaI, setMetaI] = useState<string | null>(null);
+  const [metaD, setMetaD] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -519,6 +536,9 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
       setFirmaClearedC(false);
       setFirmaClearedI(false);
       setFirmaClearedD(false);
+      setMetaC(null);
+      setMetaI(null);
+      setMetaD(null);
       sigC.current?.clear();
       sigI.current?.clear();
       sigD.current?.clear();
@@ -551,6 +571,24 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
     setFirmaClearedC(false);
     setFirmaClearedI(false);
     setFirmaClearedD(false);
+    setMetaC(
+      formatRegistroBitacoraGuardado({
+        usuario: r.contratistaGuardadoPor ?? null,
+        guardadoEn: r.contratistaGuardadoEn ?? null,
+      }),
+    );
+    setMetaI(
+      formatRegistroBitacoraGuardado({
+        usuario: r.interventoriaGuardadoPor ?? null,
+        guardadoEn: r.interventoriaGuardadoEn ?? null,
+      }),
+    );
+    setMetaD(
+      formatRegistroBitacoraGuardado({
+        usuario: r.iduGuardadoPor ?? null,
+        guardadoEn: r.iduGuardadoEn ?? null,
+      }),
+    );
     void restoreFirmaPad(sigC, findFirmaVisualUrl(r.contratistaFirmaUrl, rowsC));
     void restoreFirmaPad(sigI, findFirmaVisualUrl(r.interventoriaFirmaUrl, rowsI));
     void restoreFirmaPad(sigD, findFirmaVisualUrl(r.iduFirmaUrl, rowsD));
@@ -1121,6 +1159,7 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
               }}
               onQuitarTodosDocumentos={() => setFirmaRowsC([])}
               firmaGuardadaUrl={findFirmaVisualUrl(persisted.contratistaFirmaUrl, firmaRowsC)}
+              guardadoMeta={metaC}
             />
             <div className="section-divider" />
           </>
@@ -1150,6 +1189,7 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
               }}
               onQuitarTodosDocumentos={() => setFirmaRowsI([])}
               firmaGuardadaUrl={findFirmaVisualUrl(persisted.interventoriaFirmaUrl, firmaRowsI)}
+              guardadoMeta={metaI}
             />
             <div className="section-divider" />
           </>
@@ -1179,6 +1219,7 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
               }}
               onQuitarTodosDocumentos={() => setFirmaRowsD([])}
               firmaGuardadaUrl={findFirmaVisualUrl(persisted.iduFirmaUrl, firmaRowsD)}
+              guardadoMeta={metaD}
             />
             <div className="section-divider" />
           </>

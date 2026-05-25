@@ -3863,6 +3863,17 @@ ul.informe-searchable-list {
   margin-top: 0.25rem;
 }
 
+.registro-bitacora-slot-meta {
+  margin: 0.35rem 0 0.75rem;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #1e3a5f;
+  background: rgba(17, 20, 133, 0.06);
+  border: 1px solid var(--camacon-border-subtle);
+  border-radius: 8px;
+}
+
 .registro-bitacora-textarea {
   border-radius: 12px;
   min-height: 6rem;

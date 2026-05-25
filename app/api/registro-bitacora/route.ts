@@ -72,6 +72,12 @@ export async function GET(req: NextRequest) {
         iduFotoUrl: true,
         iduFirmaUrl: true,
         iduFirmaDocs: true,
+        contratistaGuardadoPor: true,
+        contratistaGuardadoEn: true,
+        interventoriaGuardadoPor: true,
+        interventoriaGuardadoEn: true,
+        iduGuardadoPor: true,
+        iduGuardadoEn: true,
         updatedAt: true,
       },
     });
@@ -81,6 +87,9 @@ export async function GET(req: NextRequest) {
         ? {
             ...reg,
             fecha: toYmdUtc(reg.fecha),
+            contratistaGuardadoEn: reg.contratistaGuardadoEn?.toISOString() ?? null,
+            interventoriaGuardadoEn: reg.interventoriaGuardadoEn?.toISOString() ?? null,
+            iduGuardadoEn: reg.iduGuardadoEn?.toISOString() ?? null,
             contratistaFirmaDocs: parseFirmaDocsJson(reg.contratistaFirmaDocs),
             interventoriaFirmaDocs: parseFirmaDocsJson(reg.interventoriaFirmaDocs),
             iduFirmaDocs: parseFirmaDocsJson(reg.iduFirmaDocs),
@@ -154,6 +163,13 @@ export async function POST(req: NextRequest) {
     const i = body.interventoria ?? {};
     const d = body.idu ?? {};
 
+    const me = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
+    });
+    const guardadoPorNombre = me?.name?.trim() || 'Usuario';
+    const guardadoEn = new Date();
+
     const { row, created } = await prisma.$transaction(async (tx) => {
       const existing = await tx.registroBitacoraObra.findUnique({
         where: { projectId_fecha: { projectId, fecha } },
@@ -172,6 +188,10 @@ export async function POST(req: NextRequest) {
         contratistaFirmaDocs: can('contratista')
           ? (normalizeFirmaDocsForSave(c.firmaDocs) as Prisma.InputJsonValue)
           : ((existing?.contratistaFirmaDocs as Prisma.InputJsonValue) ?? []),
+        contratistaGuardadoPor: can('contratista')
+          ? guardadoPorNombre
+          : (existing?.contratistaGuardadoPor ?? null),
+        contratistaGuardadoEn: can('contratista') ? guardadoEn : (existing?.contratistaGuardadoEn ?? null),
         interventoriaObservaciones: can('interventor')
           ? asString(i.observaciones)
           : (existing?.interventoriaObservaciones ?? ''),
@@ -184,12 +204,20 @@ export async function POST(req: NextRequest) {
         interventoriaFirmaDocs: can('interventor')
           ? (normalizeFirmaDocsForSave(i.firmaDocs) as Prisma.InputJsonValue)
           : ((existing?.interventoriaFirmaDocs as Prisma.InputJsonValue) ?? []),
+        interventoriaGuardadoPor: can('interventor')
+          ? guardadoPorNombre
+          : (existing?.interventoriaGuardadoPor ?? null),
+        interventoriaGuardadoEn: can('interventor')
+          ? guardadoEn
+          : (existing?.interventoriaGuardadoEn ?? null),
         iduObservaciones: can('idu') ? asString(d.observaciones) : (existing?.iduObservaciones ?? ''),
         iduFotoUrl: can('idu') ? asOptionalUrl(d.fotoUrl) : (existing?.iduFotoUrl ?? null),
         iduFirmaUrl: can('idu') ? asOptionalUrl(d.firmaUrl) : (existing?.iduFirmaUrl ?? null),
         iduFirmaDocs: can('idu')
           ? (normalizeFirmaDocsForSave(d.firmaDocs) as Prisma.InputJsonValue)
           : ((existing?.iduFirmaDocs as Prisma.InputJsonValue) ?? []),
+        iduGuardadoPor: can('idu') ? guardadoPorNombre : (existing?.iduGuardadoPor ?? null),
+        iduGuardadoEn: can('idu') ? guardadoEn : (existing?.iduGuardadoEn ?? null),
         franjaClimaMananaCodigo: existing?.franjaClimaMananaCodigo ?? null,
         franjaClimaTardeCodigo: existing?.franjaClimaTardeCodigo ?? null,
         franjaClimaNocheCodigo: existing?.franjaClimaNocheCodigo ?? null,
