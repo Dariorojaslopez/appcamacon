@@ -906,15 +906,25 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const data = (await res.json()) as { error?: string; consecutivo?: number };
+      const data = (await res.json()) as {
+        error?: string;
+        consecutivo?: number;
+        notificacionesEnviadas?: number;
+      };
       if (!res.ok) throw new Error(data.error ?? 'No se pudo guardar');
 
       const baseMsg =
         res.status === 201 ? 'Registro creado correctamente.' : 'Registro actualizado correctamente.';
+      const notifyMsg =
+        typeof data.notificacionesEnviadas === 'number' && data.notificacionesEnviadas > 0
+          ? ` Se envió aviso por correo a ${data.notificacionesEnviadas} usuario(s).`
+          : typeof data.notificacionesEnviadas === 'number'
+            ? ' No se envió correo a otros roles: en Configuración → Obras asigne los tres usuarios de notificación (y que no sean la misma cuenta que guarda).'
+            : '';
       setMsg(
         firmaSubidaEnSave
-          ? `${baseMsg} Revise la imagen en «Firma guardada» debajo del recuadro.`
-          : baseMsg,
+          ? `${baseMsg}${notifyMsg} Revise la imagen en «Firma guardada» debajo del recuadro.`
+          : `${baseMsg}${notifyMsg}`,
       );
       if (typeof data.consecutivo === 'number') setConsecutivo(data.consecutivo);
 

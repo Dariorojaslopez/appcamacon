@@ -10,6 +10,18 @@ export function isEmailConfigured() {
   return Boolean(smtpHost && smtpUser && smtpPass && fromEmail);
 }
 
+function createMailTransporter() {
+  return nodemailer.createTransport({
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpPort === 465,
+    auth: {
+      user: smtpUser,
+      pass: smtpPass,
+    },
+  });
+}
+
 export async function sendPasswordResetEmail(params: {
   to: string;
   name: string;
@@ -20,15 +32,7 @@ export async function sendPasswordResetEmail(params: {
     return;
   }
 
-  const transporter = nodemailer.createTransport({
-    host: smtpHost,
-    port: smtpPort,
-    secure: smtpPort === 465,
-    auth: {
-      user: smtpUser,
-      pass: smtpPass,
-    },
-  });
+  const transporter = createMailTransporter();
 
   const subject = 'SIGOCC Camacon - Nueva contraseña temporal';
   const text = [
@@ -67,15 +71,7 @@ export async function sendRegistroBitacoraNotifyEmail(params: {
     return;
   }
 
-  const transporter = nodemailer.createTransport({
-    host: smtpHost,
-    port: smtpPort,
-    secure: smtpPort === 465,
-    auth: {
-      user: smtpUser,
-      pass: smtpPass,
-    },
-  });
+  const transporter = createMailTransporter();
 
   const subject = `SIGOCC Camacon - Bitácora actualizada (${params.obraCode})`;
   const lines = [
