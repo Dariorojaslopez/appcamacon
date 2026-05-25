@@ -30,17 +30,19 @@ export async function notifyBitacoraSaveToOthers(params: {
   });
   if (!project) return;
 
-  const recipientIds = new Set<string>();
+  const recipientIds: string[] = [];
   for (const savedSlot of params.savedSlots) {
     for (const otherSlot of BITACORA_NOTIFY_OTHER_SLOTS[savedSlot]) {
       const uid = projectNotifyUserIdForSlot(project, otherSlot);
-      if (uid && uid !== params.savedByUserId) recipientIds.add(uid);
+      if (uid && uid !== params.savedByUserId && !recipientIds.includes(uid)) {
+        recipientIds.push(uid);
+      }
     }
   }
-  if (recipientIds.size === 0) return;
+  if (recipientIds.length === 0) return;
 
   const users = await prisma.user.findMany({
-    where: { id: { in: [...recipientIds] }, isActive: true },
+    where: { id: { in: recipientIds }, isActive: true },
     select: { id: true, email: true, name: true },
   });
 

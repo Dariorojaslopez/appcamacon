@@ -28,7 +28,7 @@ export async function buildObraNotifyDataFromBody(body: {
     if (parsed) idsToValidate.push(parsed);
   }
 
-  const uniqueIds = [...new Set(idsToValidate)];
+  const uniqueIds = idsToValidate.filter((id, index, arr) => arr.indexOf(id) === index);
   if (uniqueIds.length > 0) {
     const found = await prisma.user.count({
       where: { id: { in: uniqueIds }, isActive: true },
