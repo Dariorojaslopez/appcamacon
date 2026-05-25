@@ -11,8 +11,8 @@ import {
   type RegistroBitacoraSlotKey,
 } from '../../src/shared/registroBitacoraPermissions';
 import {
+  dedupeFirmaDocs,
   MAX_REGISTRO_FIRMA_DOCS,
-  mergeLegacyFirmaUrl,
   type RegistroBitacoraFirmaDoc,
 } from '../../src/shared/registroBitacoraFirmaDocs';
 
@@ -32,16 +32,27 @@ function newFirmaDocRowId(): string {
   return `d-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-function firmaRowsFromApi(
-  firmaUrl: string | null,
-  firmaDocs: RegistroBitacoraFirmaDoc[],
-): FirmaDocRow[] {
-  return mergeLegacyFirmaUrl(firmaUrl, firmaDocs).map((d, i) => ({
+/** La API ya devuelve `firmaDocs` fusionados con la firma legacy; no volver a fusionar. */
+function firmaRowsFromDocs(firmaDocs: RegistroBitacoraFirmaDoc[]): FirmaDocRow[] {
+  return dedupeFirmaDocs(firmaDocs).map((d, i) => ({
     id: `saved-${i}-${d.url.slice(-16)}`,
     name: d.name,
     url: d.url,
     file: null,
   }));
+}
+
+async function restoreFirmaPad(
+  sigRef: RefObject<SignaturePadFieldHandle | null>,
+  firmaUrl: string | null,
+): Promise<void> {
+  const url = firmaUrl?.trim() ?? '';
+  if (!url) {
+    sigRef.current?.clear();
+    return;
+  }
+  const ok = await sigRef.current?.loadFromUrl(url);
+  if (!ok) sigRef.current?.clear();
 }
 
 function validateRegistroDoc(file: File): string | null {
@@ -314,9 +325,17 @@ function SlotBlock({
         <div className="signature-pad-wrap" style={{ marginTop: '0.65rem' }}>
           <SignaturePadField ref={sigRef} />
         </div>
-        <button type="button" className="btn-secondary" style={{ marginTop: '0.5rem' }} onClick={onLimpiarFirmaDibujo}>
+        <button
+          type="button"
+          className="btn-secondary"
+          style={{ marginTop: '0.5rem' }}
+          onClick={onLimpiarFirmaDibujo}
+        >
           Borrar firma dibujada
         </button>
+        <p className="shell-text-muted" style={{ fontSize: '0.8rem', marginTop: '0.35rem' }}>
+          La firma dibujada se guarda al pulsar «Guardar registro de bitácora» al final del formulario.
+        </p>
       </div>
     </div>
   );
@@ -494,12 +513,12 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
     setLabelC(r.contratistaFotoUrl ? 'Imagen guardada' : '');
     setLabelI(r.interventoriaFotoUrl ? 'Imagen guardada' : '');
     setLabelD(r.iduFotoUrl ? 'Imagen guardada' : '');
-    setFirmaRowsC(firmaRowsFromApi(r.contratistaFirmaUrl, r.contratistaFirmaDocs ?? []));
-    setFirmaRowsI(firmaRowsFromApi(r.interventoriaFirmaUrl, r.interventoriaFirmaDocs ?? []));
-    setFirmaRowsD(firmaRowsFromApi(r.iduFirmaUrl, r.iduFirmaDocs ?? []));
-    sigC.current?.clear();
-    sigI.current?.clear();
-    sigD.current?.clear();
+    setFirmaRowsC(firmaRowsFromDocs(r.contratistaFirmaDocs ?? []));
+    setFirmaRowsI(firmaRowsFromDocs(r.interventoriaFirmaDocs ?? []));
+    setFirmaRowsD(firmaRowsFromDocs(r.iduFirmaDocs ?? []));
+    void restoreFirmaPad(sigC, r.contratistaFirmaUrl);
+    void restoreFirmaPad(sigI, r.interventoriaFirmaUrl);
+    void restoreFirmaPad(sigD, r.iduFirmaUrl);
   }, []);
 
   useEffect(() => {
@@ -704,55 +723,66 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
         };
       } = { projectId, fecha: fechaDia };
 
-      if (canSlot('contratista')) {
-        let urlFotoC: string | null = null;
-        let urlFirmaC: string | null = null;
-        if (fotoC) urlFotoC = await uploadEvidenciaFoto(fotoC, projectId);
-        else urlFotoC = persisted.contratistaFotoUrl;
-        const fc = sigC.current?.toPngFile() ?? null;
-        if (fc) urlFirmaC = await uploadEvidenciaFoto(fc, projectId);
-        else urlFirmaC = persisted.contratistaFirmaUrl;
-        const firmaDocsC = await rowsToFirmaDocs(firmaRowsC, projectId);
-        body.contratista = {
-          observaciones: obsC,
-          fotoUrl: urlFotoC,
-          firmaUrl: urlFirmaC,
-          firmaDocs: firmaDocsC,
+      const buildSlotPayload = async (
+        foto: File | null,
+        fotoPersisted: string | null,
+        sigRef: RefObject<SignaturePadFieldHandle | null>,
+        firmaPersisted: string | null,
+        firmaRows: FirmaDocRow[],
+        observaciones: string,
+      ) => {
+        const urlFoto = foto ? await uploadEvidenciaFoto(foto, projectId) : fotoPersisted;
+        let urlFirma = firmaPersisted;
+        let firmaDocs = await rowsToFirmaDocs(firmaRows, projectId);
+        const drawn = sigRef.current?.toPngFile() ?? null;
+        if (drawn) {
+          const uploaded = await uploadEvidenciaFoto(drawn, projectId);
+          urlFirma = uploaded;
+          const prevUrl = firmaPersisted?.trim() ?? '';
+          firmaDocs = dedupeFirmaDocs([
+            ...firmaDocs.filter((d) => d.url !== prevUrl),
+            { url: uploaded, name: 'Firma dibujada', contentType: 'image/png' },
+          ]);
+        }
+        return {
+          observaciones,
+          fotoUrl: urlFoto,
+          firmaUrl: urlFirma,
+          firmaDocs,
         };
+      };
+
+      if (canSlot('contratista')) {
+        body.contratista = await buildSlotPayload(
+          fotoC,
+          persisted.contratistaFotoUrl,
+          sigC,
+          persisted.contratistaFirmaUrl,
+          firmaRowsC,
+          obsC,
+        );
       }
 
       if (canSlot('interventor')) {
-        let urlFotoI: string | null = null;
-        let urlFirmaI: string | null = null;
-        if (fotoI) urlFotoI = await uploadEvidenciaFoto(fotoI, projectId);
-        else urlFotoI = persisted.interventoriaFotoUrl;
-        const fi = sigI.current?.toPngFile() ?? null;
-        if (fi) urlFirmaI = await uploadEvidenciaFoto(fi, projectId);
-        else urlFirmaI = persisted.interventoriaFirmaUrl;
-        const firmaDocsI = await rowsToFirmaDocs(firmaRowsI, projectId);
-        body.interventoria = {
-          observaciones: obsI,
-          fotoUrl: urlFotoI,
-          firmaUrl: urlFirmaI,
-          firmaDocs: firmaDocsI,
-        };
+        body.interventoria = await buildSlotPayload(
+          fotoI,
+          persisted.interventoriaFotoUrl,
+          sigI,
+          persisted.interventoriaFirmaUrl,
+          firmaRowsI,
+          obsI,
+        );
       }
 
       if (canSlot('idu')) {
-        let urlFotoD: string | null = null;
-        let urlFirmaD: string | null = null;
-        if (fotoD) urlFotoD = await uploadEvidenciaFoto(fotoD, projectId);
-        else urlFotoD = persisted.iduFotoUrl;
-        const fd = sigD.current?.toPngFile() ?? null;
-        if (fd) urlFirmaD = await uploadEvidenciaFoto(fd, projectId);
-        else urlFirmaD = persisted.iduFirmaUrl;
-        const firmaDocsD = await rowsToFirmaDocs(firmaRowsD, projectId);
-        body.idu = {
-          observaciones: obsD,
-          fotoUrl: urlFotoD,
-          firmaUrl: urlFirmaD,
-          firmaDocs: firmaDocsD,
-        };
+        body.idu = await buildSlotPayload(
+          fotoD,
+          persisted.iduFotoUrl,
+          sigD,
+          persisted.iduFirmaUrl,
+          firmaRowsD,
+          obsD,
+        );
       }
 
       const res = await fetch('/api/registro-bitacora', {
@@ -969,7 +999,7 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
           >
             <span className="registro-bitacora-print-btn-title">Vista previa e imprimir PDF del rango</span>
             <span className="registro-bitacora-print-btn-hint">
-              Una hoja por informe diario, con clima mañana/tarde/noche (máx. 93 días).
+              Una hoja por cada informe diario del rango (clima mañana/tarde/noche y bitácora del día).
             </span>
           </button>
         </div>

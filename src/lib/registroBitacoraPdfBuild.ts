@@ -157,6 +157,8 @@ export function buildInformeDiarioPdfPage(
 
   return {
     consecutivo: reg?.consecutivo ?? 0,
+    folio: 0,
+    totalFolios: 0,
     informeNo,
     fechaTexto: formatFechaEsPdf(fecha),
     diaSemana: weekdayEsPdf(fecha),

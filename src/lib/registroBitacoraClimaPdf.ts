@@ -1,5 +1,5 @@
 import prisma from './prisma';
-import { eachYmdInRangeUtc, parseYmdUtc, toYmdUtc } from './registroBitacoraFecha';
+import { buildUtcDateRangeInclusive, eachYmdInRangeUtc, parseYmdUtc, toYmdUtc } from './registroBitacoraFecha';
 import {
   resolveClimaFranja,
   type RegistroBitacoraPdfClimaFranja,
@@ -75,21 +75,15 @@ export async function findInformesDiariosEnRango(
   desde: Date,
   hasta: Date,
 ): Promise<InformeDiarioPdfRow[]> {
-  const days = eachYmdInRangeUtc(desde, hasta);
-  if (days.length === 0) return [];
-  const batches = await Promise.all(
-    days.map((day) =>
-      prisma.informeDiario.findMany({
-        where: {
-          projectId,
-          date: { gte: day, lt: new Date(day.getTime() + 86400000) },
-        },
-        select: INFORME_DIARIO_PDF_SELECT,
-        orderBy: [{ date: 'asc' }, { jornadaCatalogo: { orden: 'asc' } }],
-      }),
-    ),
-  );
-  return batches.flat();
+  const { gte, lt } = buildUtcDateRangeInclusive(desde, hasta);
+  return prisma.informeDiario.findMany({
+    where: {
+      projectId,
+      date: { gte, lt },
+    },
+    select: INFORME_DIARIO_PDF_SELECT,
+    orderBy: [{ date: 'asc' }, { jornadaCatalogo: { orden: 'asc' } }],
+  });
 }
 
 /** @deprecated Use findInformesDiariosEnRango */

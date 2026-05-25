@@ -43,5 +43,18 @@ export function mergeLegacyFirmaUrl(
 }
 
 export function normalizeFirmaDocsForSave(input: unknown): RegistroBitacoraFirmaDoc[] {
-  return parseFirmaDocsJson(input);
+  return dedupeFirmaDocs(parseFirmaDocsJson(input));
+}
+
+export function dedupeFirmaDocs(docs: RegistroBitacoraFirmaDoc[]): RegistroBitacoraFirmaDoc[] {
+  const seen = new Set<string>();
+  const out: RegistroBitacoraFirmaDoc[] = [];
+  for (const d of docs) {
+    const key = d.url.trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(d);
+    if (out.length >= MAX_REGISTRO_FIRMA_DOCS) break;
+  }
+  return out;
 }

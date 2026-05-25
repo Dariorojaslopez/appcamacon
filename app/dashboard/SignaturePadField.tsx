@@ -10,27 +10,15 @@ export type SignaturePadFieldHandle = {
   clear: () => void;
   isEmpty: () => boolean;
   toPngFile: () => File | null;
+  loadFromUrl: (url: string) => Promise<boolean>;
 };
-
-function isCanvasBlank(canvas: HTMLCanvasElement): boolean {
-  const ctx = canvas.getContext('2d');
-  if (!ctx || !canvas.width || !canvas.height) return true;
-  const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const data = img.data;
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i] ?? 255;
-    const g = data[i + 1] ?? 255;
-    const b = data[i + 2] ?? 255;
-    if (r < 245 || g < 245 || b < 245) return false;
-  }
-  return true;
-}
 
 export const SignaturePadField = forwardRef<SignaturePadFieldHandle, Record<string, unknown>>(
   function SignaturePadField(_props, ref) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawing = useRef(false);
   const last = useRef<{ x: number; y: number } | null>(null);
+  const hasInk = useRef(false);
 
   const layoutCanvas = useCallback(() => {
     const c = canvasRef.current;
@@ -46,6 +34,7 @@ export const SignaturePadField = forwardRef<SignaturePadFieldHandle, Record<stri
     ctx.scale(dpr, dpr);
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, CSS_W, CSS_H);
+    hasInk.current = false;
   }, []);
 
   useEffect(() => {
@@ -70,14 +59,37 @@ export const SignaturePadField = forwardRef<SignaturePadFieldHandle, Record<stri
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
     ctx.stroke();
+    hasInk.current = true;
   };
 
   useImperativeHandle(ref, () => ({
     clear: () => layoutCanvas(),
-    isEmpty: () => (canvasRef.current ? isCanvasBlank(canvasRef.current) : true),
+    isEmpty: () => !hasInk.current,
+    loadFromUrl: async (url: string) => {
+      const c = canvasRef.current;
+      if (!c || !url.trim()) return false;
+      layoutCanvas();
+      const ctx = c.getContext('2d');
+      if (!ctx) return false;
+      try {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = () => reject(new Error('No se pudo cargar la imagen de firma'));
+          img.src = url;
+        });
+        ctx.drawImage(img, 0, 0, CSS_W, CSS_H);
+        hasInk.current = true;
+        return true;
+      } catch {
+        hasInk.current = false;
+        return false;
+      }
+    },
     toPngFile: () => {
       const c = canvasRef.current;
-      if (!c || isCanvasBlank(c)) return null;
+      if (!c || !hasInk.current) return null;
       const dataUrl = c.toDataURL('image/png');
       const b64 = dataUrl.split(',')[1];
       if (!b64) return null;

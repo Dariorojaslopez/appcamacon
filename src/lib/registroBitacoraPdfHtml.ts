@@ -36,8 +36,12 @@ export type RegistroBitacoraPdfObra = {
 };
 
 export type RegistroBitacoraPdfDia = {
-  /** Consecutivo de bitácora del día (si existe). */
+  /** Consecutivo interno del registro de bitácora del día (si existe). */
   consecutivo: number;
+  /** Folio autonumerado en el PDF impreso (1 por hoja del rango). */
+  folio: number;
+  /** Total de hojas/folios en este documento. */
+  totalFolios: number;
   /** Número del informe diario (ej. IDO-2026-006). */
   informeNo: string;
   fechaTexto: string;
@@ -447,11 +451,11 @@ function buildHeaderHtml(obra: RegistroBitacoraPdfObra, dia: RegistroBitacoraPdf
         <td class="val" colspan="2">${esc(dia.diaSemana)}</td>
       </tr>
       <tr>
-        <th class="hdr">Bitácora No.</th>
-        <td class="val" colspan="2">${dia.consecutivo > 0 ? esc(dia.consecutivo) : '—'}</td>
+        <th class="hdr">Folio</th>
+        <td class="val" colspan="2">${dia.folio > 0 ? esc(String(dia.folio)) : '—'}</td>
       </tr>
       <tr>
-        <td colspan="4" class="title-main">Informe diario de trabajo</td>
+        <td colspan="4" class="title-main">Bitácora de obra</td>
       </tr>
       <tr>
         <th class="hdr-proyecto">Proyecto</th>
@@ -619,6 +623,10 @@ function buildSeccionesHtml(secciones: RegistroBitacoraPdfSlot[]): string {
 }
 
 function buildDaySheetHtml(obra: RegistroBitacoraPdfObra, dia: RegistroBitacoraPdfDia, extraClass = ''): string {
+  const hojaTxt =
+    dia.folio > 0 && dia.totalFolios > 0
+      ? `Hoja ${dia.folio} · Folio ${dia.folio}${dia.totalFolios > 1 ? ` de ${dia.totalFolios}` : ''} · `
+      : '';
   return `<section class="sheet ${extraClass}">
     ${buildHeaderHtml(obra, dia)}
     ${buildClimaHtml(dia)}
@@ -626,7 +634,7 @@ function buildDaySheetHtml(obra: RegistroBitacoraPdfObra, dia: RegistroBitacoraP
     ${buildEquiposMaterialesHtml(dia)}
     ${buildSeccionesHtml(dia.secciones)}
     <p class="footer-note">
-      Registrado por: ${esc(dia.registradoPor)} · ${esc(dia.actualizadoTexto)}
+      ${hojaTxt}Registrado por: ${esc(dia.registradoPor)} · ${esc(dia.actualizadoTexto)}
     </p>
   </section>`;
 }
@@ -647,8 +655,13 @@ export function buildRegistroBitacoraPdfDocumentHtml(doc: RegistroBitacoraPdfDoc
       </section>`
     : '';
 
+  const totalFolios = dias.length;
   const sheetsHtml = dias
-    .map((dia, i) => buildDaySheetHtml(obra, dia, multi && i > 0 ? 'day-break' : ''))
+    .map((dia, i) => {
+      const folio = i + 1;
+      const diaConFolio: RegistroBitacoraPdfDia = { ...dia, folio, totalFolios };
+      return buildDaySheetHtml(obra, diaConFolio, multi && i > 0 ? 'day-break' : '');
+    })
     .join('\n');
 
   return `<!doctype html>
@@ -698,6 +711,8 @@ export function buildRegistroBitacoraPdfHtml(data: RegistroBitacoraPdfData): str
   };
   const dia: RegistroBitacoraPdfDia = {
     consecutivo: rest.consecutivo,
+    folio: 1,
+    totalFolios: 1,
     informeNo: (rest as RegistroBitacoraPdfDia).informeNo ?? String(rest.consecutivo),
     fechaTexto: rest.fechaTexto,
     diaSemana: rest.diaSemana,

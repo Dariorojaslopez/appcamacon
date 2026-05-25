@@ -110,7 +110,9 @@ export async function GET(req: NextRequest) {
         : `${formatFechaEsPdf(rango.desde)} — ${formatFechaEsPdf(rango.hasta)}`;
 
     const toolbarDetalle =
-      dias.length === 1 ? '1 informe diario' : `${dias.length} informes diarios en el período`;
+      dias.length === 1
+        ? '1 hoja · folio 1'
+        : `${dias.length} hojas · folios 1 a ${dias.length}`;
 
     const styleNonce = req.headers.get('x-nonce') ?? generateNonce();
 
