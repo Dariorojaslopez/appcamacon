@@ -2219,6 +2219,19 @@ body {
   overflow: hidden;
 }
 
+/* Lista flotante en portal (escritorio): evita recorte en tablas con overflow:hidden */
+.informe-searchable-panel--floating {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  z-index: 400;
+}
+
+.informe-searchable-panel--floating .informe-searchable-list {
+  flex: 1;
+  min-height: 0;
+}
+
 /* Bottom sheet + backdrop (móvil, portal en body) */
 .informe-searchable-backdrop {
   position: fixed;
@@ -2971,8 +2984,12 @@ ul.informe-searchable-list {
 }
 
 .informe-franja-clima-table td {
-  overflow: hidden;
+  overflow: visible;
   vertical-align: middle;
+}
+
+.informe-franja-clima-wrap:has(.informe-searchable-trigger[aria-expanded='true']) {
+  overflow: visible;
 }
 
 .informe-franja-clima-table td .informe-searchable {

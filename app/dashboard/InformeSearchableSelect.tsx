@@ -1,7 +1,15 @@
 'use client';
 
 import { createPortal } from 'react-dom';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 import { IconChevronDown } from './icons';
 
 export type InformeSearchableOption = { value: string; label: string };
@@ -58,6 +66,7 @@ export function InformeSearchableSelect({
 }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [floatStyle, setFloatStyle] = useState<CSSProperties>({});
   const narrowSheet = useNarrowSheet();
   const wrapRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -80,6 +89,49 @@ export function InformeSearchableSelect({
     setOpen(false);
     setQuery('');
   }, []);
+
+  const repositionFloating = useCallback(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const pad = 8;
+    const belowTop = rect.bottom + 4;
+    const spaceBelow = window.innerHeight - belowTop - pad;
+    const spaceAbove = rect.top - pad;
+    const openBelow = spaceBelow >= 140 || spaceBelow >= spaceAbove;
+    const listMax = Math.min(260, Math.max(100, (openBelow ? spaceBelow : spaceAbove) - 52));
+
+    if (openBelow) {
+      setFloatStyle({
+        position: 'fixed',
+        left: Math.max(pad, Math.min(rect.left, window.innerWidth - rect.width - pad)),
+        top: belowTop,
+        width: rect.width,
+        maxHeight: listMax + 52,
+        zIndex: 400,
+      });
+    } else {
+      setFloatStyle({
+        position: 'fixed',
+        left: Math.max(pad, Math.min(rect.left, window.innerWidth - rect.width - pad)),
+        bottom: window.innerHeight - rect.top + 4,
+        width: rect.width,
+        maxHeight: listMax + 52,
+        zIndex: 400,
+      });
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open || narrowSheet) return;
+    repositionFloating();
+    window.addEventListener('resize', repositionFloating);
+    window.addEventListener('scroll', repositionFloating, true);
+    return () => {
+      window.removeEventListener('resize', repositionFloating);
+      window.removeEventListener('scroll', repositionFloating, true);
+    };
+  }, [open, narrowSheet, repositionFloating]);
 
   useEffect(() => {
     if (!open) return;
@@ -120,7 +172,10 @@ export function InformeSearchableSelect({
   const panel = open && !disabled && (
     <div
       ref={panelRef}
-      className={`informe-searchable-panel ${narrowSheet ? 'informe-searchable-panel--sheet' : ''}`}
+      className={`informe-searchable-panel ${
+        narrowSheet ? 'informe-searchable-panel--sheet' : 'informe-searchable-panel--floating'
+      }`}
+      style={narrowSheet ? undefined : floatStyle}
       role="presentation"
     >
       {narrowSheet && (
@@ -196,14 +251,13 @@ export function InformeSearchableSelect({
             <IconChevronDown open={open} />
           </span>
         </button>
-        {!narrowSheet && panel}
       </div>
-      {narrowSheet &&
+      {open &&
         panel &&
         typeof document !== 'undefined' &&
         createPortal(
           <>
-            <div className="informe-searchable-backdrop" aria-hidden onClick={close} />
+            {narrowSheet ? <div className="informe-searchable-backdrop" aria-hidden onClick={close} /> : null}
             {panel}
           </>,
           document.body,
