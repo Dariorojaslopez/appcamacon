@@ -849,8 +849,6 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
         };
       };
 
-      let firmaSubidaEnSave = false;
-
       if (canSlot('contratista')) {
         const slot = await buildSlotPayload(
           fotoC,
@@ -867,7 +865,6 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
           firmaUrl: slot.firmaUrl,
           firmaDocs: slot.firmaDocs,
         };
-        if (slot.firmaSubida) firmaSubidaEnSave = true;
       }
 
       if (canSlot('interventor')) {
@@ -886,7 +883,6 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
           firmaUrl: slot.firmaUrl,
           firmaDocs: slot.firmaDocs,
         };
-        if (slot.firmaSubida) firmaSubidaEnSave = true;
       }
 
       if (canSlot('idu')) {
@@ -905,7 +901,6 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
           firmaUrl: slot.firmaUrl,
           firmaDocs: slot.firmaDocs,
         };
-        if (slot.firmaSubida) firmaSubidaEnSave = true;
       }
 
       const res = await fetch('/api/registro-bitacora', {
@@ -914,39 +909,11 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const data = (await res.json()) as {
-        error?: string;
-        consecutivo?: number;
-        notificacionesEnviadas?: number;
-        notificacionesSkipReason?: string;
-      };
+      const data = (await res.json()) as { error?: string; consecutivo?: number };
       if (!res.ok) throw new Error(data.error ?? 'No se pudo guardar');
 
-      const baseMsg =
-        res.status === 201 ? 'Registro creado correctamente.' : 'Registro actualizado correctamente.';
-      const notifySkipHints: Record<string, string> = {
-        smtp_no_configurado:
-          ' No se envió correo: el servidor no tiene SMTP configurado (revise SMTP_HOST, SMTP_USER, SMTP_PASS en el servidor).',
-        sin_seccion_guardada:
-          ' No se envió correo: su rol no tiene sección de bitácora asignada.',
-        obra_sin_destinatarios:
-          ' No se envió correo: abra Configuración → Obras → Editar esta obra, asigne los tres usuarios en «Notificaciones de bitácora» y pulse Guardar.',
-        sin_correo_destinatario:
-          ' No se envió correo: los usuarios asignados no tienen correo válido en el sistema.',
-        error_envio:
-          ' No se pudo enviar el correo (mismo SMTP que «olvidé contraseña»; si ese sí funciona, despliegue la última versión o revise logs del servidor).',
-      };
-      const notifyMsg =
-        typeof data.notificacionesEnviadas === 'number' && data.notificacionesEnviadas > 0
-          ? ` Se envió aviso por correo a ${data.notificacionesEnviadas} destinatario(s).`
-          : data.notificacionesSkipReason
-            ? notifySkipHints[data.notificacionesSkipReason] ??
-              ' No se envió correo de notificación.'
-            : '';
       setMsg(
-        firmaSubidaEnSave
-          ? `${baseMsg}${notifyMsg} Revise la imagen en «Firma guardada» debajo del recuadro.`
-          : `${baseMsg}${notifyMsg}`,
+        res.status === 201 ? 'Registro creado correctamente.' : 'Registro actualizado correctamente.',
       );
       if (typeof data.consecutivo === 'number') setConsecutivo(data.consecutivo);
 
