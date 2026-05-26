@@ -149,6 +149,7 @@ export async function POST(req: NextRequest) {
       franjaClimaMananaCodigo?: string | null;
       franjaClimaTardeCodigo?: string | null;
       franjaClimaNocheCodigo?: string | null;
+      centroTrabajo?: string;
       condiciones?: string;
       actividades?: string;
       incidentes?: string;
@@ -226,6 +227,9 @@ export async function POST(req: NextRequest) {
           ...(body.franjaClimaNocheCodigo !== undefined
             ? { franjaClimaNocheCodigo: body.franjaClimaNocheCodigo?.trim() || null }
             : {}),
+          ...(body.centroTrabajo !== undefined
+            ? { centroTrabajo: body.centroTrabajo?.trim() || null }
+            : {}),
           ...(frentePatchOk
             ? {
                 frenteObra: frentePatchOk.frenteObra,
@@ -267,7 +271,9 @@ export async function POST(req: NextRequest) {
 
     const year = reportDate.getUTCFullYear();
     const informeNo = `IDO-${year}-${padNumber(nextInformeConsecutivo, 3)}`;
-    const centroTrabajo = `CT-${padNumber(nextCentroTrabajoConsecutivo, 3)}`;
+    const centroTrabajoManual = body.centroTrabajo?.trim();
+    const centroTrabajo =
+      centroTrabajoManual || `CT-${padNumber(nextCentroTrabajoConsecutivo, 3)}`;
 
     let frenteObraFinal: string | null = body.frenteObra?.trim() || null;
     let frenteObraCatalogoFinal: string | null = null;

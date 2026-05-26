@@ -5382,6 +5382,8 @@ export default function DashboardPage() {
 
   const startVoiceCapture = async (
     field:
+      | 'centroTrabajo'
+      | 'frenteObra'
       | 'contratista'
       | 'encargadoReporte'
       | 'cargo'
@@ -5759,12 +5761,16 @@ export default function DashboardPage() {
     setInformeMessage(null);
     setInformeError(null);
     try {
+      const frenteTxt = (datosGeneralesForm.frenteObra ?? '').trim();
+      if (!frenteTxt) {
+        setInformeError('Indique el frente de obra.');
+        setSavingInforme(false);
+        return;
+      }
       const cid = (datosGeneralesForm.frenteObraCatalogoId ?? '').trim();
-      const frenteBody: Record<string, string> = {};
+      const frenteBody: Record<string, string> = { frenteObra: frenteTxt };
       if (cid && cid !== 'local') {
         frenteBody.frenteObraCatalogoId = cid;
-      } else if ((datosGeneralesForm.frenteObra ?? '').trim()) {
-        frenteBody.frenteObra = datosGeneralesForm.frenteObra.trim();
       }
       const res = await fetch('/api/informes', {
         method: 'POST',
@@ -5773,6 +5779,7 @@ export default function DashboardPage() {
           projectId: selectedObraId,
           date: datosGeneralesForm.fechaReporte,
           jornadaId: selectedJornadaId,
+          centroTrabajo: datosGeneralesForm.centroTrabajo.trim() || undefined,
           ...frenteBody,
           contratistaCatalogoId: datosGeneralesForm.contratistaCatalogoId || undefined,
           contratista: datosGeneralesForm.contratista || undefined,
@@ -11840,46 +11847,84 @@ export default function DashboardPage() {
                     className="form-input"
                     type="text"
                     required
-                    readOnly
-                    aria-readonly="true"
+                    readOnly={informeBloqueado}
+                    aria-readonly={informeBloqueado}
+                    placeholder="Ej: CT-007"
                     value={datosGeneralesForm.centroTrabajo}
                     onChange={(e) => setDatosGeneralesForm((f) => ({ ...f, centroTrabajo: e.target.value }))}
                   />
-                  <span className="informe-input-icon" aria-hidden><IconMic /></span>
+                  <button
+                    type="button"
+                    className="informe-icon-button"
+                    aria-label="Dictar centro de trabajo"
+                    disabled={informeBloqueado}
+                    onClick={() => void startVoiceCapture('centroTrabajo')}
+                  >
+                    <IconMic />
+                  </button>
                 </div>
+                <p className="informe-label-hint" style={{ marginTop: '0.35rem' }}>
+                  Puede editar el código. Si lo deja vacío al crear un informe nuevo, se asignará uno automático.
+                </p>
               </div>
               <div className="informe-field">
                 <label className="informe-label" htmlFor="frente-obra">FRENTE DE OBRA *</label>
+                <div className="informe-input-wrap" style={{ marginBottom: '0.5rem' }}>
+                  <input
+                    id="frente-obra"
+                    className="form-input"
+                    type="text"
+                    required
+                    readOnly={informeBloqueado}
+                    aria-readonly={informeBloqueado}
+                    placeholder="Escriba el frente de obra"
+                    value={datosGeneralesForm.frenteObra}
+                    onChange={(e) => {
+                      const txt = e.target.value;
+                      const match = frentesObraOptions.find((o) => o.nombre === txt.trim());
+                      setDatosGeneralesForm((f) => ({
+                        ...f,
+                        frenteObra: txt,
+                        frenteObraCatalogoId: match ? match.id : txt.trim() ? 'local' : '',
+                      }));
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="informe-icon-button"
+                    aria-label="Dictar frente de obra"
+                    disabled={informeBloqueado}
+                    onClick={() => void startVoiceCapture('frenteObra')}
+                  >
+                    <IconMic />
+                  </button>
+                </div>
+                <p className="informe-label-hint" style={{ marginTop: 0, marginBottom: '0.35rem' }}>
+                  Escriba el texto o elíjalo del catálogo de la obra:
+                </p>
                 <div className="informe-input-wrap">
                   <InformeSearchableSelect
-                    id="frente-obra"
+                    id="frente-obra-catalogo"
                     value={frenteSelectValue}
-                    disabled={!selectedObraId || loadingFrentesObraCatalog}
-                    emptyOptionLabel={selectedObraId ? 'Seleccione...' : 'Seleccione una obra arriba'}
+                    disabled={informeBloqueado || !selectedObraId || loadingFrentesObraCatalog}
+                    emptyOptionLabel={selectedObraId ? 'Elegir del catálogo…' : 'Seleccione una obra arriba'}
                     searchPlaceholder="Buscar frente de obra…"
                     options={frenteSelectOptions.map((o) => ({ value: o.id, label: o.nombre }))}
                     onChange={(v) => {
                       if (!v) {
-                        setDatosGeneralesForm((f) => ({ ...f, frenteObra: '', frenteObraCatalogoId: '' }));
                         return;
                       }
                       if (v === 'local') {
-                        const row = frenteSelectOptions.find((o) => o.id === 'local');
-                        setDatosGeneralesForm((f) => ({
-                          ...f,
-                          frenteObraCatalogoId: 'local',
-                          frenteObra: row?.nombre ?? f.frenteObra,
-                        }));
                         return;
                       }
-                      setDatosGeneralesForm((f) => {
-                        const fromCatalog = frentesObraOptions.find((o) => o.id === v);
-                        return {
+                      const fromCatalog = frentesObraOptions.find((o) => o.id === v);
+                      if (fromCatalog) {
+                        setDatosGeneralesForm((f) => ({
                           ...f,
                           frenteObraCatalogoId: v,
-                          frenteObra: fromCatalog?.nombre ?? f.frenteObra,
-                        };
-                      });
+                          frenteObra: fromCatalog.nombre,
+                        }));
+                      }
                     }}
                   />
                   {selectedObraId && loadingFrentesObraCatalog && (
