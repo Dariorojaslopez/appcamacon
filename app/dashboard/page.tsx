@@ -6642,17 +6642,13 @@ export default function DashboardPage() {
   const updateActividadDraft = (patch: Partial<typeof actividadDraft>) => {
     setActividadDraft((prev) => {
       const next = { ...prev, ...patch };
-      const largo = typeof next.largo === 'number' ? next.largo : Number(next.largo ?? 0);
-      const ancho = typeof next.ancho === 'number' ? next.ancho : Number(next.ancho ?? 0);
-      const altura = typeof next.altura === 'number' ? next.altura : Number(next.altura ?? 0);
-      const cantidadCalculada = Number.isFinite(largo * ancho * altura) ? largo * ancho * altura : 0;
-      const cantidadManualEnPatch = patch.cantidadTotal !== undefined;
-      const cantidadTotal = cantidadManualEnPatch
-        ? Number(next.cantidadTotal ?? 0)
-        : Number(next.cantidadTotal ?? 0) > 0
-          ? Number(next.cantidadTotal ?? 0)
-          : cantidadCalculada;
-      return { ...next, largo, ancho, altura, cantidadTotal };
+      return {
+        ...next,
+        largo: Number(next.largo ?? 0),
+        ancho: Number(next.ancho ?? 0),
+        altura: Number(next.altura ?? 0),
+        cantidadTotal: Number(next.cantidadTotal ?? 0),
+      };
     });
   };
 
@@ -6686,36 +6682,18 @@ export default function DashboardPage() {
 
   const commitActividadDraft = () => {
     const selectedItem = itemsCatalogOptions.find((it) => it.codigo === actividadDraft.itemContractual);
-    const normalizedDraft = {
+    const cantidadTotal = Number(actividadDraft.cantidadTotal ?? 0);
+    const normalizedDraftWithTotal = {
       ...actividadDraft,
       descripcion: String(selectedItem?.descripcion ?? actividadDraft.descripcion ?? '').trim(),
       unidadMedida: String(selectedItem?.unidad ?? actividadDraft.unidadMedida ?? '').trim(),
-      largo:
-        selectedItem?.largo != null && Number.isFinite(Number(selectedItem.largo))
-          ? Number(selectedItem.largo)
-          : Number(actividadDraft.largo ?? 0),
-      ancho:
-        selectedItem?.ancho != null && Number.isFinite(Number(selectedItem.ancho))
-          ? Number(selectedItem.ancho)
-          : Number(actividadDraft.ancho ?? 0),
-      altura:
-        selectedItem?.altura != null && Number.isFinite(Number(selectedItem.altura))
-          ? Number(selectedItem.altura)
-          : Number(actividadDraft.altura ?? 0),
-      cantidadTotal:
-        selectedItem?.cantidad != null && Number.isFinite(Number(selectedItem.cantidad))
-          ? Number(selectedItem.cantidad)
-          : Number(actividadDraft.cantidadTotal ?? 0),
+      largo: Number(actividadDraft.largo ?? 0),
+      ancho: Number(actividadDraft.ancho ?? 0),
+      altura: Number(actividadDraft.altura ?? 0),
+      cantidadTotal,
       imagenUrl: actividadDraft.imagenUrl ?? null,
       ...fotoGeoPayload(actividadDraft),
     };
-    const cantidadCalculada = Number.isFinite(normalizedDraft.largo * normalizedDraft.ancho * normalizedDraft.altura)
-      ? normalizedDraft.largo * normalizedDraft.ancho * normalizedDraft.altura
-      : 0;
-    const cantidadTotal = Number(normalizedDraft.cantidadTotal ?? 0) > 0
-      ? Number(normalizedDraft.cantidadTotal ?? 0)
-      : cantidadCalculada;
-    const normalizedDraftWithTotal = { ...normalizedDraft, cantidadTotal };
     const invalid =
       !normalizedDraftWithTotal.pk.trim() ||
       !normalizedDraftWithTotal.itemContractual.trim() ||
@@ -6755,17 +6733,13 @@ export default function DashboardPage() {
       prev.map((r, i) => {
         if (i !== idx) return r;
         const next = { ...r, ...patch };
-        const largo = typeof next.largo === 'number' ? next.largo : Number(next.largo ?? 0);
-        const ancho = typeof next.ancho === 'number' ? next.ancho : Number(next.ancho ?? 0);
-        const altura = typeof next.altura === 'number' ? next.altura : Number(next.altura ?? 0);
-        const cantidadCalculada = Number.isFinite(largo * ancho * altura) ? largo * ancho * altura : 0;
-        const cantidadManualEnPatch = patch.cantidadTotal !== undefined;
-        const cantidadTotal = cantidadManualEnPatch
-          ? Number(next.cantidadTotal ?? 0)
-          : Number(next.cantidadTotal ?? 0) > 0
-            ? Number(next.cantidadTotal ?? 0)
-            : cantidadCalculada;
-        return { ...next, largo, ancho, altura, cantidadTotal };
+        return {
+          ...next,
+          largo: Number(next.largo ?? 0),
+          ancho: Number(next.ancho ?? 0),
+          altura: Number(next.altura ?? 0),
+          cantidadTotal: Number(next.cantidadTotal ?? 0),
+        };
       }),
     );
   };
@@ -13756,13 +13730,6 @@ export default function DashboardPage() {
                             itemContractual: codigo,
                             descripcion: selected?.descripcion ?? actividadDraft.descripcion,
                             unidadMedida: selected?.unidad ?? actividadDraft.unidadMedida,
-                            largo: selected?.largo != null ? Number(selected.largo) : 0,
-                            ancho: selected?.ancho != null ? Number(selected.ancho) : 0,
-                            altura: selected?.altura != null ? Number(selected.altura) : 0,
-                            cantidadTotal:
-                              selected?.cantidad != null && Number.isFinite(Number(selected.cantidad))
-                                ? Number(selected.cantidad)
-                                : Number(actividadDraft.cantidadTotal ?? 0),
                           });
                         }}
                         disabled={!selectedObraId}
@@ -13795,8 +13762,20 @@ export default function DashboardPage() {
                         step="0.001"
                         min="0"
                         placeholder="Cantidad"
-                        value={Number.isFinite(Number(actividadDraft.cantidadTotal)) ? String(actividadDraft.cantidadTotal) : ''}
-                        onChange={(e) => updateActividadDraft({ cantidadTotal: Number(e.target.value || 0) })}
+                        value={
+                          actividadDraft.cantidadTotal === 0
+                            ? ''
+                            : String(actividadDraft.cantidadTotal)
+                        }
+                        onChange={(e) => {
+                          const raw = e.target.value.trim().replace(',', '.');
+                          if (!raw) {
+                            updateActividadDraft({ cantidadTotal: 0 });
+                            return;
+                          }
+                          const n = Number(raw);
+                          updateActividadDraft({ cantidadTotal: Number.isFinite(n) && n >= 0 ? n : 0 });
+                        }}
                       />
                     </div>
                     <div className="informe-field">
