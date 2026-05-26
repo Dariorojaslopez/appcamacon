@@ -2284,6 +2284,34 @@ body {
   margin-top: 0.25rem;
 }
 
+.force-password-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(17, 20, 133, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+}
+
+.force-password-modal {
+  max-width: 440px;
+}
+
+.force-password-form .form-field {
+  margin-bottom: 0.85rem;
+}
+
+.force-password-loading {
+  min-height: 40vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--camacon-azul);
+  font-weight: 600;
+}
+
 .informe-searchable-panel--sheet {
   position: fixed;
   left: 0;

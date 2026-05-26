@@ -51,6 +51,12 @@ export async function PATCH(
       updateData.passwordHash = await hash(body.password, 10);
     }
     const user = await userRepository.update(id, updateData);
+    if (body.password != null && body.password !== '' && user) {
+      await prisma.user.update({
+        where: { id },
+        data: { mustChangePassword: false },
+      });
+    }
     if (!user) return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 });
     return NextResponse.json({ user: toPublicUser(user) });
   } catch (error: unknown) {

@@ -14,9 +14,10 @@ model User {
   password       String
   name           String
   role           String   @default("SUPER_ADMIN")
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  isActive             Boolean  @default(true)
+  mustChangePassword   Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   informes              InformeDiario[]
   registrosBitacoraObra RegistroBitacoraObra[]

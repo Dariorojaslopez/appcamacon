@@ -12,6 +12,7 @@ interface LoginResponse {
     role: string;
   };
   allowedMenus?: string[];
+  mustChangePassword?: boolean;
   error?: string;
 }
 
@@ -164,6 +165,15 @@ export default function HomePage() {
           } catch {
             // ignorar si no hay sessionStorage
           }
+        }
+        try {
+          if (data.mustChangePassword) {
+            sessionStorage.setItem('sigocc_mustChangePassword', '1');
+          } else {
+            sessionStorage.removeItem('sigocc_mustChangePassword');
+          }
+        } catch {
+          // ignorar
         }
         /* replace: evita que «Atrás» en Android vuelva al login con sesión aún válida */
         router.replace('/dashboard');

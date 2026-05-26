@@ -42,6 +42,17 @@ export async function GET(req: NextRequest) {
   const firmaSlotPermissions = await dbFirmaPermisosPorSlot(role);
   const registroBitacoraSlots = registroBitacoraSlotsToFlags(await dbRegistroBitacoraSlotsForRole(role));
 
+  let mustChangePassword = false;
+  try {
+    const row = await prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { mustChangePassword: true },
+    });
+    mustChangePassword = row?.mustChangePassword === true;
+  } catch (error: unknown) {
+    console.error('auth/me mustChangePassword:', error);
+  }
+
   return NextResponse.json({
     user: {
       id: payload.sub,
@@ -51,6 +62,7 @@ export async function GET(req: NextRequest) {
       role,
     },
     allowedMenus,
+    mustChangePassword,
     firmaToken,
     firmaSlotPermissions,
     registroBitacoraSlots,

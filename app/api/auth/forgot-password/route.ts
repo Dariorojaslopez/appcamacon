@@ -66,6 +66,7 @@ export async function POST(request: NextRequest) {
       where: { id: user.id },
       data: {
         password: newPasswordHash,
+        mustChangePassword: true,
         ...(isSuperAdminRole(user.role) ? { isActive: true } : {}),
       },
     });

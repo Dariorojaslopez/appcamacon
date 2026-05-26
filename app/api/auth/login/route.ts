@@ -20,6 +20,11 @@ export async function POST(req: NextRequest) {
 
     const result = await loginUserUseCase.execute({ identification, password });
 
+    const dbUser = await prisma.user.findUnique({
+      where: { id: result.user.id },
+      select: { mustChangePassword: true },
+    });
+
     let allowedMenus: string[] = [];
     try {
       const permissions = await prisma.roleMenuPermission.findMany({
@@ -52,6 +57,7 @@ export async function POST(req: NextRequest) {
           role: result.user.role,
         },
         allowedMenus,
+        mustChangePassword: dbUser?.mustChangePassword === true,
       },
       { status: 200 },
     );
