@@ -1169,6 +1169,31 @@ function firmasEvidenciasToApiPayload(
   >;
 }
 
+function mensajeBloqueoFirmaEvidencia(params: {
+  puedeFirmarAqui: boolean;
+  codigo: string;
+  observacion: string;
+  cierraInforme: boolean;
+  registroFotografico: boolean;
+  totalFotos: number;
+  informeBloqueado: boolean;
+}): string | null {
+  if (params.informeBloqueado) return null;
+  if (!params.puedeFirmarAqui) {
+    return 'Tu rol no puede firmar en esta casilla. Un administrador puede habilitarlo en Usuarios → Permisos de firma.';
+  }
+  if (!params.codigo.trim()) {
+    return 'Ingrese el código de firma o pulse «Usar mi código».';
+  }
+  if (!params.observacion.trim()) {
+    return 'Escriba la observación (obligatoria) antes de pulsar Firmar.';
+  }
+  if (params.cierraInforme && params.registroFotografico && params.totalFotos === 0) {
+    return 'Es la última firma: cargue al menos una foto arriba o marque «NO» en registro fotográfico para poder cerrar.';
+  }
+  return null;
+}
+
 function normalizeFirmaEvidenciaFromApi(raw: unknown): FirmaEvidenciaState {
   if (!raw || typeof raw !== 'object') return emptyFirmaEvidencia();
   const o = raw as Record<string, unknown>;
@@ -7386,7 +7411,14 @@ export default function DashboardPage() {
     const date = datosGeneralesForm.fechaReporte || new Date().toISOString().slice(0, 10);
 
     if (!options?.skipPhotoValidation && registroFotografico && totalEvidenciasCount(evidenciaUrlsPorFase) === 0) {
-      setEvidenciasError('Si marcaste “Sí”, debes cargar al menos una foto.');
+      const msg =
+        'Para cerrar el informe con la última firma debe cargar al menos una foto (tiene marcado «Sí» en registro fotográfico).';
+      setEvidenciasError(msg);
+      if (typeof document !== 'undefined') {
+        requestAnimationFrame(() => {
+          document.getElementById('evidencias-feedback-error')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+      }
       return false;
     }
 
@@ -7412,7 +7444,13 @@ export default function DashboardPage() {
 
       const data = await res.json();
       if (!res.ok) {
-        setEvidenciasError(data?.error ?? 'No se pudo guardar');
+        const msg = data?.error ?? 'No se pudo guardar';
+        setEvidenciasError(msg);
+        if (typeof document !== 'undefined') {
+          requestAnimationFrame(() => {
+            document.getElementById('evidencias-feedback-error')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          });
+        }
         return false;
       }
 
@@ -14782,7 +14820,11 @@ export default function DashboardPage() {
             <h1 className="shell-title">Informe diario - Evidencias y cierre</h1>
 
             {evidenciasMessage && <p className="feedback feedback-success">{evidenciasMessage}</p>}
-            {evidenciasError && <p className="feedback feedback-error">{evidenciasError}</p>}
+            {evidenciasError && (
+              <p id="evidencias-feedback-error" className="feedback feedback-error" role="alert">
+                {evidenciasError}
+              </p>
+            )}
 
             {loadingEvidencias ? (
               <p className="shell-text-muted">Cargando evidencias...</p>
@@ -15097,6 +15139,25 @@ export default function DashboardPage() {
                       const puedeFirmarAqui = firmaSlotPermissions?.[key] === true;
                       const bloquearEdicion = !puedeFirmarAqui || informeBloqueado;
                       const mostrarAvisoRol = firmaSlotPermissions !== null && !puedeFirmarAqui;
+                      const cierraAlFirmar = FIRMAS_EVIDENCIAS_CONFIG.every(
+                        ({ key: slot }) => (slot === key ? true : firmasEvidencias[slot].firmado),
+                      );
+                      const avisoFirma = mensajeBloqueoFirmaEvidencia({
+                        puedeFirmarAqui,
+                        codigo: f.codigo,
+                        observacion: f.observacion,
+                        cierraInforme: cierraAlFirmar,
+                        registroFotografico,
+                        totalFotos: totalEvidenciasCount(evidenciaUrlsPorFase),
+                        informeBloqueado,
+                      });
+                      const firmaLista =
+                        puedeFirmarAqui &&
+                        Boolean(f.codigo.trim()) &&
+                        Boolean(f.observacion.trim()) &&
+                        (!cierraAlFirmar ||
+                          !registroFotografico ||
+                          totalEvidenciasCount(evidenciaUrlsPorFase) > 0);
                       return (
                         <div
                           key={key}
@@ -15142,7 +15203,10 @@ export default function DashboardPage() {
                                       onClick={() =>
                                         setFirmasEvidencias((prev) => ({
                                           ...prev,
-                                          [key]: { ...prev[key], codigo: firmaToken ?? '' },
+                                          [key]: {
+                                            ...prev[key],
+                                            codigo: (firmaToken ?? '').trim().toUpperCase(),
+                                          },
                                         }))
                                       }
                                     >
@@ -15160,7 +15224,7 @@ export default function DashboardPage() {
                                   onChange={(e) =>
                                     setFirmasEvidencias((prev) => ({
                                       ...prev,
-                                      [key]: { ...prev[key], codigo: e.target.value },
+                                      [key]: { ...prev[key], codigo: e.target.value.toUpperCase() },
                                     }))
                                   }
                                 />
@@ -15193,21 +15257,26 @@ export default function DashboardPage() {
                                   gap: '0.65rem',
                                 }}
                               >
+                                {avisoFirma ? (
+                                  <p className="shell-text-muted" style={{ fontSize: '0.82rem', margin: '0 0 0.5rem' }}>
+                                    {avisoFirma}
+                                  </p>
+                                ) : null}
                                 <button
                                   type="button"
                                   className="btn-primary"
-                                  disabled={
-                                    savingEvidencias ||
-                                    bloquearEdicion ||
-                                    !puedeFirmarAqui ||
-                                    !String(f.codigo).trim() ||
-                                    !String(f.observacion).trim()
-                                  }
+                                  disabled={savingEvidencias || bloquearEdicion || !firmaLista}
                                   onClick={async () => {
                                     const ts = new Date().toISOString();
                                     const nextFirmas: Record<FirmaEvidenciaKey, FirmaEvidenciaState> = {
                                       ...firmasEvidencias,
-                                      [key]: { ...firmasEvidencias[key], firmado: true, firmadoEn: ts },
+                                      [key]: {
+                                        ...firmasEvidencias[key],
+                                        codigo: firmasEvidencias[key].codigo.trim().toUpperCase(),
+                                        observacion: firmasEvidencias[key].observacion.trim(),
+                                        firmado: true,
+                                        firmadoEn: ts,
+                                      },
                                     };
                                     const cierraInforme = FIRMAS_EVIDENCIAS_CONFIG.every(
                                       ({ key: slot }) => nextFirmas[slot].firmado,

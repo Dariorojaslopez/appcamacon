@@ -88,7 +88,8 @@ async function validarFirmasEvidencias(
       };
     }
 
-    if (firma.codigo !== expectedToken) {
+    const codigoIngresado = firma.codigo.trim().toUpperCase();
+    if (codigoIngresado !== expectedToken) {
       return {
         ok: false,
         status: 400,
