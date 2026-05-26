@@ -1051,12 +1051,6 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
             contratista, interventoría e IDU en «Notificaciones de bitácora» y pulse <strong>Guardar</strong>.
           </p>
         )}
-        {!loadingMeta && projectId && bitacoraNotifyEmails.length > 0 && (
-          <p className="informe-label-hint" style={{ marginBottom: '0.75rem' }}>
-            Correos de aviso al guardar: {bitacoraNotifyEmails.join(', ')}
-          </p>
-        )}
-
         <div className="form-field">
           <label className="form-label" htmlFor="rb-fecha">
             Día del registro
