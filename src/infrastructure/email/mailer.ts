@@ -1,45 +1,55 @@
 import nodemailer from 'nodemailer';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport';
+import { diagnoseSmtpEnv, readSmtpConfig } from '../../lib/smtpConfig';
 
-const smtpHost = process.env.SMTP_HOST;
-const smtpPort = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587;
-const smtpUser = process.env.SMTP_USER;
-const smtpPass = process.env.SMTP_PASS;
-const fromEmail = process.env.MAIL_FROM || smtpUser;
-
-export function isEmailConfigured() {
-  return Boolean(smtpHost && smtpUser && smtpPass && fromEmail);
+export function isEmailConfigured(): boolean {
+  return readSmtpConfig() != null;
 }
 
-function mailFromHeader(): string {
-  const addr = fromEmail!.trim();
-  if (addr.includes('<')) return addr;
-  return `"SIGOCC Camacon" <${addr}>`;
+export function getSmtpDiagnostic() {
+  return diagnoseSmtpEnv();
 }
 
 function createMailTransporter() {
-  const port = smtpPort;
-  return nodemailer.createTransport({
-    host: smtpHost,
-    port,
-    secure: port === 465,
-    requireTLS: port === 587,
+  const cfg = readSmtpConfig();
+  if (!cfg) {
+    throw new Error('SMTP no configurado');
+  }
+
+  const options: SMTPTransport.Options = {
+    host: cfg.host,
+    port: cfg.port,
+    secure: cfg.port === 465,
     auth: {
-      user: smtpUser,
-      pass: smtpPass,
+      user: cfg.user,
+      pass: cfg.pass,
     },
-  });
+  };
+
+  if (cfg.port === 587) {
+    options.requireTLS = true;
+  }
+
+  return { transporter: nodemailer.createTransport(options), fromHeader: cfg.fromHeader };
+}
+
+/** Verifica conexión y credenciales sin enviar correo al usuario final. */
+export async function verifySmtpConnection(): Promise<void> {
+  const { transporter } = createMailTransporter();
+  await transporter.verify();
 }
 
 /** Mismo envío que usa «olvidé contraseña» y las notificaciones de bitácora. */
 export async function sendPlainTextEmail(params: { to: string; subject: string; text: string }) {
-  if (!isEmailConfigured()) {
+  const cfg = readSmtpConfig();
+  if (!cfg) {
     console.warn('SMTP no está configurado.');
     return;
   }
 
-  const transporter = createMailTransporter();
+  const { transporter, fromHeader } = createMailTransporter();
   await transporter.sendMail({
-    from: mailFromHeader(),
+    from: fromHeader,
     to: params.to,
     subject: params.subject,
     text: params.text,
