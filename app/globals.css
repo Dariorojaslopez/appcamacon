@@ -4044,6 +4044,185 @@ ul.informe-searchable-list {
   color: var(--camacon-primary, #111485);
 }
 
+/* Tablas datos del día (registro bitácora sin informe) */
+.registro-bitacora-dia-informe {
+  max-width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+.registro-dia-informe-block {
+  margin-top: 1rem;
+  margin-bottom: 0.25rem;
+  max-width: 100%;
+}
+
+.registro-dia-informe-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.45rem;
+}
+
+.registro-dia-informe-band {
+  display: block;
+  padding: 0.45rem 0.65rem;
+  font-weight: 700;
+  font-size: 0.82rem;
+  text-align: center;
+  color: #fff;
+  background: #1e3a5f;
+  border: 1px solid #152a45;
+}
+
+.registro-dia-informe-band--standalone {
+  border-radius: 8px 8px 0 0;
+  flex: 1 1 auto;
+  text-align: left;
+}
+
+.registro-dia-informe-table-scroll {
+  overflow-x: auto;
+  border: 1px solid rgba(209, 213, 219, 0.9);
+  border-radius: 0 0 12px 12px;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+.registro-dia-informe-block .registro-dia-informe-band--standalone {
+  margin-bottom: 0;
+  border-radius: 12px 12px 0 0;
+  border-bottom: none;
+}
+
+.registro-dia-informe-block .registro-dia-informe-toolbar:has(.registro-dia-informe-add-btn) .registro-dia-informe-band--standalone {
+  border-radius: 12px 0 0 0;
+}
+
+.registro-dia-informe-table.registro-dia-informe-table {
+  min-width: 0;
+  width: 100%;
+  table-layout: fixed;
+  margin: 0;
+}
+
+.registro-dia-informe-table th {
+  background: #e8eef5;
+  color: #1e3a5f;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.registro-dia-informe-table .registro-dia-informe-band {
+  background: #1e3a5f;
+  color: #fff;
+}
+
+.registro-dia-informe-th-narrow {
+  width: 5.5rem;
+  text-align: center;
+}
+
+.registro-dia-informe-th-estado {
+  width: 38%;
+  text-align: center;
+}
+
+.registro-dia-informe-th-action {
+  width: 5.5rem;
+}
+
+.registro-dia-informe-td-center {
+  text-align: center;
+}
+
+.registro-dia-informe-td-action {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.registro-dia-informe-input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.5rem;
+}
+
+.registro-dia-informe-input--total {
+  max-width: 5rem;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.registro-dia-informe-empty {
+  text-align: center;
+  padding: 0.75rem !important;
+  font-size: 0.85rem;
+}
+
+.registro-dia-informe-add-btn {
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 0 12px 0 0;
+  border: 1px solid rgba(209, 213, 219, 0.9);
+  border-bottom: none;
+}
+
+.registro-dia-informe-remove-btn {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.45rem;
+}
+
+@media (max-width: 639px) {
+  .registro-dia-informe-table--personal thead,
+  .registro-dia-informe-table--equipos thead {
+    display: none;
+  }
+
+  .registro-dia-informe-table--personal tbody tr,
+  .registro-dia-informe-table--equipos tbody tr {
+    display: block;
+    padding: 0.65rem 0.75rem;
+    border-bottom: 1px solid rgba(229, 231, 235, 0.9);
+  }
+
+  .registro-dia-informe-table--personal tbody tr:last-child,
+  .registro-dia-informe-table--equipos tbody tr:last-child {
+    border-bottom: none;
+  }
+
+  .registro-dia-informe-table--personal td,
+  .registro-dia-informe-table--equipos td {
+    display: block;
+    width: 100% !important;
+    padding: 0.25rem 0;
+    border: none;
+  }
+
+  .registro-dia-informe-table--personal td::before,
+  .registro-dia-informe-table--equipos td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--camacon-azul);
+    margin-bottom: 0.2rem;
+  }
+
+  .registro-dia-informe-td-action::before {
+    content: none;
+  }
+
+  .registro-dia-informe-input--total {
+    max-width: 100%;
+    margin: 0;
+    text-align: left;
+  }
+}
+
 .registro-bitacora-rango-link:hover {
   background: #eef2ff;
   border-color: var(--camacon-primary, #111485);

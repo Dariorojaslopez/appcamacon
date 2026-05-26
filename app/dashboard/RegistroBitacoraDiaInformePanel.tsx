@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { InformeSearchableSelect, type InformeSearchableOption } from './InformeSearchableSelect';
 import {
   REGISTRO_MANUAL_EQUIPOS_MAX,
@@ -38,7 +39,22 @@ export function RegistroBitacoraDiaInformePanel({
   tipoCondicionOptions,
   loading,
 }: Props) {
-  const editable = !state.tieneInformeDiario && !loading;
+  const editable = !state.tieneInformeDiario;
+  const inputsDisabled = Boolean(loading);
+
+  useEffect(() => {
+    if (!editable || loading) return;
+    const needsPersonal = state.personalPorCargo.length === 0;
+    const needsEquipos = state.equipos.length === 0;
+    if (!needsPersonal && !needsEquipos) return;
+    onChange({
+      ...state,
+      personalPorCargo: needsPersonal ? [emptyRegistroPersonalManualRow()] : state.personalPorCargo,
+      equipos: needsEquipos ? [emptyRegistroEquipoManualRow()] : state.equipos,
+    });
+    // Solo al pasar a modo manual vacío (p. ej. tras cargar el día sin informe).
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onChange/state completos re-dispararían en bucle
+  }, [editable, loading, state.tieneInformeDiario, state.personalPorCargo.length, state.equipos.length]);
 
   const setClima = (key: keyof RegistroClimaFranjasForm, value: string) => {
     onChange({
@@ -55,6 +71,16 @@ export function RegistroBitacoraDiaInformePanel({
     onChange({ ...state, equipos: rows });
   };
 
+  const personalRows =
+    state.personalPorCargo.length > 0
+      ? state.personalPorCargo
+      : editable
+        ? [emptyRegistroPersonalManualRow()]
+        : [];
+
+  const equiposRows =
+    state.equipos.length > 0 ? state.equipos : editable ? [emptyRegistroEquipoManualRow()] : [];
+
   return (
     <div className="registro-bitacora-dia-informe">
       <h3 className="shell-title" style={{ fontSize: '1rem', marginTop: 0 }}>
@@ -66,19 +92,22 @@ export function RegistroBitacoraDiaInformePanel({
         </p>
       ) : (
         <p className="informe-label-hint" style={{ marginTop: 0 }}>
-          No hay informe diario para esta fecha. Complete los datos manualmente; se guardan al pulsar «Guardar
-          registro».
+          No hay informe diario para esta fecha. Complete los datos en las tablas siguientes; se guardan al pulsar
+          «Guardar registro».
         </p>
       )}
 
-      <div className="informe-franja-clima-wrap" style={{ marginBottom: '1rem' }}>
-        <table className="users-table informe-franja-clima-table">
+      <div className="informe-franja-clima-wrap registro-dia-informe-block">
+        <table className="users-table informe-franja-clima-table registro-dia-informe-table">
           <thead>
             <tr>
-              <th className="informe-franja-clima-th-franja">Franja del día</th>
-              <th className="informe-franja-clima-th-tipo">
-                {editable ? 'Condición climática' : 'Condición climática'}
+              <th colSpan={2} className="registro-dia-informe-band">
+                Condición climática por franja
               </th>
+            </tr>
+            <tr>
+              <th className="informe-franja-clima-th-franja">Franja del día</th>
+              <th className="informe-franja-clima-th-tipo">Condición climática</th>
             </tr>
           </thead>
           <tbody>
@@ -91,6 +120,7 @@ export function RegistroBitacoraDiaInformePanel({
                   <InformeSearchableSelect
                     id="rb-clima-manana"
                     value={state.climaFranjas.manana}
+                    disabled={inputsDisabled}
                     emptyOptionLabel="Seleccione…"
                     searchPlaceholder="Buscar tipo…"
                     options={tipoCondicionOptions}
@@ -110,6 +140,7 @@ export function RegistroBitacoraDiaInformePanel({
                   <InformeSearchableSelect
                     id="rb-clima-tarde"
                     value={state.climaFranjas.tarde}
+                    disabled={inputsDisabled}
                     emptyOptionLabel="Seleccione…"
                     searchPlaceholder="Buscar tipo…"
                     options={tipoCondicionOptions}
@@ -129,6 +160,7 @@ export function RegistroBitacoraDiaInformePanel({
                   <InformeSearchableSelect
                     id="rb-clima-noche"
                     value={state.climaFranjas.noche}
+                    disabled={inputsDisabled}
                     emptyOptionLabel="Seleccione…"
                     searchPlaceholder="Buscar tipo…"
                     options={tipoCondicionOptions}
@@ -143,141 +175,196 @@ export function RegistroBitacoraDiaInformePanel({
         </table>
       </div>
 
-      <table className="users-table" style={{ marginBottom: '1rem' }}>
-        <thead>
-          <tr>
-            <th colSpan={2}>Personal</th>
-          </tr>
-          <tr>
-            <th>Cargo</th>
-            <th style={{ width: '7rem' }}>Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {state.personalPorCargo.length === 0 && !editable ? (
-            <tr>
-              <td colSpan={2} className="shell-text-muted">
-                —
-              </td>
-            </tr>
+      <div className="registro-dia-informe-block">
+        <div className="registro-dia-informe-toolbar">
+          <span className="registro-dia-informe-band registro-dia-informe-band--standalone">Personal</span>
+          {editable && state.personalPorCargo.length < REGISTRO_MANUAL_PERSONAL_MAX ? (
+            <button
+              type="button"
+              className="btn-secondary registro-dia-informe-add-btn"
+              disabled={inputsDisabled}
+              onClick={() => setPersonal([...state.personalPorCargo, emptyRegistroPersonalManualRow()])}
+            >
+              + Agregar cargo
+            </button>
           ) : null}
-          {state.personalPorCargo.map((row, idx) => (
-            <tr key={`p-${idx}`}>
-              <td>
-                {editable ? (
-                  <input
-                    className="form-input"
-                    value={row.cargo}
-                    placeholder="Ej. Inspector técnico"
-                    onChange={(e) => {
-                      const next = [...state.personalPorCargo];
-                      next[idx] = { ...next[idx], cargo: e.target.value };
-                      setPersonal(next);
-                    }}
-                  />
-                ) : (
-                  row.cargo
-                )}
-              </td>
-              <td>
-                {editable ? (
-                  <input
-                    className="form-input"
-                    type="number"
-                    min={0}
-                    value={row.total || ''}
-                    onChange={(e) => {
-                      const next = [...state.personalPorCargo];
-                      const n = parseInt(e.target.value, 10);
-                      next[idx] = { ...next[idx], total: Number.isFinite(n) && n >= 0 ? n : 0 };
-                      setPersonal(next);
-                    }}
-                  />
-                ) : (
-                  row.total
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {editable && state.personalPorCargo.length < REGISTRO_MANUAL_PERSONAL_MAX ? (
-        <button
-          type="button"
-          className="btn-secondary"
-          style={{ marginBottom: '1rem' }}
-          onClick={() => setPersonal([...state.personalPorCargo, emptyRegistroPersonalManualRow()])}
-        >
-          Agregar cargo
-        </button>
-      ) : null}
+        </div>
+        <div className="registro-dia-informe-table-scroll">
+          <table className="users-table registro-dia-informe-table registro-dia-informe-table--personal">
+            <thead>
+              <tr>
+                <th>Cargo</th>
+                <th className="registro-dia-informe-th-narrow">Total</th>
+                {editable ? <th className="registro-dia-informe-th-action" aria-label="Acciones" /> : null}
+              </tr>
+            </thead>
+            <tbody>
+              {personalRows.length === 0 ? (
+                <tr>
+                  <td colSpan={editable ? 3 : 2} className="shell-text-muted registro-dia-informe-empty">
+                    Sin personal registrado
+                  </td>
+                </tr>
+              ) : (
+                personalRows.map((row, idx) => (
+                  <tr key={`p-${idx}`}>
+                    <td data-label="Cargo">
+                      {editable ? (
+                        <input
+                          className="form-input registro-dia-informe-input"
+                          value={row.cargo}
+                          disabled={inputsDisabled}
+                          placeholder="Ej. Inspector técnico"
+                          onChange={(e) => {
+                            const next = [...(state.personalPorCargo.length ? state.personalPorCargo : personalRows)];
+                            next[idx] = { ...next[idx], cargo: e.target.value };
+                            setPersonal(next);
+                          }}
+                        />
+                      ) : (
+                        row.cargo
+                      )}
+                    </td>
+                    <td data-label="Total" className="registro-dia-informe-td-center">
+                      {editable ? (
+                        <input
+                          className="form-input registro-dia-informe-input registro-dia-informe-input--total"
+                          type="number"
+                          min={0}
+                          disabled={inputsDisabled}
+                          value={row.total === 0 ? '' : row.total}
+                          onChange={(e) => {
+                            const next = [...(state.personalPorCargo.length ? state.personalPorCargo : personalRows)];
+                            const n = parseInt(e.target.value, 10);
+                            next[idx] = {
+                              ...next[idx],
+                              total: Number.isFinite(n) && n >= 0 ? n : 0,
+                            };
+                            setPersonal(next);
+                          }}
+                        />
+                      ) : (
+                        row.total
+                      )}
+                    </td>
+                    {editable ? (
+                      <td className="registro-dia-informe-td-action">
+                        <button
+                          type="button"
+                          className="btn-secondary registro-dia-informe-remove-btn"
+                          disabled={inputsDisabled || personalRows.length <= 1}
+                          title="Quitar fila"
+                          onClick={() => {
+                            const base = state.personalPorCargo.length ? state.personalPorCargo : personalRows;
+                            const next = base.filter((_, i) => i !== idx);
+                            setPersonal(next.length > 0 ? next : [emptyRegistroPersonalManualRow()]);
+                          }}
+                        >
+                          Quitar
+                        </button>
+                      </td>
+                    ) : null}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-      <table className="users-table" style={{ marginBottom: '0.5rem' }}>
-        <thead>
-          <tr>
-            <th colSpan={2}>Equipos y materiales</th>
-          </tr>
-          <tr>
-            <th>Descripción</th>
-            <th>Estado</th>
-          </tr>
-        </thead>
-        <tbody>
-          {state.equipos.length === 0 && !editable ? (
-            <tr>
-              <td colSpan={2} className="shell-text-muted">
-                —
-              </td>
-            </tr>
+      <div className="registro-dia-informe-block">
+        <div className="registro-dia-informe-toolbar">
+          <span className="registro-dia-informe-band registro-dia-informe-band--standalone">
+            Equipos y materiales
+          </span>
+          {editable && state.equipos.length < REGISTRO_MANUAL_EQUIPOS_MAX ? (
+            <button
+              type="button"
+              className="btn-secondary registro-dia-informe-add-btn"
+              disabled={inputsDisabled}
+              onClick={() => setEquipos([...state.equipos, emptyRegistroEquipoManualRow()])}
+            >
+              + Agregar equipo
+            </button>
           ) : null}
-          {state.equipos.map((row, idx) => (
-            <tr key={`e-${idx}`}>
-              <td>
-                {editable ? (
-                  <input
-                    className="form-input"
-                    value={row.descripcion}
-                    placeholder="Ej. Camión"
-                    onChange={(e) => {
-                      const next = [...state.equipos];
-                      next[idx] = { ...next[idx], descripcion: e.target.value };
-                      setEquipos(next);
-                    }}
-                  />
-                ) : (
-                  row.descripcion
-                )}
-              </td>
-              <td>
-                {editable ? (
-                  <input
-                    className="form-input"
-                    value={row.estado}
-                    placeholder="Ej. Operativo"
-                    onChange={(e) => {
-                      const next = [...state.equipos];
-                      next[idx] = { ...next[idx], estado: e.target.value };
-                      setEquipos(next);
-                    }}
-                  />
-                ) : (
-                  row.estado
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {editable && state.equipos.length < REGISTRO_MANUAL_EQUIPOS_MAX ? (
-        <button
-          type="button"
-          className="btn-secondary"
-          style={{ marginBottom: '1.25rem' }}
-          onClick={() => setEquipos([...state.equipos, emptyRegistroEquipoManualRow()])}
-        >
-          Agregar equipo
-        </button>
-      ) : null}
+        </div>
+        <div className="registro-dia-informe-table-scroll">
+          <table className="users-table registro-dia-informe-table registro-dia-informe-table--equipos">
+            <thead>
+              <tr>
+                <th>Descripción</th>
+                <th className="registro-dia-informe-th-estado">Estado</th>
+                {editable ? <th className="registro-dia-informe-th-action" aria-label="Acciones" /> : null}
+              </tr>
+            </thead>
+            <tbody>
+              {equiposRows.length === 0 ? (
+                <tr>
+                  <td colSpan={editable ? 3 : 2} className="shell-text-muted registro-dia-informe-empty">
+                    Sin equipos registrados
+                  </td>
+                </tr>
+              ) : (
+                equiposRows.map((row, idx) => (
+                  <tr key={`e-${idx}`}>
+                    <td data-label="Descripción">
+                      {editable ? (
+                        <input
+                          className="form-input registro-dia-informe-input"
+                          value={row.descripcion}
+                          disabled={inputsDisabled}
+                          placeholder="Ej. Camión"
+                          onChange={(e) => {
+                            const next = [...(state.equipos.length ? state.equipos : equiposRows)];
+                            next[idx] = { ...next[idx], descripcion: e.target.value };
+                            setEquipos(next);
+                          }}
+                        />
+                      ) : (
+                        row.descripcion
+                      )}
+                    </td>
+                    <td data-label="Estado">
+                      {editable ? (
+                        <input
+                          className="form-input registro-dia-informe-input"
+                          value={row.estado}
+                          disabled={inputsDisabled}
+                          placeholder="Ej. Operativo"
+                          onChange={(e) => {
+                            const next = [...(state.equipos.length ? state.equipos : equiposRows)];
+                            next[idx] = { ...next[idx], estado: e.target.value };
+                            setEquipos(next);
+                          }}
+                        />
+                      ) : (
+                        row.estado
+                      )}
+                    </td>
+                    {editable ? (
+                      <td className="registro-dia-informe-td-action">
+                        <button
+                          type="button"
+                          className="btn-secondary registro-dia-informe-remove-btn"
+                          disabled={inputsDisabled || equiposRows.length <= 1}
+                          title="Quitar fila"
+                          onClick={() => {
+                            const base = state.equipos.length ? state.equipos : equiposRows;
+                            const next = base.filter((_, i) => i !== idx);
+                            setEquipos(next.length > 0 ? next : [emptyRegistroEquipoManualRow()]);
+                          }}
+                        >
+                          Quitar
+                        </button>
+                      </td>
+                    ) : null}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
