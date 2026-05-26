@@ -60,11 +60,23 @@ export async function resolveActiveUnidadCodigo(
   raw: string | null | undefined,
   normalize: (v: string | null | undefined) => string | null,
 ): Promise<string | null> {
-  const codigo = normalize(raw);
-  if (!codigo) return null;
-  const row = await prisma.unidadCatalog.findFirst({
-    where: { codigo, isActive: true },
-    select: { codigo: true },
-  });
-  return row?.codigo ?? null;
+  const trimmed = String(raw ?? '').trim();
+  if (!trimmed) return null;
+
+  const candidates = new Set<string>();
+  const normalized = normalize(trimmed);
+  if (normalized) candidates.add(normalized);
+  const direct = trimmed.toLowerCase().replace(/\s+/g, ' ');
+  if (isValidUnidadCodigo(direct)) candidates.add(direct);
+
+  const codigos = Array.from(candidates);
+  for (let i = 0; i < codigos.length; i += 1) {
+    const codigo = codigos[i];
+    const row = await prisma.unidadCatalog.findFirst({
+      where: { codigo, isActive: true },
+      select: { codigo: true },
+    });
+    if (row) return row.codigo;
+  }
+  return null;
 }

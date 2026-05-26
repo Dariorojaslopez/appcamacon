@@ -1,5 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
-import { resolveActiveUnidadCodigo } from './unidadCatalog';
+import { isValidUnidadCodigo, resolveActiveUnidadCodigo } from './unidadCatalog';
 
 /** Unidades por defecto (semilla en BD). */
 export const ITEM_CATALOG_UNIT_VALUES = ['m3', 'm2', 'ml', 'm', 'und', 'kg', 'ton', 'l'] as const;
@@ -44,6 +44,8 @@ export function normalizeItemCatalogUnit(raw: string | null | undefined): string
   };
   if (map[u0]) return map[u0];
   if ((ITEM_CATALOG_UNIT_VALUES as readonly string[]).includes(u0)) return u0;
+  // Unidades creadas en Configuración → Unidades (código alfanumérico en catálogo)
+  if (isValidUnidadCodigo(u0)) return u0;
   return null;
 }
 

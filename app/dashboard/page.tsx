@@ -68,7 +68,10 @@ import {
 import { INFORME_CERRADO_MSG } from '../../src/lib/informeCerrado';
 import { InformeDiarioCalendario } from './InformeDiarioCalendario';
 import { normalizeObraCarpetaInput, obraCarpetaInputFromDb } from '../../src/lib/obraCarpetaNube';
-import { ITEM_CATALOG_UNIT_FALLBACK_OPTIONS } from '../../src/lib/itemCatalogUnits';
+import {
+  ITEM_CATALOG_UNIT_FALLBACK_OPTIONS,
+  normalizeItemCatalogUnit,
+} from '../../src/lib/itemCatalogUnits';
 import { UNIDAD_TIPO_CALCULO_LABELS, UNIDAD_TIPO_CALCULO_VALUES } from '../../src/lib/unidadCatalog';
 
 /**
@@ -289,39 +292,6 @@ function syncUnidadTipoCalculoRegistry(
       unidadTipoCalculoRegistry.set(u.codigo, k);
     }
   }
-}
-
-function normalizeItemCatalogUnit(raw: string | null | undefined): string | null {
-  let u0 = String(raw ?? '')
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, ' ');
-  if (!u0) return null;
-  // Valores o etiquetas tipo "m² — área (l × a)" guardados en BD o pegados
-  if (/[—–]/.test(u0)) {
-    u0 = u0.split(/[—–]/)[0].trim();
-  }
-  const map: Record<string, string> = {
-    m3: 'm3',
-    'm³': 'm3',
-    m2: 'm2',
-    'm²': 'm2',
-    ml: 'ml',
-    m: 'm',
-    und: 'und',
-    un: 'und',
-    kg: 'kg',
-    ton: 'ton',
-    t: 'ton',
-    l: 'l',
-    lt: 'l',
-    litro: 'l',
-    litros: 'l',
-    'l (litros)': 'l',
-  };
-  if (map[u0]) return map[u0];
-  if (['m3', 'm2', 'ml', 'm', 'und', 'kg', 'ton', 'l'].includes(u0)) return u0;
-  return null;
 }
 
 type ItemCatalogCaptureKind = 'm3' | 'm2' | 'length' | 'manual' | 'none';
@@ -1729,7 +1699,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (activeSection !== 'settings') return;
     void refetchItemCatalogUnitOptions();
-  }, [activeSection, refetchItemCatalogUnitOptions]);
+  }, [activeSection, settingsSubSection, refetchItemCatalogUnitOptions]);
 
   const opcionesTipoCondicionSelect = useMemo(
     () => (tiposCondicionInformeOptions.length > 0 ? tiposCondicionInformeOptions : CLIMA_INFORME_OPTIONS_FALLBACK),
