@@ -3,6 +3,7 @@ import { hash } from 'bcryptjs';
 import { UserRepository } from '../../../../../src/infrastructure/repositories/UserRepository';
 import { verifyAccessToken } from '../../../../../src/infrastructure/auth/tokens';
 import prisma from '../../../../../src/lib/prisma';
+import { isSuperAdminRole } from '../../../../../src/lib/authRoles';
 
 const userRepository = new UserRepository();
 
@@ -24,7 +25,17 @@ export async function PATCH(
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
     const { id } = await params;
+    const target = await prisma.user.findUnique({ where: { id }, select: { role: true } });
+    if (!target) return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 });
+
     const body = await req.json() as { name?: string; email?: string; role?: string; isActive?: boolean; password?: string };
+
+    if (isSuperAdminRole(target.role) && body.isActive === false) {
+      return NextResponse.json(
+        { error: 'No se puede desactivar la cuenta de super administrador.' },
+        { status: 400 },
+      );
+    }
     const updateData: { name?: string; email?: string; role?: string; isActive?: boolean; passwordHash?: string } = {};
     if (body.name != null) updateData.name = body.name;
     if (body.email != null) updateData.email = body.email;

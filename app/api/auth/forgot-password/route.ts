@@ -1,73 +1,81 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { UserRepository } from '../../../../src/infrastructure/repositories/UserRepository';
-import { hash } from 'bcryptjs';
-import { initDatabase } from '../../../../src/infrastructure/db/init';
-import { sendPasswordResetEmail } from '../../../../src/infrastructure/email/mailer';
+import bcrypt from 'bcryptjs';
+import prisma from '../../../../src/lib/prisma';
+import { sendPasswordResetEmail, isEmailConfigured } from '../../../../src/infrastructure/email/mailer';
+import { isSuperAdminRole } from '../../../../src/lib/authRoles';
 
-const userRepository = new UserRepository();
-
-export async function POST(req: NextRequest) {
-  try {
-    await initDatabase();
-
-    const body = await req.json();
-    const { identification } = body as { identification?: string };
-
-    if (!identification) {
-      return NextResponse.json(
-        { error: 'El número de identificación es requerido' },
-        { status: 400 },
-      );
-    }
-
-    const user = await userRepository.findByIdentification(identification);
-
-    if (!user) {
-      // No filtramos si existe o no, para no dar pistas
-      return NextResponse.json(
-        { message: 'Si el usuario existe, se ha restablecido la contraseña.' },
-        { status: 200 },
-      );
-    }
-
-    // Generamos una contraseña temporal aleatoria
-    const temporaryPassword = Math.random().toString(36).slice(-8);
-    const newPasswordHash = await hash(temporaryPassword, 10);
-
-    await (async () => {
-      // update directo vía prisma porque el repositorio no tiene update aún
-      const prismaModule = await import('../../../../src/lib/prisma');
-      const prisma = prismaModule.default;
-
-      await prisma.user.update({
-        where: { identification },
-        data: {
-          password: newPasswordHash,
-        },
-      });
-    })();
-
-    await sendPasswordResetEmail({
-      to: user.email,
-      name: user.name,
-      temporaryPassword,
-    });
-
-    return NextResponse.json(
-      {
-        message:
-          'Hemos generado una nueva contraseña temporal y la hemos enviado al correo registrado.',
-      },
-      { status: 200 },
-    );
-  } catch (error: any) {
-    console.error(error);
-    return NextResponse.json(
-      {
-        error: error?.message ?? 'Error al restablecer contraseña',
-      },
-      { status: 500 },
-    );
+function generateTemporaryPassword(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  let s = '';
+  for (let i = 0; i < 12; i++) {
+    s += chars[Math.floor(Math.random() * chars.length)];
   }
+  return s;
 }
 
+/** No exponer detalles de Gmail/SMTP al cliente. */
+function publicEmailErrorMessage(): string {
+  return 'No se pudo enviar el correo de restablecimiento. El administrador del sistema debe revisar la configuración SMTP (correo de Google con contraseña de aplicación). Su contraseña no fue modificada.';
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const identification = String(body?.identification ?? '').trim();
+    if (!identification) {
+      return NextResponse.json({ error: 'Identificación requerida' }, { status: 400 });
+    }
+
+    if (!isEmailConfigured()) {
+      return NextResponse.json(
+        {
+          error:
+            'El servicio de correo no está configurado en el servidor. Contacte al administrador del sistema.',
+        },
+        { status: 503 },
+      );
+    }
+
+    const user = await prisma.user.findFirst({
+      where: { identification },
+      select: { id: true, email: true, name: true, role: true, isActive: true },
+    });
+
+    if (!user?.email) {
+      return NextResponse.json({
+        message:
+          'Si la identificación está registrada, recibirá un correo con instrucciones para restablecer su contraseña.',
+      });
+    }
+
+    const temporaryPassword = generateTemporaryPassword();
+    const newPasswordHash = await bcrypt.hash(temporaryPassword, 10);
+
+    try {
+      await sendPasswordResetEmail({
+        to: user.email,
+        name: user.name,
+        temporaryPassword,
+      });
+    } catch (mailErr) {
+      console.error('[forgot-password] Error SMTP:', mailErr);
+      return NextResponse.json({ error: publicEmailErrorMessage() }, { status: 503 });
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: newPasswordHash,
+        ...(isSuperAdminRole(user.role) ? { isActive: true } : {}),
+      },
+    });
+
+    return NextResponse.json({
+      message:
+        'Si la identificación está registrada, recibirá un correo con su contraseña temporal. Revise también la carpeta de spam.',
+    });
+  } catch (e) {
+    console.error('[forgot-password]', e);
+    return NextResponse.json({ error: 'Error al procesar la solicitud' }, { status: 500 });
+  }
+}

@@ -31,6 +31,7 @@ async function main() {
       name: defaultName,
       password: passwordHash,
       role: 'SUPER_ADMIN',
+      isActive: true,
     },
     create: {
       identification: defaultIdentification,
@@ -38,6 +39,7 @@ async function main() {
       name: defaultName,
       password: passwordHash,
       role: 'SUPER_ADMIN',
+      isActive: true,
     },
   });
 

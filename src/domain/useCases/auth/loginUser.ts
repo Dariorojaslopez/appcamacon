@@ -1,6 +1,7 @@
 import type { IUserRepository } from '../../interfaces/IUserRepository';
 import type { User } from '../../models/user';
 import { compare } from 'bcryptjs';
+import { isSuperAdminRole } from '../../../lib/authRoles';
 
 export interface LoginUserInput {
   identification: string;
@@ -21,7 +22,7 @@ export class LoginUserUseCase {
       throw new Error('Credenciales inválidas');
     }
 
-    if (user.isActive === false) {
+    if (user.isActive === false && !isSuperAdminRole(user.role)) {
       throw new Error('Usuario inactivo. Contacte al administrador.');
     }
 
