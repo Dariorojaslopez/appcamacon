@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessToken } from '../../../../../src/infrastructure/auth/tokens';
 import prisma from '../../../../../src/lib/prisma';
 import { adminObraInclude, serializeAdminObra } from '../../../../../src/lib/adminObraSerialize';
-import { buildObraNotifyDataFromBody } from '../../../../../src/lib/adminObraNotifyBody';
+import {
+  buildObraNotifyDataFromBody,
+  syncProjectBitacoraNotifyUsers,
+} from '../../../../../src/lib/adminObraNotifyBody';
 
 export async function PATCH(
   req: NextRequest,
@@ -27,15 +30,18 @@ export async function PATCH(
       evidenciasOnedriveShareUrl?: string | null;
       evidenciasGoogleDriveFolderId?: string | null;
       logoUrl?: string | null;
+      bitacoraNotifyContratistaUserIds?: unknown;
+      bitacoraNotifyInterventorUserIds?: unknown;
+      bitacoraNotifyIduUserIds?: unknown;
       bitacoraNotifyContratistaUserId?: unknown;
       bitacoraNotifyInterventorUserId?: unknown;
       bitacoraNotifyIduUserId?: unknown;
     };
-    const notifyData = await buildObraNotifyDataFromBody(body);
-    if ('error' in notifyData) {
-      return NextResponse.json({ error: notifyData.error }, { status: 400 });
+    const notifyParsed = await buildObraNotifyDataFromBody(body);
+    if ('error' in notifyParsed) {
+      return NextResponse.json({ error: notifyParsed.error }, { status: 400 });
     }
-    const data: Record<string, unknown> = { ...notifyData };
+    const data: Record<string, unknown> = {};
     if (body.name !== undefined) data.name = body.name.trim();
     if (body.description !== undefined) data.description = body.description?.trim() || null;
     if (body.startDate !== undefined) data.startDate = body.startDate ? new Date(body.startDate) : null;
@@ -61,7 +67,20 @@ export async function PATCH(
       data: data as any,
       include: adminObraInclude,
     });
-    return NextResponse.json({ obra: serializeAdminObra(obra) });
+
+    if (notifyParsed.notifyByRole) {
+      await syncProjectBitacoraNotifyUsers(id, notifyParsed.notifyByRole);
+    }
+
+    const obraOut =
+      notifyParsed.notifyByRole || Object.keys(data).length > 0
+        ? await prisma.project.findUniqueOrThrow({
+            where: { id },
+            include: adminObraInclude,
+          })
+        : obra;
+
+    return NextResponse.json({ obra: serializeAdminObra(obraOut) });
   } catch (error: unknown) {
     const err = error as { name?: string; code?: string };
     if (err.name === 'TokenExpiredError' || err.name === 'JsonWebTokenError') {

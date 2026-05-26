@@ -1,54 +1,56 @@
 import prisma from './prisma';
-import type { ProjectBitacoraNotifyUserIds } from './projectBitacoraNotifyUsers';
+import type { ProjectBitacoraNotifyRow } from './projectBitacoraNotifyUsers';
 
-const notifySelect = {
-  name: true,
-  code: true,
-  bitacoraNotifyContratistaUserId: true,
-  bitacoraNotifyInterventorUserId: true,
-  bitacoraNotifyIduUserId: true,
-} as const;
-
-export type ProjectBitacoraNotifyRow = ProjectBitacoraNotifyUserIds & {
+export type ProjectBitacoraNotifyLoadRow = ProjectBitacoraNotifyRow & {
   name: string;
   code: string;
 };
 
-/** Carga datos de notificación de la obra (Prisma + respaldo SQL si hiciera falta). */
+function sortNotifyRows(
+  rows: { role: string; userId: string; sortOrder: number }[],
+): { role: string; userId: string; sortOrder: number }[] {
+  return [...rows].sort((a, b) => a.role.localeCompare(b.role) || a.sortOrder - b.sortOrder);
+}
+
+/** Carga datos de notificación de la obra. */
 export async function loadProjectBitacoraNotify(
   projectId: string,
-): Promise<ProjectBitacoraNotifyRow | null> {
+): Promise<ProjectBitacoraNotifyLoadRow | null> {
   try {
     const p = await prisma.project.findUnique({
       where: { id: projectId },
-      select: notifySelect,
+      select: {
+        name: true,
+        code: true,
+        bitacoraNotifyUsers: {
+          select: { role: true, userId: true, sortOrder: true },
+        },
+      },
     });
-    if (p) return p;
+    if (p) {
+      return {
+        name: p.name,
+        code: p.code,
+        bitacoraNotifyUsers: sortNotifyRows(p.bitacoraNotifyUsers),
+      };
+    }
   } catch (err) {
     console.warn('loadProjectBitacoraNotify: prisma', err);
   }
 
   try {
-    const rows = await prisma.$queryRaw<
-      Array<{
-        name: string;
-        code: string;
-        bitacoraNotifyContratistaUserId: string | null;
-        bitacoraNotifyInterventorUserId: string | null;
-        bitacoraNotifyIduUserId: string | null;
-      }>
-    >`
-      SELECT "name", "code",
-        "bitacoraNotifyContratistaUserId",
-        "bitacoraNotifyInterventorUserId",
-        "bitacoraNotifyIduUserId"
-      FROM "Project"
-      WHERE "id" = ${projectId}
-      LIMIT 1
-    `;
-    return rows[0] ?? null;
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { name: true, code: true },
+    });
+    if (!project) return null;
+    const rows = await prisma.projectBitacoraNotifyUser.findMany({
+      where: { projectId },
+      select: { role: true, userId: true, sortOrder: true },
+    });
+    return { ...project, bitacoraNotifyUsers: sortNotifyRows(rows) };
   } catch (err) {
-    console.warn('loadProjectBitacoraNotify: sql', err);
+    console.warn('loadProjectBitacoraNotify: fallback', err);
     return null;
   }
 }

@@ -1,14 +1,40 @@
 import type { Prisma } from '@prisma/client';
+import { BITACORA_NOTIFY_ROLES, notifyUserIdsByRole } from './projectBitacoraNotifyUsers';
 
 const notifyUserSelect = { id: true, name: true, email: true } as const;
 
 export const adminObraInclude = {
-  bitacoraNotifyContratistaUser: { select: notifyUserSelect },
-  bitacoraNotifyInterventorUser: { select: notifyUserSelect },
-  bitacoraNotifyIduUser: { select: notifyUserSelect },
+  bitacoraNotifyUsers: {
+    include: { user: { select: notifyUserSelect } },
+  },
 } satisfies Prisma.ProjectInclude;
 
 export type AdminObraRow = Prisma.ProjectGetPayload<{ include: typeof adminObraInclude }>;
+
+function serializeNotifyUsers(o: AdminObraRow) {
+  const byRole = notifyUserIdsByRole(o);
+  const usersByRole = Object.fromEntries(
+    BITACORA_NOTIFY_ROLES.map((role) => [
+      role,
+      [...o.bitacoraNotifyUsers]
+        .filter((n) => n.role === role)
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((n) => n.user),
+    ]),
+  ) as Record<
+    (typeof BITACORA_NOTIFY_ROLES)[number],
+    { id: string; name: string; email: string }[]
+  >;
+
+  return {
+    bitacoraNotifyContratistaUserIds: byRole.contratista,
+    bitacoraNotifyInterventorUserIds: byRole.interventor,
+    bitacoraNotifyIduUserIds: byRole.idu,
+    bitacoraNotifyContratistaUsers: usersByRole.contratista,
+    bitacoraNotifyInterventorUsers: usersByRole.interventor,
+    bitacoraNotifyIduUsers: usersByRole.idu,
+  };
+}
 
 export function serializeAdminObra(o: AdminObraRow) {
   return {
@@ -25,11 +51,6 @@ export function serializeAdminObra(o: AdminObraRow) {
     isActive: o.isActive,
     createdAt: o.createdAt,
     updatedAt: o.updatedAt,
-    bitacoraNotifyContratistaUserId: o.bitacoraNotifyContratistaUserId,
-    bitacoraNotifyInterventorUserId: o.bitacoraNotifyInterventorUserId,
-    bitacoraNotifyIduUserId: o.bitacoraNotifyIduUserId,
-    bitacoraNotifyContratistaUser: o.bitacoraNotifyContratistaUser,
-    bitacoraNotifyInterventorUser: o.bitacoraNotifyInterventorUser,
-    bitacoraNotifyIduUser: o.bitacoraNotifyIduUser,
+    ...serializeNotifyUsers(o),
   };
 }

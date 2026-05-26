@@ -3,7 +3,10 @@ import { verifyAccessToken } from '../../../../src/infrastructure/auth/tokens';
 import prisma from '../../../../src/lib/prisma';
 import { ensureDefaultBudgetHierarchy } from '../../../../src/lib/budgetHierarchy';
 import { adminObraInclude, serializeAdminObra } from '../../../../src/lib/adminObraSerialize';
-import { buildObraNotifyDataFromBody } from '../../../../src/lib/adminObraNotifyBody';
+import {
+  buildObraNotifyDataFromBody,
+  syncProjectBitacoraNotifyUsers,
+} from '../../../../src/lib/adminObraNotifyBody';
 
 export async function GET(req: NextRequest) {
   try {
@@ -50,15 +53,18 @@ export async function POST(req: NextRequest) {
       evidenciasOnedriveShareUrl?: string | null;
       evidenciasGoogleDriveFolderId?: string | null;
       logoUrl?: string | null;
+      bitacoraNotifyContratistaUserIds?: unknown;
+      bitacoraNotifyInterventorUserIds?: unknown;
+      bitacoraNotifyIduUserIds?: unknown;
       bitacoraNotifyContratistaUserId?: unknown;
       bitacoraNotifyInterventorUserId?: unknown;
       bitacoraNotifyIduUserId?: unknown;
     };
     const { name, description, startDate, endDate, evidenciasOnedriveShareUrl, evidenciasGoogleDriveFolderId } =
       body;
-    const notifyData = await buildObraNotifyDataFromBody(body);
-    if ('error' in notifyData) {
-      return NextResponse.json({ error: notifyData.error }, { status: 400 });
+    const notifyParsed = await buildObraNotifyDataFromBody(body);
+    if ('error' in notifyParsed) {
+      return NextResponse.json({ error: notifyParsed.error }, { status: 400 });
     }
     if (!name || typeof name !== 'string' || !name.trim()) {
       return NextResponse.json({ error: 'El nombre de la obra es requerido' }, { status: 400 });
@@ -84,14 +90,24 @@ export async function POST(req: NextRequest) {
           evidenciasGoogleDriveFolderId != null && String(evidenciasGoogleDriveFolderId).trim()
             ? String(evidenciasGoogleDriveFolderId).trim()
             : null,
-        ...notifyData,
       },
       include: adminObraInclude,
     });
 
+    if (notifyParsed.notifyByRole) {
+      await syncProjectBitacoraNotifyUsers(obra.id, notifyParsed.notifyByRole);
+    }
+
     await ensureDefaultBudgetHierarchy(prisma, obra.id);
 
-    return NextResponse.json({ obra: serializeAdminObra(obra) }, { status: 201 });
+    const obraWithNotify = notifyParsed.notifyByRole
+      ? await prisma.project.findUniqueOrThrow({
+          where: { id: obra.id },
+          include: adminObraInclude,
+        })
+      : obra;
+
+    return NextResponse.json({ obra: serializeAdminObra(obraWithNotify) }, { status: 201 });
   } catch (error: unknown) {
     const err = error as { name?: string };
     if (err.name === 'TokenExpiredError' || err.name === 'JsonWebTokenError') {

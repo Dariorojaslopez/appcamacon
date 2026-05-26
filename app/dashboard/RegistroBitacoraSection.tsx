@@ -18,6 +18,11 @@ import {
 } from '../../src/shared/registroBitacoraFirmaDocs';
 import { firmaImageDisplaySrc } from '../../src/lib/firmaImageSrc';
 import { formatRegistroBitacoraGuardado } from '../../src/lib/registroBitacoraSlotMeta';
+import {
+  RegistroBitacoraDiaInformePanel,
+  emptyRegistroBitacoraDiaInformeState,
+  type RegistroBitacoraDiaInformeState,
+} from './RegistroBitacoraDiaInformePanel';
 
 const MAX_FILE = 10 * 1024 * 1024;
 
@@ -426,6 +431,10 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
   const [persisted, setPersisted] = useState<PersistedUrls>(emptyPersisted);
   const [slotFlags, setSlotFlags] = useState<Record<RegistroBitacoraSlotKey, boolean> | null>(null);
   const [loadingSlots, setLoadingSlots] = useState(true);
+  const [diaInforme, setDiaInforme] = useState<RegistroBitacoraDiaInformeState>(
+    emptyRegistroBitacoraDiaInformeState,
+  );
+  const [tipoCondicionOptions, setTipoCondicionOptions] = useState<InformeSearchableOption[]>([]);
 
   const sigC = useRef<SignaturePadFieldHandle>(null);
   const sigI = useRef<SignaturePadFieldHandle>(null);
@@ -476,9 +485,26 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
   );
 
   useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch('/api/catalogos/tipos-condicion', { credentials: 'include' });
+        const data = (await res.json()) as { items?: InformeSearchableOption[] };
+        if (res.ok && Array.isArray(data.items)) {
+          setTipoCondicionOptions(data.items.map((t) => ({ value: t.value, label: t.label })));
+        } else {
+          setTipoCondicionOptions([]);
+        }
+      } catch {
+        setTipoCondicionOptions([]);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
     if (!projectId) {
       setProyectoMeta(null);
       setBitacoraNotifyEmails([]);
+      setDiaInforme(emptyRegistroBitacoraDiaInformeState());
       return;
     }
     let cancelled = false;
@@ -525,8 +551,10 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
     };
   }, [projectId]);
 
-  const applyRegistro = useCallback((r: ApiRegistro | null) => {
+  const applyRegistro = useCallback((r: ApiRegistro | null, dia?: RegistroBitacoraDiaInformeState) => {
+    if (dia) setDiaInforme(dia);
     if (!r) {
+      if (!dia) setDiaInforme(emptyRegistroBitacoraDiaInformeState());
       setConsecutivo(null);
       setObsC('');
       setObsI('');
@@ -616,14 +644,18 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
           `/api/registro-bitacora?projectId=${encodeURIComponent(projectId)}&fecha=${encodeURIComponent(fechaDia)}`,
           { credentials: 'include' },
         );
-        const data = (await res.json()) as { registro?: ApiRegistro | null; error?: string };
+        const data = (await res.json()) as {
+          registro?: ApiRegistro | null;
+          diaInforme?: RegistroBitacoraDiaInformeState;
+          error?: string;
+        };
         if (cancelled) return;
         if (!res.ok) {
           setErr(data.error ?? 'No se pudo cargar el registro');
           applyRegistro(null);
           return;
         }
-        applyRegistro(data.registro ?? null);
+        applyRegistro(data.registro ?? null, data.diaInforme);
       } finally {
         if (!cancelled) setLoadingRegistro(false);
       }
@@ -789,6 +821,11 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
           fotoUrl: string | null;
           firmaUrl: string | null;
           firmaDocs: RegistroBitacoraFirmaDoc[];
+          franjaClimaMananaCodigo?: string | null;
+          franjaClimaTardeCodigo?: string | null;
+          franjaClimaNocheCodigo?: string | null;
+          personalManual?: { cargo: string; total: number }[];
+          equiposManual?: { descripcion: string; estado: string }[];
         };
         interventoria?: {
           observaciones: string;
@@ -865,6 +902,17 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
           firmaUrl: slot.firmaUrl,
           firmaDocs: slot.firmaDocs,
         };
+        if (!diaInforme.tieneInformeDiario) {
+          body.contratista.franjaClimaMananaCodigo = diaInforme.climaFranjas.manana.trim() || null;
+          body.contratista.franjaClimaTardeCodigo = diaInforme.climaFranjas.tarde.trim() || null;
+          body.contratista.franjaClimaNocheCodigo = diaInforme.climaFranjas.noche.trim() || null;
+          body.contratista.personalManual = diaInforme.personalPorCargo
+            .map((p) => ({ cargo: p.cargo.trim(), total: p.total }))
+            .filter((p) => p.cargo && p.total > 0);
+          body.contratista.equiposManual = diaInforme.equipos
+            .map((e) => ({ descripcion: e.descripcion.trim(), estado: e.estado.trim() }))
+            .filter((e) => e.descripcion || e.estado);
+        }
       }
 
       if (canSlot('interventor')) {
@@ -921,8 +969,11 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
         `/api/registro-bitacora?projectId=${encodeURIComponent(projectId)}&fecha=${encodeURIComponent(fechaDia)}`,
         { credentials: 'include' },
       );
-      const reloadJson = (await reload.json()) as { registro?: ApiRegistro | null };
-      if (reload.ok) applyRegistro(reloadJson.registro ?? null);
+      const reloadJson = (await reload.json()) as {
+        registro?: ApiRegistro | null;
+        diaInforme?: RegistroBitacoraDiaInformeState;
+      };
+      if (reload.ok) applyRegistro(reloadJson.registro ?? null, reloadJson.diaInforme);
     } catch (er: unknown) {
       setErr(er instanceof Error ? er.message : 'Error al guardar');
     } finally {
@@ -944,9 +995,13 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
       setErr('La fecha inicial no puede ser posterior a la final.');
       return;
     }
-    if (rangoResumen && (rangoResumen.conInforme ?? 0) === 0) {
+    if (
+      rangoResumen &&
+      (rangoResumen.conInforme ?? 0) === 0 &&
+      (rangoResumen.conRegistro ?? 0) === 0
+    ) {
       setErr(
-        'No hay informes diarios en ese rango. Cree el informe en «Datos generales» (obra y fecha) antes de imprimir.',
+        'No hay informes diarios ni registros de bitácora en ese rango. Cree un informe o un registro con datos del día.',
       );
       return;
     }
@@ -1126,12 +1181,14 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
               !fechaDesde ||
               !fechaHasta ||
               loadingRango ||
-              (rangoResumen != null && (rangoResumen.conInforme ?? 0) === 0)
+              (rangoResumen != null &&
+                (rangoResumen.conInforme ?? 0) === 0 &&
+                (rangoResumen.conRegistro ?? 0) === 0)
             }
           >
             <span className="registro-bitacora-print-btn-title">Vista previa e imprimir PDF del rango</span>
             <span className="registro-bitacora-print-btn-hint">
-              Una hoja por cada informe diario del rango (clima mañana/tarde/noche y bitácora del día).
+              Una hoja por informe diario o por registro de bitácora con datos manuales del día.
             </span>
           </button>
         </div>
@@ -1148,6 +1205,13 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
 
         {canSlot('contratista') ? (
           <>
+            <RegistroBitacoraDiaInformePanel
+              state={diaInforme}
+              onChange={setDiaInforme}
+              tipoCondicionOptions={tipoCondicionOptions}
+              loading={loadingRegistro}
+            />
+            <div className="section-divider" />
             <SlotBlock
               title={REGISTRO_BITACORA_SLOT_LABELS.contratista}
               observaciones={obsC}

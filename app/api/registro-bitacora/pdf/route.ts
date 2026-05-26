@@ -17,9 +17,11 @@ import { findInformesDiariosEnRango } from '../../../../src/lib/registroBitacora
 import {
   buildInformeDiarioPdfPage,
   buildObraPdfBase,
+  buildRegistroSinInformePdfPage,
   formatFechaEsPdf,
 } from '../../../../src/lib/registroBitacoraPdfBuild';
 import { authFromRequest, isAuthPayload, requireAccessibleProject } from '../../../../src/lib/requireProjectAccess';
+import type { RegistroBitacoraPdfDia } from '../../../../src/lib/registroBitacoraPdfHtml';
 
 export async function GET(req: NextRequest) {
   try {
@@ -72,16 +74,6 @@ export async function GET(req: NextRequest) {
 
     const informes = await findInformesDiariosEnRango(projectId, rango.desde, rango.hasta);
 
-    if (informes.length === 0) {
-      return NextResponse.json(
-        {
-          error:
-            'No hay informes diarios en ese rango. Cree el informe en «Datos generales» para cada fecha antes de imprimir.',
-        },
-        { status: 404 },
-      );
-    }
-
     const registros = await prisma.registroBitacoraObra.findMany({
       where: {
         projectId,
@@ -90,6 +82,7 @@ export async function GET(req: NextRequest) {
       include: { user: { select: { name: true } } },
     });
     const registrosByYmd = new Map(registros.map((r) => [toYmdUtc(r.fecha), r] as const));
+    const informeYmds = new Set(informes.map((inf) => toYmdUtc(inf.date)));
 
     const tipos = await prisma.tipoCondicionCatalog.findMany({
       where: { isActive: true },
@@ -98,11 +91,38 @@ export async function GET(req: NextRequest) {
     const catalog = new Map(tipos.map((t) => [t.codigo, t.nombre]));
 
     const obra = buildObraPdfBase(origin, project);
-    const dias = informes.map((informe) => {
+    const paginas: { ymd: string; dia: RegistroBitacoraPdfDia }[] = [];
+
+    for (const informe of informes) {
       const ymd = toYmdUtc(informe.date);
       const reg = registrosByYmd.get(ymd) ?? null;
-      return buildInformeDiarioPdfPage(origin, project, informe, reg, catalog);
-    });
+      paginas.push({
+        ymd,
+        dia: buildInformeDiarioPdfPage(origin, project, informe, reg, catalog),
+      });
+    }
+
+    for (const reg of registros) {
+      const ymd = toYmdUtc(reg.fecha);
+      if (informeYmds.has(ymd)) continue;
+      paginas.push({
+        ymd,
+        dia: buildRegistroSinInformePdfPage(origin, project, reg.fecha, reg, catalog),
+      });
+    }
+
+    paginas.sort((a, b) => a.ymd.localeCompare(b.ymd));
+    const dias = paginas.map((p) => p.dia);
+
+    if (dias.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            'No hay informes diarios ni registros de bitácora en ese rango. Cree un informe en «Datos generales» o un registro de bitácora con datos del día.',
+        },
+        { status: 404 },
+      );
+    }
 
     const periodoTexto =
       fechaDesdeStr === fechaHastaStr

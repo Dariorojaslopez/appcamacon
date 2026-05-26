@@ -40,6 +40,14 @@ import {
 } from './icons';
 import { InformeSearchableSelect, type InformeSearchableOption } from './InformeSearchableSelect';
 import { RegistroBitacoraSection } from './RegistroBitacoraSection';
+import { ObraBitacoraNotifyFields } from './ObraBitacoraNotifyFields';
+import {
+  bitacoraNotifyPayloadFromForm,
+  countBitacoraNotifyAssignments,
+  emptyObraBitacoraNotifyFormFields,
+  obraBitacoraNotifyFormFromObra,
+  type ObraBitacoraNotifyFormFields,
+} from '../../src/shared/obraBitacoraNotifyForm';
 import {
   EVIDENCIA_FASES,
   emptyEvidenciaUrlsPorFase,
@@ -1356,9 +1364,9 @@ export default function DashboardPage() {
       evidenciasGoogleDriveFolderId: string | null;
       logoUrl: string | null;
       isActive: boolean;
-      bitacoraNotifyContratistaUserId?: string | null;
-      bitacoraNotifyInterventorUserId?: string | null;
-      bitacoraNotifyIduUserId?: string | null;
+      bitacoraNotifyContratistaUserIds?: string[];
+      bitacoraNotifyInterventorUserIds?: string[];
+      bitacoraNotifyIduUserIds?: string[];
     }[]
   >([]);
   const [obraNotifyUsersOptions, setObraNotifyUsersOptions] = useState<
@@ -1370,9 +1378,7 @@ export default function DashboardPage() {
     startDate: '',
     endDate: '',
     evidenciasCarpetaShareUrl: '',
-    bitacoraNotifyContratistaUserId: '',
-    bitacoraNotifyInterventorUserId: '',
-    bitacoraNotifyIduUserId: '',
+    ...emptyObraBitacoraNotifyFormFields(),
   });
   const [creatingObra, setCreatingObra] = useState(false);
   const [obraMessage, setObraMessage] = useState<string | null>(null);
@@ -1387,9 +1393,9 @@ export default function DashboardPage() {
     evidenciasOnedriveShareUrl: string | null;
     evidenciasGoogleDriveFolderId: string | null;
     logoUrl: string | null;
-    bitacoraNotifyContratistaUserId?: string | null;
-    bitacoraNotifyInterventorUserId?: string | null;
-    bitacoraNotifyIduUserId?: string | null;
+    bitacoraNotifyContratistaUserIds?: string[];
+    bitacoraNotifyInterventorUserIds?: string[];
+    bitacoraNotifyIduUserIds?: string[];
   } | null>(null);
   const [editObraForm, setEditObraForm] = useState({
     name: '',
@@ -1397,9 +1403,7 @@ export default function DashboardPage() {
     endDate: '',
     evidenciasCarpetaShareUrl: '',
     logoUrl: null as string | null,
-    bitacoraNotifyContratistaUserId: '',
-    bitacoraNotifyInterventorUserId: '',
-    bitacoraNotifyIduUserId: '',
+    ...emptyObraBitacoraNotifyFormFields(),
   });
   const [savingObra, setSavingObra] = useState(false);
   const [deletingObraId, setDeletingObraId] = useState<string | null>(null);
@@ -2308,9 +2312,9 @@ export default function DashboardPage() {
               evidenciasGoogleDriveFolderId: string | null;
               logoUrl?: string | null;
               isActive: boolean;
-              bitacoraNotifyContratistaUserId?: string | null;
-              bitacoraNotifyInterventorUserId?: string | null;
-              bitacoraNotifyIduUserId?: string | null;
+              bitacoraNotifyContratistaUserIds?: string[];
+              bitacoraNotifyInterventorUserIds?: string[];
+              bitacoraNotifyIduUserIds?: string[];
             }[];
           };
           setObrasList((data.obras ?? []).map((o) => ({ ...o, logoUrl: o.logoUrl ?? null })));
@@ -3854,9 +3858,7 @@ export default function DashboardPage() {
           startDate: obraForm.startDate || undefined,
           endDate: obraForm.endDate || undefined,
           ...carpeta,
-          bitacoraNotifyContratistaUserId: obraForm.bitacoraNotifyContratistaUserId || null,
-          bitacoraNotifyInterventorUserId: obraForm.bitacoraNotifyInterventorUserId || null,
-          bitacoraNotifyIduUserId: obraForm.bitacoraNotifyIduUserId || null,
+          ...bitacoraNotifyPayloadFromForm(obraForm),
         }),
       });
       const data = await res.json();
@@ -3898,9 +3900,7 @@ export default function DashboardPage() {
         startDate: '',
         endDate: '',
         evidenciasCarpetaShareUrl: '',
-        bitacoraNotifyContratistaUserId: '',
-        bitacoraNotifyInterventorUserId: '',
-        bitacoraNotifyIduUserId: '',
+        ...emptyObraBitacoraNotifyFormFields(),
       });
       setObraMessage('Obra creada. El consecutivo y código se asignaron automáticamente.');
       setTimeout(() => setObraMessage(null), 4000);
@@ -3921,9 +3921,9 @@ export default function DashboardPage() {
     evidenciasOnedriveShareUrl: string | null;
     evidenciasGoogleDriveFolderId: string | null;
     logoUrl: string | null;
-    bitacoraNotifyContratistaUserId?: string | null;
-    bitacoraNotifyInterventorUserId?: string | null;
-    bitacoraNotifyIduUserId?: string | null;
+    bitacoraNotifyContratistaUserIds?: string[];
+    bitacoraNotifyInterventorUserIds?: string[];
+    bitacoraNotifyIduUserIds?: string[];
   }) => {
     setEditObra(o);
     setEditObraForm({
@@ -3935,9 +3935,7 @@ export default function DashboardPage() {
         o.evidenciasGoogleDriveFolderId,
       ),
       logoUrl: o.logoUrl ?? null,
-      bitacoraNotifyContratistaUserId: o.bitacoraNotifyContratistaUserId ?? '',
-      bitacoraNotifyInterventorUserId: o.bitacoraNotifyInterventorUserId ?? '',
-      bitacoraNotifyIduUserId: o.bitacoraNotifyIduUserId ?? '',
+      ...obraBitacoraNotifyFormFromObra(o),
     });
     setObraEditLogoPickLabel(null);
   };
@@ -3975,9 +3973,7 @@ export default function DashboardPage() {
           endDate: editObraForm.endDate || null,
           ...carpetaEdit,
           logoUrl: nextLogoUrl,
-          bitacoraNotifyContratistaUserId: editObraForm.bitacoraNotifyContratistaUserId || null,
-          bitacoraNotifyInterventorUserId: editObraForm.bitacoraNotifyInterventorUserId || null,
-          bitacoraNotifyIduUserId: editObraForm.bitacoraNotifyIduUserId || null,
+          ...bitacoraNotifyPayloadFromForm(editObraForm),
         }),
       });
       const data = await res.json();
@@ -3988,14 +3984,12 @@ export default function DashboardPage() {
       setObrasList((prev) => prev.map((x) => (x.id === editObra.id ? { ...x, ...data.obra } : x)));
       setEditObra(null);
       setObraEditLogoPickLabel(null);
-      const notifyCount = [
-        data.obra?.bitacoraNotifyContratistaUserId,
-        data.obra?.bitacoraNotifyInterventorUserId,
-        data.obra?.bitacoraNotifyIduUserId,
-      ].filter(Boolean).length;
+      const notifyCount = countBitacoraNotifyAssignments(
+        obraBitacoraNotifyFormFromObra(data.obra ?? {}),
+      );
       setObraMessage(
         notifyCount > 0
-          ? `Obra actualizada. Notificaciones de bitácora: ${notifyCount} rol(es) asignado(s).`
+          ? `Obra actualizada. Notificaciones de bitácora: ${notifyCount} usuario(s) asignado(s).`
           : 'Obra actualizada. Asigne usuarios en «Notificaciones de bitácora» para enviar correos.',
       );
       setTimeout(() => setObraMessage(null), 3000);
@@ -8447,69 +8441,14 @@ export default function DashboardPage() {
                   <h3 className="shell-title" style={{ fontSize: '1rem', marginTop: '0.75rem' }}>
                     Notificaciones de bitácora
                   </h3>
-                  <p className="informe-label-hint" style={{ marginBottom: '0.75rem' }}>
-                    Asigne el usuario de cada rol. Cuando uno guarde su sección en el registro de bitácora, los otros dos recibirán un correo.
-                  </p>
-                  <div className="form-field">
-                    <label className="form-label" htmlFor="obra-notify-contratista">Usuario contratista</label>
-                    <select
-                      id="obra-notify-contratista"
-                      className="form-input"
-                      value={obraForm.bitacoraNotifyContratistaUserId}
-                      onChange={(e) =>
-                        setObraForm({ ...obraForm, bitacoraNotifyContratistaUserId: e.target.value })
-                      }
-                    >
-                      <option value="">— Sin asignar —</option>
-                      {[...obraNotifyUsersOptions]
-                        .sort((a, b) => a.name.localeCompare(b.name, 'es'))
-                        .map((u) => (
-                          <option key={u.id} value={u.id}>
-                            {u.name} ({u.email})
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                  <div className="form-field">
-                    <label className="form-label" htmlFor="obra-notify-interventor">Usuario interventoría</label>
-                    <select
-                      id="obra-notify-interventor"
-                      className="form-input"
-                      value={obraForm.bitacoraNotifyInterventorUserId}
-                      onChange={(e) =>
-                        setObraForm({ ...obraForm, bitacoraNotifyInterventorUserId: e.target.value })
-                      }
-                    >
-                      <option value="">— Sin asignar —</option>
-                      {[...obraNotifyUsersOptions]
-                        .sort((a, b) => a.name.localeCompare(b.name, 'es'))
-                        .map((u) => (
-                          <option key={`iv-${u.id}`} value={u.id}>
-                            {u.name} ({u.email})
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                  <div className="form-field">
-                    <label className="form-label" htmlFor="obra-notify-idu">Usuario IDU</label>
-                    <select
-                      id="obra-notify-idu"
-                      className="form-input"
-                      value={obraForm.bitacoraNotifyIduUserId}
-                      onChange={(e) =>
-                        setObraForm({ ...obraForm, bitacoraNotifyIduUserId: e.target.value })
-                      }
-                    >
-                      <option value="">— Sin asignar —</option>
-                      {[...obraNotifyUsersOptions]
-                        .sort((a, b) => a.name.localeCompare(b.name, 'es'))
-                        .map((u) => (
-                          <option key={`idu-${u.id}`} value={u.id}>
-                            {u.name} ({u.email})
-                          </option>
-                        ))}
-                    </select>
-                  </div>
+                  <ObraBitacoraNotifyFields
+                    idPrefix="obra-create"
+                    form={obraForm}
+                    onChange={(notifyFields: ObraBitacoraNotifyFormFields) =>
+                      setObraForm({ ...obraForm, ...notifyFields })
+                    }
+                    usersOptions={obraNotifyUsersOptions}
+                  />
                   <button type="submit" className="btn-primary" disabled={creatingObra}>
                     {creatingObra ? 'Creando...' : 'Crear obra'}
                   </button>
@@ -8704,75 +8643,14 @@ export default function DashboardPage() {
                       <h4 className="shell-title" style={{ fontSize: '0.95rem', marginTop: '0.5rem' }}>
                         Notificaciones de bitácora
                       </h4>
-                      <p className="informe-label-hint" style={{ marginBottom: '0.65rem' }}>
-                        Al guardar una sección del registro de bitácora, se notifica por correo a los otros dos usuarios asignados.
-                      </p>
-                      <div className="form-field">
-                        <label className="form-label">Usuario contratista</label>
-                        <select
-                          className="form-input"
-                          value={editObraForm.bitacoraNotifyContratistaUserId}
-                          onChange={(e) =>
-                            setEditObraForm({
-                              ...editObraForm,
-                              bitacoraNotifyContratistaUserId: e.target.value,
-                            })
-                          }
-                        >
-                          <option value="">— Sin asignar —</option>
-                          {[...obraNotifyUsersOptions]
-                            .sort((a, b) => a.name.localeCompare(b.name, 'es'))
-                            .map((u) => (
-                              <option key={`ec-${u.id}`} value={u.id}>
-                                {u.name} ({u.email})
-                              </option>
-                            ))}
-                        </select>
-                      </div>
-                      <div className="form-field">
-                        <label className="form-label">Usuario interventoría</label>
-                        <select
-                          className="form-input"
-                          value={editObraForm.bitacoraNotifyInterventorUserId}
-                          onChange={(e) =>
-                            setEditObraForm({
-                              ...editObraForm,
-                              bitacoraNotifyInterventorUserId: e.target.value,
-                            })
-                          }
-                        >
-                          <option value="">— Sin asignar —</option>
-                          {[...obraNotifyUsersOptions]
-                            .sort((a, b) => a.name.localeCompare(b.name, 'es'))
-                            .map((u) => (
-                              <option key={`ei-${u.id}`} value={u.id}>
-                                {u.name} ({u.email})
-                              </option>
-                            ))}
-                        </select>
-                      </div>
-                      <div className="form-field">
-                        <label className="form-label">Usuario IDU</label>
-                        <select
-                          className="form-input"
-                          value={editObraForm.bitacoraNotifyIduUserId}
-                          onChange={(e) =>
-                            setEditObraForm({
-                              ...editObraForm,
-                              bitacoraNotifyIduUserId: e.target.value,
-                            })
-                          }
-                        >
-                          <option value="">— Sin asignar —</option>
-                          {[...obraNotifyUsersOptions]
-                            .sort((a, b) => a.name.localeCompare(b.name, 'es'))
-                            .map((u) => (
-                              <option key={`ed-${u.id}`} value={u.id}>
-                                {u.name} ({u.email})
-                              </option>
-                            ))}
-                        </select>
-                      </div>
+                      <ObraBitacoraNotifyFields
+                        idPrefix="obra-edit"
+                        form={editObraForm}
+                        onChange={(notifyFields: ObraBitacoraNotifyFormFields) =>
+                          setEditObraForm({ ...editObraForm, ...notifyFields })
+                        }
+                        usersOptions={obraNotifyUsersOptions}
+                      />
                       <div className="form-actions-row">
                         <button type="submit" className="btn-primary" disabled={savingObra}>
                           {savingObra ? 'Guardando...' : 'Guardar'}

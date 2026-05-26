@@ -1,7 +1,12 @@
 import type { RegistroBitacoraObra, User } from '@prisma/client';
 import { storedMediaImgSrc } from './evidenciasUrlPayload';
 import { diffInclusiveCalendarDaysUtc } from './registroBitacoraFecha';
-import { buildClimaFilasDeUnInforme, type InformeDiarioPdfRow } from './registroBitacoraClimaPdf';
+import {
+  buildClimaFilasDeUnInforme,
+  buildClimaFilasFromInformes,
+  type InformeDiarioPdfRow,
+} from './registroBitacoraClimaPdf';
+import { parseEquiposManualJson, parsePersonalManualJson } from './registroBitacoraDiaInforme';
 import { mapEquiposMaterialesParaPdf } from './registroBitacoraEquiposPdf';
 import { agruparPersonalPorCargo } from './registroBitacoraPersonalPdf';
 import type { RegistroBitacoraPdfDia, RegistroBitacoraPdfObra, RegistroBitacoraPdfSlot } from './registroBitacoraPdfHtml';
@@ -140,6 +145,41 @@ function seccionesDesdeRegistro(origin: string, reg: RegistroWithUser): Registro
       firmaDocs: d.firmaDocs,
     },
   ];
+}
+
+type RegistroManualPdfSource = RegistroBitacoraObra & {
+  user: Pick<User, 'name'>;
+};
+
+/** Hoja PDF cuando no hay informe diario pero sí registro con datos manuales del contratista. */
+export function buildRegistroSinInformePdfPage(
+  origin: string,
+  project: ProjectPdf,
+  fecha: Date,
+  reg: RegistroManualPdfSource,
+  catalog: Map<string, string>,
+): RegistroBitacoraPdfDia {
+  const climaFilas = buildClimaFilasFromInformes([], catalog, {
+    franjaClimaMananaCodigo: reg.franjaClimaMananaCodigo,
+    franjaClimaTardeCodigo: reg.franjaClimaTardeCodigo,
+    franjaClimaNocheCodigo: reg.franjaClimaNocheCodigo,
+  });
+
+  return {
+    consecutivo: reg.consecutivo,
+    folio: 0,
+    totalFolios: 0,
+    informeNo: '—',
+    fechaTexto: formatFechaEsPdf(fecha),
+    diaSemana: weekdayEsPdf(fecha),
+    tiempoTranscurridoDias: transcurridoDiasObra(project, fecha),
+    climaFilas,
+    personalPorCargo: parsePersonalManualJson(reg.contratistaPersonalManual),
+    equiposMateriales: parseEquiposManualJson(reg.contratistaEquiposManual),
+    secciones: seccionesDesdeRegistro(origin, reg),
+    registradoPor: reg.user.name ?? '—',
+    actualizadoTexto: reg.updatedAt.toLocaleString('es-CO', { timeZone: 'America/Bogota' }),
+  };
 }
 
 /** Una hoja del PDF = un informe diario (obra + fecha + jornada) + bitácora del mismo día si existe. */

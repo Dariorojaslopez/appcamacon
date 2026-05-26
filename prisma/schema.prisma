@@ -21,9 +21,7 @@ model User {
   informes              InformeDiario[]
   registrosBitacoraObra RegistroBitacoraObra[]
   projectAccess         UserProjectAccess[]
-  projectBitacoraNotifyContratista Project[] @relation("ProjectBitacoraNotifyContratista")
-  projectBitacoraNotifyInterventor Project[] @relation("ProjectBitacoraNotifyInterventor")
-  projectBitacoraNotifyIdu         Project[] @relation("ProjectBitacoraNotifyIdu")
+  bitacoraNotifyAssignments ProjectBitacoraNotifyUser[]
 }
 
 /// Obras a las que un usuario puede acceder (informe diario y catálogos por obra).
@@ -53,13 +51,6 @@ model Project {
   // ID o URL de carpeta Google Drive para evidencias de esta obra. Si está vacío, se usa GOOGLE_DRIVE_FOLDER_ID del .env.
   evidenciasGoogleDriveFolderId String?
   logoUrl       String?
-  /// Usuarios notificados por correo al actualizar el registro de bitácora (por rol).
-  bitacoraNotifyContratistaUserId String?
-  bitacoraNotifyContratistaUser   User?   @relation("ProjectBitacoraNotifyContratista", fields: [bitacoraNotifyContratistaUserId], references: [id], onDelete: SetNull)
-  bitacoraNotifyInterventorUserId String?
-  bitacoraNotifyInterventorUser   User?   @relation("ProjectBitacoraNotifyInterventor", fields: [bitacoraNotifyInterventorUserId], references: [id], onDelete: SetNull)
-  bitacoraNotifyIduUserId         String?
-  bitacoraNotifyIduUser           User?   @relation("ProjectBitacoraNotifyIdu", fields: [bitacoraNotifyIduUserId], references: [id], onDelete: SetNull)
   isActive    Boolean         @default(true)
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
@@ -76,6 +67,21 @@ model Project {
   itemsCatalog      ItemCatalog[]
   budgetChapters    BudgetChapter[]
   userAccess        UserProjectAccess[]
+  bitacoraNotifyUsers ProjectBitacoraNotifyUser[]
+}
+
+/// Usuarios notificados por correo al guardar el registro de bitácora (hasta 5 por rol).
+model ProjectBitacoraNotifyUser {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  role      String   // contratista | interventor | idu
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sortOrder Int      @default(0)
+
+  @@unique([projectId, role, userId])
+  @@index([projectId, role])
 }
 
 /// Capítulo de presupuesto (nivel 1: rubros tipo licitación / APU).
@@ -637,6 +643,9 @@ model RegistroBitacoraObra {
   franjaClimaMananaCodigo String?
   franjaClimaTardeCodigo   String?
   franjaClimaNocheCodigo   String?
+  /// Personal y equipos del día cuando no hay informe diario (solo sección contratista).
+  contratistaPersonalManual Json @default("[]")
+  contratistaEquiposManual  Json @default("[]")
 
   contratistaObservaciones String  @default("")
   contratistaFotoUrl       String?

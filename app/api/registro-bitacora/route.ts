@@ -15,6 +15,12 @@ import {
 import { notifyBitacoraSaveToOthers } from '../../../src/lib/registroBitacoraNotify';
 import { normalizeFirmaDocsForSave, parseFirmaDocsJson } from '../../../src/shared/registroBitacoraFirmaDocs';
 import { Prisma } from '@prisma/client';
+import {
+  hayInformeDiarioEnDia,
+  loadRegistroBitacoraDiaInforme,
+  parseEquiposManualFromBody,
+  parsePersonalManualFromBody,
+} from '../../../src/lib/registroBitacoraDiaInforme';
 
 type SlotPayload = {
   observaciones?: unknown;
@@ -22,6 +28,21 @@ type SlotPayload = {
   firmaUrl?: unknown;
   firmaDocs?: unknown;
 };
+
+type ContratistaSlotPayload = SlotPayload & {
+  franjaClimaMananaCodigo?: unknown;
+  franjaClimaTardeCodigo?: unknown;
+  franjaClimaNocheCodigo?: unknown;
+  personalManual?: unknown;
+  equiposManual?: unknown;
+};
+
+function parseOptionalCodigoField(v: unknown): string | null | undefined {
+  if (v === undefined) return undefined;
+  if (typeof v !== 'string') return null;
+  const t = v.trim();
+  return t.length > 0 ? t : null;
+}
 
 function asString(v: unknown): string {
   return typeof v === 'string' ? v : '';
@@ -83,8 +104,15 @@ export async function GET(req: NextRequest) {
         iduGuardadoPor: true,
         iduGuardadoEn: true,
         updatedAt: true,
+        franjaClimaMananaCodigo: true,
+        franjaClimaTardeCodigo: true,
+        franjaClimaNocheCodigo: true,
+        contratistaPersonalManual: true,
+        contratistaEquiposManual: true,
       },
     });
+
+    const diaInforme = await loadRegistroBitacoraDiaInforme(projectId, fecha, reg);
 
     return NextResponse.json({
       registro: reg
@@ -99,6 +127,7 @@ export async function GET(req: NextRequest) {
             iduFirmaDocs: parseFirmaDocsJson(reg.iduFirmaDocs),
           }
         : null,
+      diaInforme,
     });
   } catch (error: unknown) {
     const err = error as { name?: string };
@@ -124,7 +153,7 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as {
       projectId?: unknown;
       fecha?: unknown;
-      contratista?: SlotPayload;
+      contratista?: ContratistaSlotPayload;
       interventoria?: SlotPayload;
       idu?: SlotPayload;
     };
@@ -166,6 +195,7 @@ export async function POST(req: NextRequest) {
     const c = body.contratista ?? {};
     const i = body.interventoria ?? {};
     const d = body.idu ?? {};
+    const tieneInforme = await hayInformeDiarioEnDia(projectId, fecha);
 
     const me = await prisma.user.findUnique({
       where: { id: userId },
@@ -225,7 +255,28 @@ export async function POST(req: NextRequest) {
         franjaClimaMananaCodigo: existing?.franjaClimaMananaCodigo ?? null,
         franjaClimaTardeCodigo: existing?.franjaClimaTardeCodigo ?? null,
         franjaClimaNocheCodigo: existing?.franjaClimaNocheCodigo ?? null,
+        contratistaPersonalManual:
+          (existing?.contratistaPersonalManual as Prisma.InputJsonValue) ?? [],
+        contratistaEquiposManual:
+          (existing?.contratistaEquiposManual as Prisma.InputJsonValue) ?? [],
       };
+
+      if (can('contratista') && !tieneInforme) {
+        const manana = parseOptionalCodigoField(c.franjaClimaMananaCodigo);
+        const tarde = parseOptionalCodigoField(c.franjaClimaTardeCodigo);
+        const noche = parseOptionalCodigoField(c.franjaClimaNocheCodigo);
+        if (manana !== undefined) dataSlots.franjaClimaMananaCodigo = manana;
+        if (tarde !== undefined) dataSlots.franjaClimaTardeCodigo = tarde;
+        if (noche !== undefined) dataSlots.franjaClimaNocheCodigo = noche;
+        const personalManual = parsePersonalManualFromBody(c.personalManual);
+        if (personalManual !== undefined) {
+          dataSlots.contratistaPersonalManual = personalManual as Prisma.InputJsonValue;
+        }
+        const equiposManual = parseEquiposManualFromBody(c.equiposManual);
+        if (equiposManual !== undefined) {
+          dataSlots.contratistaEquiposManual = equiposManual as Prisma.InputJsonValue;
+        }
+      }
 
       if (existing) {
         const updated = await tx.registroBitacoraObra.update({
