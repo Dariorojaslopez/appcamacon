@@ -112,7 +112,6 @@ async function main() {
   const FIRMA_ROLE_SLOTS = [
     { role: 'RESPONSABLE_DILIGENCIAMIENTO', slot: 'responsableDiligenciamiento' },
     { role: 'RESIDENTE_OBRA', slot: 'residenteObra' },
-    { role: 'AUXILIAR_INGENIERIA', slot: 'auxiliarIngenieria' },
     { role: 'DIRECTOR_OBRA', slot: 'vistoBuenoDirectorObra' },
   ];
   for (const { role, label } of ROLE_LABELS) {

@@ -8,7 +8,6 @@ export const FIRMA_PERM_TOKEN = 'token';
 export const FIRMA_SLOT_KEYS = [
   'responsableDiligenciamiento',
   'residenteObra',
-  'auxiliarIngenieria',
   'vistoBuenoDirectorObra',
 ] as const;
 
@@ -21,14 +20,12 @@ export const FIRMA_PERM_LABELS: Record<(typeof FIRMA_PERM_ADMIN_KEYS)[number], s
   token: 'Código barra',
   responsableDiligenciamiento: 'Firma · Responsable diligenciamiento',
   residenteObra: 'Firma · Residente de obra',
-  auxiliarIngenieria: 'Firma · Auxiliar de ingeniería',
   vistoBuenoDirectorObra: 'Firma · Visto bueno director',
 };
 
 export const FIRMA_SLOT_LABELS: Record<FirmaSlotKey, string> = {
   responsableDiligenciamiento: 'Responsable de diligenciamiento',
   residenteObra: 'Residente de obra',
-  auxiliarIngenieria: 'Auxiliar de ingeniería',
   vistoBuenoDirectorObra: 'Visto bueno director de obra',
 };
 
@@ -53,13 +50,6 @@ const DEFAULT_FIRMA_ROLES_POR_SLOT: Record<FirmaSlotKey, readonly string[]> = {
     'DIRECTOR',
   ],
   residenteObra: ['RESIDENTE_OBRA', 'RESIDENTE_TECNICO', 'SUPER_ADMIN', 'DIRECTOR'],
-  auxiliarIngenieria: [
-    'AUXILIAR_INGENIERIA',
-    'INSPECTOR_TECNICO',
-    'INSPECTOR_SSTMA',
-    'SUPER_ADMIN',
-    'DIRECTOR',
-  ],
   vistoBuenoDirectorObra: ['DIRECTOR_OBRA', 'DIRECTOR', 'SUPER_ADMIN'],
 };
 
@@ -77,7 +67,6 @@ export function defaultFirmaPermisosPorSlot(role: string): Record<FirmaSlotKey, 
   return {
     responsableDiligenciamiento: defaultPuedeFirmarEnSlot(role, 'responsableDiligenciamiento'),
     residenteObra: defaultPuedeFirmarEnSlot(role, 'residenteObra'),
-    auxiliarIngenieria: defaultPuedeFirmarEnSlot(role, 'auxiliarIngenieria'),
     vistoBuenoDirectorObra: defaultPuedeFirmarEnSlot(role, 'vistoBuenoDirectorObra'),
   };
 }

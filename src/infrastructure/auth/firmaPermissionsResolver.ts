@@ -31,12 +31,7 @@ export async function dbPuedeFirmarEnSlot(role: string, slot: FirmaSlotKey): Pro
 }
 
 export async function dbFirmaPermisosPorSlot(role: string): Promise<Record<FirmaSlotKey, boolean>> {
-  const out: Record<FirmaSlotKey, boolean> = {
-    responsableDiligenciamiento: false,
-    residenteObra: false,
-    auxiliarIngenieria: false,
-    vistoBuenoDirectorObra: false,
-  };
+  const out = Object.fromEntries(FIRMA_SLOT_KEYS.map((slot) => [slot, false])) as Record<FirmaSlotKey, boolean>;
   const rows = await firmaRowsForRole(role);
   if (rows.length === 0) return defaultFirmaPermisosPorSlot(role);
   const keys = new Set(rows.map((r) => r.permKey));

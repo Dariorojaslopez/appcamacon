@@ -60,7 +60,13 @@ import {
   type EvidenciaItem,
 } from '../../src/lib/evidenciasUrlPayload';
 import { MENU_KEYS, MENU_LABELS } from '../../src/shared/menuPermissions';
-import { FIRMA_PERM_ADMIN_KEYS, FIRMA_PERM_LABELS } from '../../src/shared/firmaPolicies';
+import {
+  FIRMA_PERM_ADMIN_KEYS,
+  FIRMA_PERM_LABELS,
+  FIRMA_SLOT_KEYS,
+  FIRMA_SLOT_LABELS,
+  type FirmaSlotKey,
+} from '../../src/shared/firmaPolicies';
 import {
   REGISTRO_BITACORA_SLOT_KEYS,
   REGISTRO_BITACORA_SLOT_LABELS,
@@ -1046,12 +1052,10 @@ const emptyFirmaEvidencia = (): FirmaEvidenciaState => ({
   firmadoEn: null,
 });
 
-const FIRMAS_EVIDENCIAS_CONFIG = [
-  { key: 'responsableDiligenciamiento', label: 'Responsable de diligenciamiento' },
-  { key: 'residenteObra', label: 'Residente de obra' },
-  { key: 'auxiliarIngenieria', label: 'Auxiliar de ingeniería' },
-  { key: 'vistoBuenoDirectorObra', label: 'Visto bueno director de obra' },
-] as const;
+const FIRMAS_EVIDENCIAS_CONFIG = FIRMA_SLOT_KEYS.map((key) => ({
+  key,
+  label: FIRMA_SLOT_LABELS[key],
+}));
 
 const BITACORA_TABS = [
   { id: 'dashboard' as const, label: 'Dashboard diario' },
@@ -1142,7 +1146,28 @@ type SuspensionRow = {
   imagenTomadaEn?: string | null;
 };
 
-type FirmaEvidenciaKey = (typeof FIRMAS_EVIDENCIAS_CONFIG)[number]['key'];
+type FirmaEvidenciaKey = FirmaSlotKey;
+
+function emptyFirmasEvidenciasState(): Record<FirmaEvidenciaKey, FirmaEvidenciaState> {
+  return Object.fromEntries(
+    FIRMA_SLOT_KEYS.map((k) => [k, emptyFirmaEvidencia()]),
+  ) as Record<FirmaEvidenciaKey, FirmaEvidenciaState>;
+}
+
+function firmasEvidenciasFromApi(data: Record<string, unknown>): Record<FirmaEvidenciaKey, FirmaEvidenciaState> {
+  return Object.fromEntries(
+    FIRMA_SLOT_KEYS.map((k) => [k, normalizeFirmaEvidenciaFromApi(data[k])]),
+  ) as Record<FirmaEvidenciaKey, FirmaEvidenciaState>;
+}
+
+function firmasEvidenciasToApiPayload(
+  firmas: Record<FirmaEvidenciaKey, FirmaEvidenciaState>,
+): Record<FirmaEvidenciaKey, FirmaEvidenciaState> {
+  return Object.fromEntries(FIRMA_SLOT_KEYS.map((k) => [k, firmas[k]])) as Record<
+    FirmaEvidenciaKey,
+    FirmaEvidenciaState
+  >;
+}
 
 function normalizeFirmaEvidenciaFromApi(raw: unknown): FirmaEvidenciaState {
   if (!raw || typeof raw !== 'object') return emptyFirmaEvidencia();
@@ -2026,12 +2051,8 @@ export default function DashboardPage() {
     despues: 0,
   });
   const [observacionesGenerales, setObservacionesGenerales] = useState('');
-  const [firmasEvidencias, setFirmasEvidencias] = useState<Record<FirmaEvidenciaKey, FirmaEvidenciaState>>({
-    responsableDiligenciamiento: emptyFirmaEvidencia(),
-    residenteObra: emptyFirmaEvidencia(),
-    auxiliarIngenieria: emptyFirmaEvidencia(),
-    vistoBuenoDirectorObra: emptyFirmaEvidencia(),
-  });
+  const [firmasEvidencias, setFirmasEvidencias] =
+    useState<Record<FirmaEvidenciaKey, FirmaEvidenciaState>>(emptyFirmasEvidenciasState);
 
   const [loadingEvidencias, setLoadingEvidencias] = useState(false);
   const [savingEvidencias, setSavingEvidencias] = useState(false);
@@ -2075,12 +2096,11 @@ export default function DashboardPage() {
         setFirmaToken(typeof data.firmaToken === 'string' && data.firmaToken ? data.firmaToken : null);
         const perms = data.firmaSlotPermissions;
         if (perms && typeof perms === 'object') {
-          setFirmaSlotPermissions({
-            responsableDiligenciamiento: Boolean(perms.responsableDiligenciamiento),
-            residenteObra: Boolean(perms.residenteObra),
-            auxiliarIngenieria: Boolean(perms.auxiliarIngenieria),
-            vistoBuenoDirectorObra: Boolean(perms.vistoBuenoDirectorObra),
-          });
+          setFirmaSlotPermissions(
+            Object.fromEntries(
+              FIRMA_SLOT_KEYS.map((k) => [k, Boolean(perms[k])]),
+            ) as Record<FirmaEvidenciaKey, boolean>,
+          );
         } else {
           setFirmaSlotPermissions(null);
         }
@@ -3139,12 +3159,7 @@ export default function DashboardPage() {
         setEvidenciaUrlsPorFase(normalizeEvidenciasBody(data.evidenciaUrls));
         setEvidenciaCarouselIndex({ antes: 0, durante: 0, despues: 0 });
         setObservacionesGenerales(data.observacionesGenerales ?? '');
-        setFirmasEvidencias({
-          responsableDiligenciamiento: normalizeFirmaEvidenciaFromApi(data.responsableDiligenciamiento),
-          residenteObra: normalizeFirmaEvidenciaFromApi(data.residenteObra),
-          auxiliarIngenieria: normalizeFirmaEvidenciaFromApi(data.auxiliarIngenieria),
-          vistoBuenoDirectorObra: normalizeFirmaEvidenciaFromApi(data.vistoBuenoDirectorObra),
-        });
+        setFirmasEvidencias(firmasEvidenciasFromApi(data));
       })
       .catch(() => {
         // si no hay registro aún, cargamos defaults
@@ -3152,12 +3167,7 @@ export default function DashboardPage() {
         setEvidenciaUrlsPorFase(emptyEvidenciaUrlsPorFase());
         setEvidenciaCarouselIndex({ antes: 0, durante: 0, despues: 0 });
         setObservacionesGenerales('');
-        setFirmasEvidencias({
-          responsableDiligenciamiento: emptyFirmaEvidencia(),
-          residenteObra: emptyFirmaEvidencia(),
-          auxiliarIngenieria: emptyFirmaEvidencia(),
-          vistoBuenoDirectorObra: emptyFirmaEvidencia(),
-        });
+        setFirmasEvidencias(emptyFirmasEvidenciasState());
       })
       .finally(() => setLoadingEvidencias(false));
   }, [activeSection, selectedObraId, selectedJornadaId, jornadaQuery, datosGeneralesForm.fechaReporte]);
@@ -5198,7 +5208,7 @@ export default function DashboardPage() {
     }
   };
 
-  /** Informe diario cerrado en BD (4 firmas): solo lectura para obra+fecha+jornada. La fecha sigue editable para cambiar de día. */
+  /** Informe diario cerrado en BD (3 firmas): solo lectura para obra+fecha+jornada. La fecha sigue editable para cambiar de día. */
   const informeBloqueado = informeCerrado;
 
   /** Texto para dejar explícita la clave del registro: obra + fecha + jornada (único en BD). */
@@ -7355,7 +7365,7 @@ export default function DashboardPage() {
   /**
    * Persiste evidencias + firmas.
    * `skipPhotoValidation`: en firmas parciales no exige fotos si marcó «Sí».
-   * En la firma que completa las cuatro, debe ser false para exigir evidencias y guardar todo antes del cierre.
+   * En la firma que completa las tres, debe ser false para exigir evidencias y guardar todo antes del cierre.
    */
   const persistEvidenciasApi = async (
     firmasToSend: Record<FirmaEvidenciaKey, FirmaEvidenciaState>,
@@ -7394,10 +7404,7 @@ export default function DashboardPage() {
           registroFotografico,
           observacionesGenerales,
           observaciones: null,
-          responsableDiligenciamiento: firmasToSend.responsableDiligenciamiento,
-          residenteObra: firmasToSend.residenteObra,
-          auxiliarIngenieria: firmasToSend.auxiliarIngenieria,
-          vistoBuenoDirectorObra: firmasToSend.vistoBuenoDirectorObra,
+          ...firmasEvidenciasToApiPayload(firmasToSend),
           // Si el usuario marcó “NO”, no se deben persistir fotos previas aunque existan en el estado.
           evidenciaUrls: registroFotografico ? evidenciaUrlsPorFase : emptyEvidenciaUrlsPorFase(),
         }),
@@ -11730,7 +11737,7 @@ export default function DashboardPage() {
 
         {isInformeSection && informeBloqueado && (
           <p className="feedback feedback-info" style={{ margin: '0 0 0.75rem' }}>
-            Informe cerrado (cuatro firmas): solo lectura. No se pueden guardar cambios en datos, evidencias ni
+            Informe cerrado (tres firmas): solo lectura. No se pueden guardar cambios en datos, evidencias ni
             firmas. Use otra fecha u obra/jornada para un informe distinto.
             {cerradoEn
               ? ` Cerrado: ${new Date(cerradoEn).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })}.`
@@ -12715,7 +12722,7 @@ export default function DashboardPage() {
               <fieldset disabled={informeBloqueado} style={informeFieldsetStyle}>
                 {informeBloqueado && (
                   <p className="shell-text-muted" style={{ fontSize: '0.88rem', marginBottom: '0.75rem' }}>
-                    No se pueden añadir, editar ni guardar equipos mientras el informe esté cerrado (cuatro firmas en
+                    No se pueden añadir, editar ni guardar equipos mientras el informe esté cerrado (tres firmas en
                     Evidencias y cierre). Use otra fecha u obra/jornada para un informe abierto.
                   </p>
                 )}
@@ -14783,7 +14790,7 @@ export default function DashboardPage() {
               <fieldset disabled={informeBloqueado} style={informeFieldsetStyle}>
                 {informeBloqueado && (
                   <p className="shell-text-muted" style={{ fontSize: '0.88rem', marginTop: 0, marginBottom: '0.65rem' }}>
-                    Las fotos y el texto de cierre deben guardarse antes de completar las cuatro firmas. Este informe
+                    Las fotos y el texto de cierre deben guardarse antes de completar las tres firmas. Este informe
                     ya no acepta nuevos archivos ni guardados.
                   </p>
                 )}
@@ -15073,7 +15080,7 @@ export default function DashboardPage() {
                   {!informeBloqueado && (
                     <p className="shell-text-muted" style={{ fontSize: '0.85rem', marginTop: '0.35rem' }}>
                       La última firma usa <strong>Firmar y cerrar informe</strong>: en ese paso se guardan evidencias,
-                      observaciones y las cuatro firmas juntas antes de bloquear el informe.
+                      observaciones y las tres firmas juntas antes de bloquear el informe.
                     </p>
                   )}
 
@@ -15212,7 +15219,7 @@ export default function DashboardPage() {
                                       setFirmasEvidencias(nextFirmas);
                                       setEvidenciasMessage(
                                         cierraInforme
-                                          ? 'Evidencias y cierre guardados con las cuatro firmas. El informe quedó cerrado.'
+                                          ? 'Evidencias y cierre guardados con las tres firmas. El informe quedó cerrado.'
                                           : 'Firma guardada en la base de datos.',
                                       );
                                       setTimeout(() => setEvidenciasMessage(null), 3500);
@@ -15308,7 +15315,7 @@ export default function DashboardPage() {
             <h1 className="shell-title">Informe diario – Exportar</h1>
             <p className="shell-text-muted" style={{ marginBottom: '1rem' }}>
               Filtra por obra, jornada y rango de fechas. Cada fila es un informe. La primera columna es el{' '}
-              <strong>estado</strong> (abierto o cerrado por las cuatro firmas). El texto de cada columna sigue las
+              <strong>estado</strong> (abierto o cerrado por las tres firmas). El texto de cada columna sigue las
               mismas etiquetas que el formulario en pantalla (sin IDs internos). La tabla, el CSV y el Excel tienen{' '}
               <strong>ocho columnas</strong>. Las URLs aparecen como enlaces en la tabla; en CSV y Excel quedan como
               texto.

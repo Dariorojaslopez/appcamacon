@@ -31,15 +31,17 @@ function emptyFirma(): FirmaEvidenciaPayload {
   return { codigo: '', observacion: '', firmado: false, firmadoEn: null };
 }
 
+function emptyFirmasRecord(): Record<FirmaSlotKey, FirmaEvidenciaPayload> {
+  return Object.fromEntries(FIRMA_SLOT_KEYS.map((slot) => [slot, emptyFirma()])) as Record<
+    FirmaSlotKey,
+    FirmaEvidenciaPayload
+  >;
+}
+
 function mapFirmasFromRows(
   rows: { slot: string; firmado: boolean; codigo: string; observacion: string; firmadoEn: Date | null }[],
 ): Record<FirmaSlotKey, FirmaEvidenciaPayload> {
-  const base: Record<FirmaSlotKey, FirmaEvidenciaPayload> = {
-    responsableDiligenciamiento: emptyFirma(),
-    residenteObra: emptyFirma(),
-    auxiliarIngenieria: emptyFirma(),
-    vistoBuenoDirectorObra: emptyFirma(),
-  };
+  const base = emptyFirmasRecord();
   for (const r of rows) {
     if (!FIRMA_SLOT_KEYS.includes(r.slot as FirmaSlotKey)) continue;
     const k = r.slot as FirmaSlotKey;
@@ -160,10 +162,7 @@ export async function GET(req: NextRequest) {
       registroFotografico: informe?.registroFotografico ?? false,
       observacionesGenerales: informe?.observacionesGenerales ?? '',
       observaciones: informe?.observaciones ?? '',
-      responsableDiligenciamiento: firmasPayload.responsableDiligenciamiento,
-      residenteObra: firmasPayload.residenteObra,
-      auxiliarIngenieria: firmasPayload.auxiliarIngenieria,
-      vistoBuenoDirectorObra: firmasPayload.vistoBuenoDirectorObra,
+      ...firmasPayload,
       evidenciaUrls: parseEvidenciasStored(informe?.evidenciasUrl ?? null),
     });
   } catch (error: unknown) {
@@ -194,7 +193,6 @@ export async function POST(req: NextRequest) {
       observaciones?: string | null;
       responsableDiligenciamiento?: unknown;
       residenteObra?: unknown;
-      auxiliarIngenieria?: unknown;
       vistoBuenoDirectorObra?: unknown;
       evidenciaUrls?: unknown;
     };
@@ -215,17 +213,9 @@ export async function POST(req: NextRequest) {
 
     const evidenciaUrlsPorFase = normalizeEvidenciasBody(body.evidenciaUrls);
 
-    const fRespObj = normalizeFirmaBody(body.responsableDiligenciamiento);
-    const fResObj = normalizeFirmaBody(body.residenteObra);
-    const fAuxObj = normalizeFirmaBody(body.auxiliarIngenieria);
-    const fVisObj = normalizeFirmaBody(body.vistoBuenoDirectorObra);
-
-    const firmasRecord: Record<FirmaSlotKey, FirmaEvidenciaPayload> = {
-      responsableDiligenciamiento: fRespObj,
-      residenteObra: fResObj,
-      auxiliarIngenieria: fAuxObj,
-      vistoBuenoDirectorObra: fVisObj,
-    };
+    const firmasRecord = Object.fromEntries(
+      FIRMA_SLOT_KEYS.map((slot) => [slot, normalizeFirmaBody((body as Record<string, unknown>)[slot])]),
+    ) as Record<FirmaSlotKey, FirmaEvidenciaPayload>;
 
     const validacion = await validarFirmasEvidencias({ sub: userId, role: userRole }, firmasRecord);
     if (validacion.ok === false) {

@@ -3,7 +3,7 @@ import type { PrismaClient } from '@prisma/client';
 
 /** Mensaje unificado para 403 cuando el informe diario (obra+fecha+jornada) está cerrado por firmas. */
 export const INFORME_CERRADO_MSG =
-  'Este informe está cerrado (cuatro firmas completas). No se puede editar.';
+  'Este informe está cerrado (tres firmas completas). No se puede editar.';
 
 export function informeCerradoJsonResponse() {
   return NextResponse.json({ error: INFORME_CERRADO_MSG }, { status: 403 });
