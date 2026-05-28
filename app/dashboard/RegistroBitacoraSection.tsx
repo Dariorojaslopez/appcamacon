@@ -70,6 +70,15 @@ async function restoreFirmaPad(
   return (await sigRef.current?.loadFromUrl(url)) ?? false;
 }
 
+function validateFirmaImagen(file: File): string | null {
+  const mime = (file.type || '').toLowerCase();
+  const okMime = mime === 'image/jpeg' || mime === 'image/jpg' || mime === 'image/png';
+  const okExt = /\.(jpe?g|png)$/i.test(file.name);
+  if (!okMime && !okExt) return 'Use una imagen JPG o PNG de la firma.';
+  if (file.size > MAX_FILE) return 'La imagen puede pesar como máximo 10 MB.';
+  return null;
+}
+
 function validateRegistroDoc(file: File): string | null {
   const mime = (file.type || '').toLowerCase();
   const allowedMime = [
@@ -220,6 +229,7 @@ type SlotProps = {
   onRemoveFirmaDoc: (id: string) => void;
   onLimpiarFirmaDibujo: () => void;
   onQuitarTodosDocumentos: () => void;
+  onFirmaInkChange?: () => void;
   firmaGuardadaUrl: string | null;
   guardadoMeta: string | null;
 };
@@ -237,12 +247,40 @@ function SlotBlock({
   onRemoveFirmaDoc,
   onLimpiarFirmaDibujo,
   onQuitarTodosDocumentos,
+  onFirmaInkChange,
   firmaGuardadaUrl,
   guardadoMeta,
 }: SlotProps) {
   const firmaPreviewSrc = firmaGuardadaUrl ? firmaImageDisplaySrc(firmaGuardadaUrl) : null;
   const fotoInputRef = useRef<HTMLInputElement>(null);
   const firmaDocsInputRef = useRef<HTMLInputElement>(null);
+  const firmaImagenInputRef = useRef<HTMLInputElement>(null);
+  const [firmaLocalHint, setFirmaLocalHint] = useState<string | null>(null);
+
+  const cargarFirmaDesdeImagen = async (file: File | null) => {
+    if (!file) return;
+    const err = validateFirmaImagen(file);
+    if (err) {
+      setFirmaLocalHint(err);
+      return;
+    }
+    if (!sigRef.current) {
+      setFirmaLocalHint('El recuadro de firma no está listo. Recargue la página.');
+      return;
+    }
+    const objectUrl = URL.createObjectURL(file);
+    try {
+      const ok = await sigRef.current.loadFromUrl(objectUrl);
+      if (!ok) {
+        setFirmaLocalHint('No se pudo cargar la imagen. Pruebe con otro archivo JPG o PNG.');
+        return;
+      }
+      setFirmaLocalHint('Imagen de firma cargada. Pulse «Guardar registro de bitácora» para guardarla.');
+      onFirmaInkChange?.();
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  };
   return (
     <div className="registro-bitacora-slot">
       <h2 className="section-title" style={{ marginTop: 0 }}>
@@ -298,8 +336,8 @@ function SlotBlock({
       <div className="form-field">
         <label className="form-label">Firma y documentos</label>
         <p className="informe-label-hint" style={{ marginTop: 0 }}>
-          Puede dibujar la firma, adjuntar varios documentos (imagen, PDF, Word, Excel; máx. 10 MB c/u, hasta{' '}
-          {MAX_REGISTRO_FIRMA_DOCS} archivos).
+          Dibuje la firma en el recuadro, suba una imagen JPG/PNG de la firma, o adjunte documentos (PDF, Word,
+          Excel; máx. 10 MB c/u, hasta {MAX_REGISTRO_FIRMA_DOCS} archivos).
         </p>
         <input
           ref={firmaDocsInputRef}
@@ -364,21 +402,50 @@ function SlotBlock({
           </div>
         ) : null}
         <p className="form-label" style={{ marginTop: '0.75rem', marginBottom: '0.35rem' }}>
-          {firmaPreviewSrc ? 'Dibujar nueva firma (reemplaza la anterior al guardar)' : 'Dibujar firma'}
+          {firmaPreviewSrc ? 'Firma (dibujar de nuevo o subir imagen reemplaza la anterior)' : 'Firma'}
         </p>
+        <input
+          ref={firmaImagenInputRef}
+          type="file"
+          accept="image/jpeg,image/jpg,image/png"
+          className="sr-only"
+          onChange={(e) => {
+            const f = e.target.files?.[0] ?? null;
+            void cargarFirmaDesdeImagen(f);
+            e.target.value = '';
+          }}
+        />
+        <div className="registro-bitacora-foto-row" style={{ marginBottom: '0.5rem' }}>
+          <button type="button" className="btn-secondary" onClick={() => firmaImagenInputRef.current?.click()}>
+            Subir imagen de firma
+          </button>
+          <span className="shell-text-muted" style={{ fontSize: '0.85rem' }}>
+            JPG o PNG · máx. 10 MB
+          </span>
+        </div>
         <div className="signature-pad-wrap">
           <SignaturePadField ref={sigRef} />
         </div>
-        <button
-          type="button"
-          className="btn-secondary"
-          style={{ marginTop: '0.5rem' }}
-          onClick={onLimpiarFirmaDibujo}
-        >
-          Borrar firma dibujada
-        </button>
+        <div className="registro-bitacora-foto-row" style={{ marginTop: '0.5rem' }}>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => {
+              onLimpiarFirmaDibujo();
+              setFirmaLocalHint(null);
+            }}
+          >
+            Borrar firma
+          </button>
+        </div>
+        {firmaLocalHint ? (
+          <p className="informe-label-hint" style={{ marginTop: '0.35rem' }} role="status">
+            {firmaLocalHint}
+          </p>
+        ) : null}
         <p className="shell-text-muted" style={{ fontSize: '0.8rem', marginTop: '0.35rem' }}>
-          Dibuje la firma y pulse «Guardar registro de bitácora» al final del formulario para guardarla.
+          En celular, mantenga el dedo o el lápiz sobre el recuadro y arrastre para dibujar. Luego pulse «Guardar
+          registro de bitácora» al final.
         </p>
       </div>
     </div>
@@ -875,7 +942,9 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
           ]);
         } else if (firmaCleared) {
           urlFirma = null;
-          firmaDocs = firmaDocs.filter((d) => d.url !== prevUrl && d.name !== 'Firma dibujada');
+          firmaDocs = firmaDocs.filter(
+            (d) => d.url !== prevUrl && d.name !== 'Firma dibujada' && d.name !== 'Firma (imagen)',
+          );
         }
         return {
           observaciones,
@@ -1223,9 +1292,15 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
                 setFirmaClearedC(true);
                 setPersisted((p) => ({ ...p, contratistaFirmaUrl: null }));
                 setFirmaRowsC((rows) =>
-                  rows.filter((r) => r.name !== 'Firma dibujada' && (!prev || r.url !== prev)),
+                  rows.filter(
+                    (r) =>
+                      r.name !== 'Firma dibujada' &&
+                      r.name !== 'Firma (imagen)' &&
+                      (!prev || r.url !== prev),
+                  ),
                 );
               }}
+              onFirmaInkChange={() => setFirmaClearedC(false)}
               onQuitarTodosDocumentos={() => setFirmaRowsC([])}
               firmaGuardadaUrl={findFirmaVisualUrl(persisted.contratistaFirmaUrl, firmaRowsC)}
               guardadoMeta={metaC}
@@ -1253,9 +1328,15 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
                 setFirmaClearedI(true);
                 setPersisted((p) => ({ ...p, interventoriaFirmaUrl: null }));
                 setFirmaRowsI((rows) =>
-                  rows.filter((r) => r.name !== 'Firma dibujada' && (!prev || r.url !== prev)),
+                  rows.filter(
+                    (r) =>
+                      r.name !== 'Firma dibujada' &&
+                      r.name !== 'Firma (imagen)' &&
+                      (!prev || r.url !== prev),
+                  ),
                 );
               }}
+              onFirmaInkChange={() => setFirmaClearedI(false)}
               onQuitarTodosDocumentos={() => setFirmaRowsI([])}
               firmaGuardadaUrl={findFirmaVisualUrl(persisted.interventoriaFirmaUrl, firmaRowsI)}
               guardadoMeta={metaI}
@@ -1283,9 +1364,15 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
                 setFirmaClearedD(true);
                 setPersisted((p) => ({ ...p, iduFirmaUrl: null }));
                 setFirmaRowsD((rows) =>
-                  rows.filter((r) => r.name !== 'Firma dibujada' && (!prev || r.url !== prev)),
+                  rows.filter(
+                    (r) =>
+                      r.name !== 'Firma dibujada' &&
+                      r.name !== 'Firma (imagen)' &&
+                      (!prev || r.url !== prev),
+                  ),
                 );
               }}
+              onFirmaInkChange={() => setFirmaClearedD(false)}
               onQuitarTodosDocumentos={() => setFirmaRowsD([])}
               firmaGuardadaUrl={findFirmaVisualUrl(persisted.iduFirmaUrl, firmaRowsD)}
               guardadoMeta={metaD}

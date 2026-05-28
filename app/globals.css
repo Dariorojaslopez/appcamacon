@@ -3990,18 +3990,21 @@ ul.informe-searchable-list {
   border-radius: 10px;
   background: #fff;
   padding: 0.35rem;
-  max-width: calc(340px + 0.7rem);
+  width: 100%;
+  max-width: 520px;
   touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .signature-pad-canvas {
   display: block;
   width: 100%;
-  max-width: 340px;
-  height: 120px;
+  min-height: 140px;
   cursor: crosshair;
   border-radius: 6px;
   touch-action: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .registro-bitacora-obs-wrap.informe-input-wrap {

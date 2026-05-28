@@ -4,8 +4,8 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 
 import type { PointerEvent } from 'react';
 import { firmaImageDisplaySrc } from '../../src/lib/firmaImageSrc';
 
-const CSS_W = 340;
-const CSS_H = 120;
+const DEFAULT_W = 340;
+const DEFAULT_H = 140;
 
 export type SignaturePadFieldHandle = {
   clear: () => void;
@@ -21,25 +21,44 @@ export const SignaturePadField = forwardRef<SignaturePadFieldHandle, Record<stri
   const last = useRef<{ x: number; y: number } | null>(null);
   const hasInk = useRef(false);
 
-  const layoutCanvas = useCallback(() => {
+  const layoutCanvas = useCallback((preserveInk = false) => {
     const c = canvasRef.current;
     if (!c) return;
+    const wrap = c.parentElement;
+    const cssW = Math.max(280, Math.min(520, Math.floor(wrap?.clientWidth ?? DEFAULT_W) - 8));
+    const cssH = DEFAULT_H;
     const ctx = c.getContext('2d');
     if (!ctx) return;
     const dpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 1;
-    c.width = Math.floor(CSS_W * dpr);
-    c.height = Math.floor(CSS_H * dpr);
-    c.style.width = `${CSS_W}px`;
-    c.style.height = `${CSS_H}px`;
+    const prevData = preserveInk && hasInk.current ? c.toDataURL('image/png') : null;
+    c.width = Math.floor(cssW * dpr);
+    c.height = Math.floor(cssH * dpr);
+    c.style.width = `${cssW}px`;
+    c.style.height = `${cssH}px`;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.scale(dpr, dpr);
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, CSS_W, CSS_H);
-    hasInk.current = false;
+    ctx.fillRect(0, 0, cssW, cssH);
+    if (prevData) {
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, cssW, cssH);
+        hasInk.current = true;
+      };
+      img.src = prevData;
+    } else {
+      hasInk.current = false;
+    }
   }, []);
 
   useEffect(() => {
     layoutCanvas();
+    const c = canvasRef.current;
+    const wrap = c?.parentElement;
+    if (!wrap || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => layoutCanvas(true));
+    ro.observe(wrap);
+    return () => ro.disconnect();
   }, [layoutCanvas]);
 
   const pos = (e: PointerEvent<HTMLCanvasElement>) => {
@@ -75,13 +94,17 @@ export const SignaturePadField = forwardRef<SignaturePadFieldHandle, Record<stri
       const src = firmaImageDisplaySrc(url) ?? url;
       try {
         const img = new Image();
-        img.crossOrigin = 'anonymous';
+        if (!src.startsWith('blob:')) {
+          img.crossOrigin = 'anonymous';
+        }
         await new Promise<void>((resolve, reject) => {
           img.onload = () => resolve();
           img.onerror = () => reject(new Error('No se pudo cargar la imagen de firma'));
           img.src = src;
         });
-        ctx.drawImage(img, 0, 0, CSS_W, CSS_H);
+        const w = Number(c.style.width?.replace('px', '')) || DEFAULT_W;
+        const h = Number(c.style.height?.replace('px', '')) || DEFAULT_H;
+        ctx.drawImage(img, 0, 0, w, h);
         hasInk.current = true;
         return true;
       } catch {
@@ -108,6 +131,7 @@ export const SignaturePadField = forwardRef<SignaturePadFieldHandle, Record<stri
       className="signature-pad-canvas"
       aria-label="Área de firma"
       onPointerDown={(e) => {
+        e.preventDefault();
         e.currentTarget.setPointerCapture(e.pointerId);
         drawing.current = true;
         const p = pos(e);
@@ -116,11 +140,17 @@ export const SignaturePadField = forwardRef<SignaturePadFieldHandle, Record<stri
       }}
       onPointerMove={(e) => {
         if (!drawing.current || !last.current) return;
+        e.preventDefault();
         const p = pos(e);
         drawSegment(last.current.x, last.current.y, p.x, p.y);
         last.current = p;
       }}
-      onPointerUp={() => {
+      onPointerUp={(e) => {
+        e.preventDefault();
+        drawing.current = false;
+        last.current = null;
+      }}
+      onPointerCancel={() => {
         drawing.current = false;
         last.current = null;
       }}
