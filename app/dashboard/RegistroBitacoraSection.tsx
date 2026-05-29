@@ -23,6 +23,7 @@ import {
   emptyRegistroBitacoraDiaInformeState,
   type RegistroBitacoraDiaInformeState,
 } from './RegistroBitacoraDiaInformePanel';
+import { RegistroBitacoraRangoCalendario } from './RegistroBitacoraRangoCalendario';
 
 const MAX_FILE = 10 * 1024 * 1024;
 
@@ -1222,16 +1223,17 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
             por día.
           </p>
         )}
-        {!loadingRango && rangoResumen && (rangoResumen.informes?.length ?? 0) > 0 && (
-          <ul className="registro-bitacora-rango-lista">
-            {rangoResumen.informes!.map((inf, i) => (
-              <li key={`${inf.fecha}-${inf.informeNo ?? i}`}>
-                <button type="button" className="registro-bitacora-rango-link" onClick={() => irADiaRegistro(inf.fecha)}>
-                  {inf.fecha} · {inf.informeNo ?? 'sin número'}
-                </button>
-              </li>
-            ))}
-          </ul>
+        {!loadingRango && rangoResumen && projectId && (
+          <RegistroBitacoraRangoCalendario
+            fechaDesde={fechaDesde}
+            fechaHasta={fechaHasta}
+            selectedDate={fechaDia}
+            informes={rangoResumen.informes ?? []}
+            registros={rangoResumen.registros ?? []}
+            obraStart={proyectoMeta?.fechaMin ?? null}
+            obraEnd={proyectoMeta?.fechaMax ?? null}
+            onSelectDate={irADiaRegistro}
+          />
         )}
 
         <div className="form-field registro-bitacora-print-wrap">

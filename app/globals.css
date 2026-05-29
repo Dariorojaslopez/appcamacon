@@ -2056,6 +2056,35 @@ body {
   background: #f1f5f9;
 }
 
+.informe-calendario-cell--rango-registro {
+  background: #dbeafe;
+  border-color: #3b82f6;
+  color: #1e3a8a;
+}
+
+.informe-calendario-cell--rango-ambos {
+  background: #bbf7d0;
+  border-color: #15803d;
+  box-shadow: inset 0 0 0 2px #3b82f6;
+  color: #14532d;
+}
+
+.informe-calendario-legend-item--rango-registro::before {
+  background: #dbeafe;
+  border-color: #3b82f6;
+}
+
+.informe-calendario-legend-item--rango-ambos::before {
+  background: #bbf7d0;
+  border-color: #15803d;
+  box-shadow: inset 0 0 0 2px #3b82f6;
+}
+
+.registro-bitacora-rango-calendario {
+  margin-top: 0.75rem;
+  margin-bottom: 1rem;
+}
+
 .suspensiones-edit-actions {
   display: flex;
   flex-wrap: wrap;
