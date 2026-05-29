@@ -2083,9 +2083,17 @@ body {
 .registro-bitacora-rango-calendario {
   margin-top: 0.75rem;
   margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.registro-bitacora-rango-calendario .informe-calendario-toggle {
+  align-self: stretch;
 }
 
 .registro-bitacora-rango-calendario .informe-calendario {
+  width: 100%;
   max-width: 22rem;
   margin-top: 0.4rem;
   padding-top: 0.4rem;
