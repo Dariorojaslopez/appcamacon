@@ -1158,7 +1158,7 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
 
         {consecutivo != null && (
           <p className="shell-text-muted" style={{ marginTop: 0 }}>
-            Consecutivo de este registro: <strong>{consecutivo}</strong>
+            Folio de este registro: <strong>{consecutivo}</strong>
           </p>
         )}
         {loadingRegistro && projectId && <p className="shell-text-muted">Cargando datos del día…</p>}

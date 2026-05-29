@@ -129,10 +129,20 @@ export async function GET(req: NextRequest) {
         ? formatFechaEsPdf(parseYmdUtc(fechaDesdeStr)!)
         : `${formatFechaEsPdf(rango.desde)} — ${formatFechaEsPdf(rango.hasta)}`;
 
-    const toolbarDetalle =
-      dias.length === 1
-        ? '1 hoja · folio 1'
-        : `${dias.length} hojas · folios 1 a ${dias.length}`;
+    const foliosBitacora = dias.map((d) => d.consecutivo).filter((c) => c > 0);
+    const toolbarDetalle = (() => {
+      if (dias.length === 1) {
+        const folio = foliosBitacora[0];
+        return folio != null ? `1 hoja · folio ${folio}` : '1 hoja';
+      }
+      const foliosTxt =
+        foliosBitacora.length === 0
+          ? ''
+          : foliosBitacora.length === 1
+            ? ` · folio ${foliosBitacora[0]}`
+            : ` · folios ${Math.min(...foliosBitacora)} a ${Math.max(...foliosBitacora)}`;
+      return `${dias.length} hojas${foliosTxt}`;
+    })();
 
     const styleNonce = req.headers.get('x-nonce') ?? generateNonce();
 

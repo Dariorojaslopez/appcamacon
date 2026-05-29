@@ -167,8 +167,8 @@ export function buildRegistroSinInformePdfPage(
 
   return {
     consecutivo: reg.consecutivo,
-    folio: 0,
-    totalFolios: 0,
+    hoja: 0,
+    totalHojas: 0,
     informeNo: '—',
     fechaTexto: formatFechaEsPdf(fecha),
     diaSemana: weekdayEsPdf(fecha),
@@ -197,8 +197,8 @@ export function buildInformeDiarioPdfPage(
 
   return {
     consecutivo: reg?.consecutivo ?? 0,
-    folio: 0,
-    totalFolios: 0,
+    hoja: 0,
+    totalHojas: 0,
     informeNo,
     fechaTexto: formatFechaEsPdf(fecha),
     diaSemana: weekdayEsPdf(fecha),
