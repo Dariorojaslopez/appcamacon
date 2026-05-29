@@ -87,6 +87,7 @@ export function RegistroBitacoraRangoCalendario({
     d: new Date().getDate(),
   };
 
+  const [expanded, setExpanded] = useState(true);
   const [viewYear, setViewYear] = useState(initial.y);
   const [viewMonth, setViewMonth] = useState(initial.m);
 
@@ -176,10 +177,42 @@ export function RegistroBitacoraRangoCalendario({
   };
 
   const rangoLabel = `${fechaDesde} — ${fechaHasta}`;
+  const diasConDatos = useMemo(() => {
+    const fechas = new Set<string>();
+    for (const inf of informes) fechas.add(inf.fecha);
+    for (const reg of registros) fechas.add(reg.fecha);
+    return fechas.size;
+  }, [informes, registros]);
 
   return (
     <div className="informe-calendario-block registro-bitacora-rango-calendario">
-      <div className="informe-calendario" aria-label="Calendario de informes y bitácora en el rango consultado">
+      <button
+        type="button"
+        className="informe-calendario-toggle"
+        aria-expanded={expanded}
+        aria-controls="registro-bitacora-rango-calendario-panel"
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <span className="informe-calendario-toggle-icon" aria-hidden>
+          {expanded ? '▾' : '▸'}
+        </span>
+        <span className="informe-calendario-toggle-text">
+          {expanded ? 'Ocultar calendario del rango' : 'Mostrar calendario del rango'}
+        </span>
+        {!expanded ? (
+          <span className="informe-calendario-toggle-hint">
+            {rangoLabel}
+            {diasConDatos > 0 ? ` · ${diasConDatos} día${diasConDatos === 1 ? '' : 's'} con datos` : ''}
+          </span>
+        ) : null}
+      </button>
+
+      {expanded ? (
+        <div
+          id="registro-bitacora-rango-calendario-panel"
+          className="informe-calendario"
+          aria-label="Calendario de informes y bitácora en el rango consultado"
+        >
         <div className="informe-calendario-header">
           <button
             type="button"
@@ -276,10 +309,11 @@ export function RegistroBitacoraRangoCalendario({
           </span>
           <span className="informe-calendario-legend-item informe-calendario-legend-item--none">Sin datos</span>
         </div>
-        <p className="informe-calendario-hint" style={{ marginBottom: 0 }}>
+        <p className="informe-calendario-hint registro-bitacora-rango-calendario-foot">
           Clic en un día con datos para abrirlo en el formulario de arriba.
         </p>
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }

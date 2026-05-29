@@ -2085,6 +2085,63 @@ body {
   margin-bottom: 1rem;
 }
 
+.registro-bitacora-rango-calendario .informe-calendario {
+  max-width: 22rem;
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
+}
+
+.registro-bitacora-rango-calendario .informe-calendario-header {
+  margin-bottom: 0.3rem;
+}
+
+.registro-bitacora-rango-calendario .informe-calendario-title {
+  font-size: 0.82rem;
+}
+
+.registro-bitacora-rango-calendario .informe-calendario-nav {
+  width: 1.65rem;
+  height: 1.65rem;
+  font-size: 0.95rem;
+  border-radius: 6px;
+}
+
+.registro-bitacora-rango-calendario .informe-calendario-hint {
+  font-size: 0.68rem;
+  margin-bottom: 0.3rem;
+  line-height: 1.35;
+}
+
+.registro-bitacora-rango-calendario .informe-calendario-weekdays {
+  font-size: 0.62rem;
+  gap: 1px;
+}
+
+.registro-bitacora-rango-calendario .informe-calendario-grid {
+  gap: 2px;
+}
+
+.registro-bitacora-rango-calendario .informe-calendario-cell {
+  min-height: 1.5rem;
+  font-size: 0.68rem;
+  border-radius: 4px;
+}
+
+.registro-bitacora-rango-calendario .informe-calendario-legend {
+  margin-top: 0.35rem;
+  gap: 0.3rem 0.55rem;
+  font-size: 0.65rem;
+}
+
+.registro-bitacora-rango-calendario .informe-calendario-legend-item::before {
+  width: 0.65rem;
+  height: 0.65rem;
+}
+
+.registro-bitacora-rango-calendario-foot {
+  margin-bottom: 0;
+}
+
 .suspensiones-edit-actions {
   display: flex;
   flex-wrap: wrap;
