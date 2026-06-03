@@ -1,6 +1,12 @@
+import fs from 'fs/promises';
+import path from 'path';
 import type { RegistroBitacoraObra, User } from '@prisma/client';
-import { storedMediaImgSrc } from './evidenciasUrlPayload';
+import {
+  extractGoogleDriveFileIdFromStoredUrl,
+  storedMediaImgSrc,
+} from './evidenciasUrlPayload';
 import { diffInclusiveCalendarDaysUtc } from './registroBitacoraFecha';
+import { isSharePointOrOneDriveShareUrl } from './obraCarpetaNube';
 import {
   buildClimaFilasDeUnInforme,
   buildClimaFilasFromInformes,
@@ -31,6 +37,43 @@ export function absMediaPdf(origin: string, stored: string | null | undefined): 
   return `${origin}${rel.startsWith('/') ? '' : '/'}${rel}`;
 }
 
+/** Logo embebible en HTML/PDF: local en base64, proxy Drive o vacío si no es cargable. */
+export async function resolveObraLogoParaPdfHtml(
+  origin: string,
+  logoUrl: string | null | undefined,
+): Promise<string> {
+  const rel = storedMediaImgSrc(logoUrl);
+  if (!rel) return '';
+
+  if (rel.startsWith('/uploads/')) {
+    try {
+      const filePath = path.join(process.cwd(), 'public', rel.replace(/^\//, ''));
+      const buf = await fs.readFile(filePath);
+      const ext = path.extname(filePath).toLowerCase();
+      const mime =
+        ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : ext === '.gif' ? 'image/gif' : 'image/jpeg';
+      return `data:${mime};base64,${buf.toString('base64')}`;
+    } catch {
+      return `${origin}${rel}`;
+    }
+  }
+
+  if (rel.startsWith('/api/')) {
+    return `${origin}${rel}`;
+  }
+
+  if (rel.startsWith('http')) {
+    if (isSharePointOrOneDriveShareUrl(rel)) return '';
+    const driveId = extractGoogleDriveFileIdFromStoredUrl(rel);
+    if (driveId) {
+      return `${origin}/api/uploads/drive-image?fileId=${encodeURIComponent(driveId)}`;
+    }
+    return '';
+  }
+
+  return absMediaPdf(origin, logoUrl);
+}
+
 export function weekdayEsPdf(fecha: Date): string {
   const d = fecha.toLocaleDateString('es-CO', { weekday: 'long', timeZone: 'UTC' });
   return d.charAt(0).toUpperCase() + d.slice(1);
@@ -45,7 +88,7 @@ export function formatFechaEsPdf(fecha: Date): string {
   });
 }
 
-export function buildObraPdfBase(origin: string, project: ProjectPdf): RegistroBitacoraPdfObra {
+export async function buildObraPdfBase(origin: string, project: ProjectPdf): Promise<RegistroBitacoraPdfObra> {
   const rangoTxt =
     project.startDate && project.endDate
       ? `${formatFechaEsPdf(project.startDate)} hasta ${formatFechaEsPdf(project.endDate)}`
@@ -63,7 +106,7 @@ export function buildObraPdfBase(origin: string, project: ProjectPdf): RegistroB
   return {
     obraNombre: project.name,
     obraCodigo: project.code,
-    obraLogoUrl: absMediaPdf(origin, project.logoUrl),
+    obraLogoUrl: await resolveObraLogoParaPdfHtml(origin, project.logoUrl),
     rangoObraTexto: rangoTxt,
     plazoContractualDias: plazoDias,
     contratoTexto: project.description?.trim() || project.code,

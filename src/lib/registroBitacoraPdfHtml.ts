@@ -415,7 +415,7 @@ const PDF_STYLES = `
 
 function logosContentHtml(obra: RegistroBitacoraPdfObra): string {
   if (obra.obraLogoUrl) {
-    return `<img class="logo-obra" src="${esc(obra.obraLogoUrl)}" alt="${esc(obra.obraNombre)}" />`;
+    return `<img class="logo-obra" src="${esc(obra.obraLogoUrl)}" alt="" />`;
   }
   return `<span class="logo-fallback">${esc(obra.obraCodigo)}</span>`;
 }

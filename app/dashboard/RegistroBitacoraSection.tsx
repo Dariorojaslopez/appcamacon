@@ -457,12 +457,14 @@ type RangoResumen = {
   totalDias: number;
   conRegistro: number;
   conInforme?: number;
+  diasConDatos?: number;
   registros: { fecha: string; consecutivo: number }[];
   informes?: { fecha: string; informeNo: string | null }[];
 };
 
 function countDiasConDatosEnRango(rango: RangoResumen | null): number {
   if (!rango) return 0;
+  if (typeof rango.diasConDatos === 'number') return rango.diasConDatos;
   const fechas = new Set<string>();
   for (const inf of rango.informes ?? []) fechas.add(inf.fecha);
   for (const reg of rango.registros) fechas.add(reg.fecha);
@@ -770,6 +772,7 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
           totalDias: data.totalDias,
           conRegistro: data.conRegistro,
           conInforme: data.conInforme,
+          diasConDatos: data.diasConDatos,
           registros: data.registros ?? [],
           informes: data.informes ?? [],
         });

@@ -12,6 +12,10 @@ import {
   toYmdUtc,
 } from '../../../../src/lib/registroBitacoraFecha';
 import { findInformesDiariosEnRango } from '../../../../src/lib/registroBitacoraClimaPdf';
+import {
+  informeDiarioTieneDatosParaPdf,
+  registroBitacoraTieneDatosParaPdf,
+} from '../../../../src/lib/registroBitacoraPdfDatos';
 import { fetchFolioPorFechaMap } from '../../../../src/lib/registroBitacoraFolio';
 import { authFromRequest, isAuthPayload, requireAccessibleProject } from '../../../../src/lib/requireProjectAccess';
 
@@ -54,26 +58,33 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: rangoObraHasta.error }, { status: 400 });
     }
 
-    const registros = await prisma.registroBitacoraObra.findMany({
+    const registrosRaw = await prisma.registroBitacoraObra.findMany({
       where: {
         projectId,
         fecha: { gte: rango.desde, lte: rango.hasta },
       },
-      select: { fecha: true, consecutivo: true },
       orderBy: { fecha: 'asc' },
     });
+    const registrosConDatos = registrosRaw.filter(registroBitacoraTieneDatosParaPdf);
 
     const totalDias = diffInclusiveCalendarDaysUtc(rango.desde, rango.hasta);
-    const informesEnRango = await findInformesDiariosEnRango(projectId, rango.desde, rango.hasta);
+    const informesEnRango = (await findInformesDiariosEnRango(projectId, rango.desde, rango.hasta)).filter(
+      informeDiarioTieneDatosParaPdf,
+    );
     const folioPorFecha = await fetchFolioPorFechaMap(projectId);
+
+    const fechasConDatos = new Set<string>();
+    for (const r of registrosConDatos) fechasConDatos.add(toYmdUtc(r.fecha));
+    for (const inf of informesEnRango) fechasConDatos.add(toYmdUtc(inf.date));
 
     return NextResponse.json({
       fechaDesde: fechaDesdeStr,
       fechaHasta: fechaHastaStr,
       totalDias,
-      conRegistro: registros.length,
+      conRegistro: registrosConDatos.length,
       conInforme: informesEnRango.length,
-      registros: registros.map((r) => ({
+      diasConDatos: fechasConDatos.size,
+      registros: registrosConDatos.map((r) => ({
         fecha: toYmdUtc(r.fecha),
         consecutivo: folioPorFecha.get(toYmdUtc(r.fecha)) ?? r.consecutivo,
       })),

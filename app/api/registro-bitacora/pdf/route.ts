@@ -20,6 +20,11 @@ import {
   buildRegistroSinInformePdfPage,
   formatFechaEsPdf,
 } from '../../../../src/lib/registroBitacoraPdfBuild';
+import {
+  informeDiarioTieneDatosParaPdf,
+  paginaRegistroBitacoraPdfTieneDatos,
+  registroBitacoraTieneDatosParaPdf,
+} from '../../../../src/lib/registroBitacoraPdfDatos';
 import { fetchFolioPorFechaMap, syncRegistroBitacoraConsecutivos } from '../../../../src/lib/registroBitacoraFolio';
 import { authFromRequest, isAuthPayload, requireAccessibleProject } from '../../../../src/lib/requireProjectAccess';
 import type { RegistroBitacoraPdfDia } from '../../../../src/lib/registroBitacoraPdfHtml';
@@ -91,25 +96,29 @@ export async function GET(req: NextRequest) {
     });
     const catalog = new Map(tipos.map((t) => [t.codigo, t.nombre]));
 
-    const obra = buildObraPdfBase(origin, project);
+    const obra = await buildObraPdfBase(origin, project);
     const paginas: { ymd: string; dia: RegistroBitacoraPdfDia }[] = [];
 
     for (const informe of informes) {
       const ymd = toYmdUtc(informe.date);
       const reg = registrosByYmd.get(ymd) ?? null;
-      paginas.push({
-        ymd,
-        dia: buildInformeDiarioPdfPage(origin, project, informe, reg, catalog),
-      });
+      const informeConDatos = informeDiarioTieneDatosParaPdf(informe);
+      const registroConDatos = reg != null && registroBitacoraTieneDatosParaPdf(reg);
+      if (!informeConDatos && !registroConDatos) continue;
+
+      const dia = buildInformeDiarioPdfPage(origin, project, informe, reg, catalog);
+      if (!paginaRegistroBitacoraPdfTieneDatos(dia)) continue;
+      paginas.push({ ymd, dia });
     }
 
     for (const reg of registros) {
       const ymd = toYmdUtc(reg.fecha);
       if (informeYmds.has(ymd)) continue;
-      paginas.push({
-        ymd,
-        dia: buildRegistroSinInformePdfPage(origin, project, reg.fecha, reg, catalog),
-      });
+      if (!registroBitacoraTieneDatosParaPdf(reg)) continue;
+
+      const dia = buildRegistroSinInformePdfPage(origin, project, reg.fecha, reg, catalog);
+      if (!paginaRegistroBitacoraPdfTieneDatos(dia)) continue;
+      paginas.push({ ymd, dia });
     }
 
     paginas.sort((a, b) => a.ymd.localeCompare(b.ymd));
@@ -126,7 +135,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            'No hay informes diarios ni registros de bitácora en ese rango. Cree un informe en «Datos generales» o un registro de bitácora con datos del día.',
+            'No hay días con datos en ese rango. Registre bitácora o datos del día antes de imprimir.',
         },
         { status: 404 },
       );
