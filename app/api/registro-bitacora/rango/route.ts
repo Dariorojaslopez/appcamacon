@@ -12,6 +12,7 @@ import {
   toYmdUtc,
 } from '../../../../src/lib/registroBitacoraFecha';
 import { findInformesDiariosEnRango } from '../../../../src/lib/registroBitacoraClimaPdf';
+import { fetchFolioPorFechaMap } from '../../../../src/lib/registroBitacoraFolio';
 import { authFromRequest, isAuthPayload, requireAccessibleProject } from '../../../../src/lib/requireProjectAccess';
 
 export async function GET(req: NextRequest) {
@@ -64,6 +65,7 @@ export async function GET(req: NextRequest) {
 
     const totalDias = diffInclusiveCalendarDaysUtc(rango.desde, rango.hasta);
     const informesEnRango = await findInformesDiariosEnRango(projectId, rango.desde, rango.hasta);
+    const folioPorFecha = await fetchFolioPorFechaMap(projectId);
 
     return NextResponse.json({
       fechaDesde: fechaDesdeStr,
@@ -73,7 +75,7 @@ export async function GET(req: NextRequest) {
       conInforme: informesEnRango.length,
       registros: registros.map((r) => ({
         fecha: toYmdUtc(r.fecha),
-        consecutivo: r.consecutivo,
+        consecutivo: folioPorFecha.get(toYmdUtc(r.fecha)) ?? r.consecutivo,
       })),
       informes: informesEnRango.map((inf) => ({
         fecha: toYmdUtc(inf.date),

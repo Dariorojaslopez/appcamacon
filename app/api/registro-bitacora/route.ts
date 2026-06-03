@@ -7,6 +7,10 @@ import {
   prismaIndicaTablaRegistroBitacoraDesactualizada,
 } from '../../../src/lib/prismaRegistroBitacoraSchema';
 import { fechaRegistroEnRangoObra, parseYmdUtc, toYmdUtc } from '../../../src/lib/registroBitacoraFecha';
+import {
+  fetchFolioPorFechaMap,
+  syncRegistroBitacoraConsecutivos,
+} from '../../../src/lib/registroBitacoraFolio';
 import { dbRegistroBitacoraSlotsForRole } from '../../../src/infrastructure/auth/registroBitacoraPermissionsResolver';
 import {
   REGISTRO_BITACORA_SLOT_KEYS,
@@ -113,11 +117,15 @@ export async function GET(req: NextRequest) {
     });
 
     const diaInforme = await loadRegistroBitacoraDiaInforme(projectId, fecha, reg);
+    const folioPorFecha = reg ? await fetchFolioPorFechaMap(projectId) : null;
+    const consecutivo =
+      reg && folioPorFecha ? (folioPorFecha.get(toYmdUtc(reg.fecha)) ?? reg.consecutivo) : null;
 
     return NextResponse.json({
       registro: reg
         ? {
             ...reg,
+            consecutivo: consecutivo ?? reg.consecutivo,
             fecha: toYmdUtc(reg.fecha),
             contratistaGuardadoEn: reg.contratistaGuardadoEn?.toISOString() ?? null,
             interventoriaGuardadoEn: reg.interventoriaGuardadoEn?.toISOString() ?? null,
@@ -285,21 +293,20 @@ export async function POST(req: NextRequest) {
         });
         return { row: updated, created: false };
       }
-      const agg = await tx.registroBitacoraObra.aggregate({
-        where: { projectId },
-        _max: { consecutivo: true },
-      });
-      const nextConsecutivo = (agg._max.consecutivo ?? 0) + 1;
       const createdRow = await tx.registroBitacoraObra.create({
         data: {
           projectId,
           userId,
           fecha,
-          consecutivo: nextConsecutivo,
+          consecutivo: 0,
           ...dataSlots,
         },
       });
-      return { row: createdRow, created: true };
+      await syncRegistroBitacoraConsecutivos(projectId, tx);
+      const rowAfterSync = await tx.registroBitacoraObra.findUniqueOrThrow({
+        where: { id: createdRow.id },
+      });
+      return { row: rowAfterSync, created: true };
     });
 
     let savedSlots = REGISTRO_BITACORA_SLOT_KEYS.filter((slot) => {

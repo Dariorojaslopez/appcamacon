@@ -20,6 +20,7 @@ import {
   buildRegistroSinInformePdfPage,
   formatFechaEsPdf,
 } from '../../../../src/lib/registroBitacoraPdfBuild';
+import { fetchFolioPorFechaMap, syncRegistroBitacoraConsecutivos } from '../../../../src/lib/registroBitacoraFolio';
 import { authFromRequest, isAuthPayload, requireAccessibleProject } from '../../../../src/lib/requireProjectAccess';
 import type { RegistroBitacoraPdfDia } from '../../../../src/lib/registroBitacoraPdfHtml';
 
@@ -112,7 +113,14 @@ export async function GET(req: NextRequest) {
     }
 
     paginas.sort((a, b) => a.ymd.localeCompare(b.ymd));
-    const dias = paginas.map((p) => p.dia);
+
+    await syncRegistroBitacoraConsecutivos(projectId);
+    const folioPorFecha = await fetchFolioPorFechaMap(projectId);
+    const dias = paginas.map((p) => {
+      const folio = folioPorFecha.get(p.ymd);
+      if (folio == null || p.dia.consecutivo <= 0) return p.dia;
+      return { ...p.dia, consecutivo: folio };
+    });
 
     if (dias.length === 0) {
       return NextResponse.json(
