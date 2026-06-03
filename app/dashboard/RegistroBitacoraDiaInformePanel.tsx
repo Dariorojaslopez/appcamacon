@@ -88,12 +88,11 @@ export function RegistroBitacoraDiaInformePanel({
       </h3>
       {state.tieneInformeDiario ? (
         <p className="informe-label-hint" style={{ marginTop: 0 }}>
-          Hay informe diario para esta fecha: la información se toma del informe y no se puede editar aquí.
+          Los datos del día ya están registrados y no se pueden editar aquí.
         </p>
       ) : (
         <p className="informe-label-hint" style={{ marginTop: 0 }}>
-          No hay informe diario para esta fecha. Complete los datos en las tablas siguientes; se guardan al pulsar
-          «Guardar registro».
+          Complete los datos en las tablas siguientes; se guardan al pulsar «Guardar registro».
         </p>
       )}
 

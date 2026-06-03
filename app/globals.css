@@ -2080,6 +2080,28 @@ body {
   box-shadow: inset 0 0 0 2px #3b82f6;
 }
 
+.registro-bitacora-rango-calendario .informe-calendario-cell--rango-data {
+  background: #1e3a8a;
+  border-color: #1e40af;
+  color: #fff;
+}
+
+.registro-bitacora-rango-calendario .informe-calendario-cell--rango-data:not(:disabled):hover {
+  background: #1e40af;
+  border-color: #2563eb;
+}
+
+.registro-bitacora-rango-calendario .informe-calendario-cell--none {
+  background: #fff;
+  border-color: #e2e8f0;
+  color: #64748b;
+}
+
+.registro-bitacora-rango-calendario .informe-calendario-legend-item--rango-data::before {
+  background: #1e3a8a;
+  border-color: #1e40af;
+}
+
 .registro-bitacora-rango-calendario {
   margin-top: 0.75rem;
   margin-bottom: 1rem;

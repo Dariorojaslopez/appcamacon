@@ -211,7 +211,7 @@ export function RegistroBitacoraRangoCalendario({
         <div
           id="registro-bitacora-rango-calendario-panel"
           className="informe-calendario"
-          aria-label="Calendario de informes y bitácora en el rango consultado"
+          aria-label="Calendario de días con datos en el rango consultado"
         >
         <div className="informe-calendario-header">
           <button
@@ -262,25 +262,22 @@ export function RegistroBitacoraRangoCalendario({
             const enRango = inRangoConsulta(ymd, fechaDesde, fechaHasta);
             const hasInforme = informeByDate.has(ymd);
             const hasRegistro = registroByDate.has(ymd);
+            const hasData = hasInforme || hasRegistro;
             const isSelected = ymd === selectedDate;
-            const informeNos = informeByDate.get(ymd) ?? [];
             const consecutivo = registroByDate.get(ymd);
 
             let stateClass = 'informe-calendario-cell--none';
             if (!enObra || !enRango) stateClass = 'informe-calendario-cell--out';
-            else if (hasInforme && hasRegistro) stateClass = 'informe-calendario-cell--rango-ambos';
-            else if (hasInforme) stateClass = 'informe-calendario-cell--abierto';
-            else if (hasRegistro) stateClass = 'informe-calendario-cell--rango-registro';
+            else if (hasData) stateClass = 'informe-calendario-cell--rango-data';
 
-            const clickable = enObra && enRango && (hasInforme || hasRegistro);
+            const clickable = enObra && enRango && hasData;
             const titleParts: string[] = [];
             if (!enObra) titleParts.push('Fuera de vigencia de la obra');
             else if (!enRango) titleParts.push('Fuera del rango consultado');
-            else {
-              if (informeNos.length) titleParts.push(`Informe: ${informeNos.join(', ')}`);
-              if (consecutivo != null) titleParts.push(`Bitácora #${consecutivo}`);
-              if (!hasInforme && !hasRegistro) titleParts.push('Sin informe ni registro de bitácora');
-            }
+            else if (hasData) {
+              if (consecutivo != null) titleParts.push(`Folio ${consecutivo}`);
+              else titleParts.push('Con datos');
+            } else titleParts.push('Sin datos');
 
             return (
               <button
@@ -298,14 +295,8 @@ export function RegistroBitacoraRangoCalendario({
           })}
         </div>
         <div className="informe-calendario-legend">
-          <span className="informe-calendario-legend-item informe-calendario-legend-item--abierto">
-            Con informe diario
-          </span>
-          <span className="informe-calendario-legend-item informe-calendario-legend-item--rango-registro">
-            Solo registro de bitácora
-          </span>
-          <span className="informe-calendario-legend-item informe-calendario-legend-item--rango-ambos">
-            Informe y bitácora
+          <span className="informe-calendario-legend-item informe-calendario-legend-item--rango-data">
+            Con datos
           </span>
           <span className="informe-calendario-legend-item informe-calendario-legend-item--none">Sin datos</span>
         </div>
