@@ -1164,101 +1164,6 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
         {loadingRegistro && projectId && <p className="shell-text-muted">Cargando datos del día…</p>}
 
         <div className="section-divider" />
-        <h2 className="section-title" style={{ marginBottom: '0.75rem' }}>
-          Consultar e imprimir por rango
-        </h2>
-        <p className="informe-label-hint" style={{ marginTop: 0, marginBottom: '1rem' }}>
-          Elija un rango de fechas: se listan los informes diarios (obra + fecha) y se genera una hoja por cada uno, con
-          sus franjas de clima (mañana, tarde, noche) y la bitácora del mismo día si existe.
-        </p>
-
-        <div className="registro-bitacora-rango-fechas">
-          <div className="form-field">
-            <label className="form-label" htmlFor="rb-desde">
-              Desde
-            </label>
-            <input
-              id="rb-desde"
-              type="date"
-              className="form-input"
-              value={fechaDesde}
-              min={proyectoMeta?.fechaMin ?? undefined}
-              max={proyectoMeta?.fechaMax ?? undefined}
-              disabled={!projectId || loadingMeta}
-              onChange={(e) => {
-                const v = clampYmd(e.target.value, proyectoMeta?.fechaMin ?? null, proyectoMeta?.fechaMax ?? null);
-                setFechaDesde(v);
-                if (fechaHasta && v > fechaHasta) setFechaHasta(v);
-              }}
-            />
-          </div>
-          <div className="form-field">
-            <label className="form-label" htmlFor="rb-hasta">
-              Hasta
-            </label>
-            <input
-              id="rb-hasta"
-              type="date"
-              className="form-input"
-              value={fechaHasta}
-              min={proyectoMeta?.fechaMin ?? undefined}
-              max={proyectoMeta?.fechaMax ?? undefined}
-              disabled={!projectId || loadingMeta}
-              onChange={(e) => {
-                const v = clampYmd(e.target.value, proyectoMeta?.fechaMin ?? null, proyectoMeta?.fechaMax ?? null);
-                setFechaHasta(v);
-                if (fechaDesde && v < fechaDesde) setFechaDesde(v);
-              }}
-            />
-          </div>
-        </div>
-
-        {loadingRango && projectId && <p className="shell-text-muted">Buscando registros en el rango…</p>}
-        {!loadingRango && rangoResumen && projectId && (
-          <p className="shell-text-muted" style={{ marginTop: 0 }}>
-            En el rango hay <strong>{rangoResumen.conInforme ?? 0}</strong> informe
-            {(rangoResumen.conInforme ?? 0) === 1 ? '' : 's'} diario
-            {(rangoResumen.conInforme ?? 0) === 1 ? '' : 's'} (una hoja por informe) y{' '}
-            <strong>{rangoResumen.conRegistro}</strong> registro{rangoResumen.conRegistro === 1 ? '' : 's'} de bitácora
-            por día.
-          </p>
-        )}
-        {!loadingRango && rangoResumen && projectId && (
-          <RegistroBitacoraRangoCalendario
-            fechaDesde={fechaDesde}
-            fechaHasta={fechaHasta}
-            selectedDate={fechaDia}
-            informes={rangoResumen.informes ?? []}
-            registros={rangoResumen.registros ?? []}
-            obraStart={proyectoMeta?.fechaMin ?? null}
-            obraEnd={proyectoMeta?.fechaMax ?? null}
-            onSelectDate={irADiaRegistro}
-          />
-        )}
-
-        <div className="form-field registro-bitacora-print-wrap">
-          <button
-            type="button"
-            className="registro-bitacora-print-btn"
-            onClick={handleImprimir}
-            disabled={
-              !projectId ||
-              !fechaDesde ||
-              !fechaHasta ||
-              loadingRango ||
-              (rangoResumen != null &&
-                (rangoResumen.conInforme ?? 0) === 0 &&
-                (rangoResumen.conRegistro ?? 0) === 0)
-            }
-          >
-            <span className="registro-bitacora-print-btn-title">Vista previa e imprimir PDF del rango</span>
-            <span className="registro-bitacora-print-btn-hint">
-              Una hoja por informe diario o por registro de bitácora con datos manuales del día.
-            </span>
-          </button>
-        </div>
-
-        <div className="section-divider" />
         {loadingSlots ? (
           <p className="shell-text-muted">Cargando permisos de su rol…</p>
         ) : slotFlags && !REGISTRO_BITACORA_SLOT_KEYS.some((s) => canSlot(s)) ? (
@@ -1403,6 +1308,101 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
             {msg}
           </p>
         )}
+
+        <div className="section-divider" />
+        <h2 className="section-title" style={{ marginBottom: '0.75rem' }}>
+          Consultar e imprimir por rango
+        </h2>
+        <p className="informe-label-hint" style={{ marginTop: 0, marginBottom: '1rem' }}>
+          Elija un rango de fechas: se listan los informes diarios (obra + fecha) y se genera una hoja por cada uno, con
+          sus franjas de clima (mañana, tarde, noche) y la bitácora del mismo día si existe.
+        </p>
+
+        <div className="registro-bitacora-rango-fechas">
+          <div className="form-field">
+            <label className="form-label" htmlFor="rb-desde">
+              Desde
+            </label>
+            <input
+              id="rb-desde"
+              type="date"
+              className="form-input"
+              value={fechaDesde}
+              min={proyectoMeta?.fechaMin ?? undefined}
+              max={proyectoMeta?.fechaMax ?? undefined}
+              disabled={!projectId || loadingMeta}
+              onChange={(e) => {
+                const v = clampYmd(e.target.value, proyectoMeta?.fechaMin ?? null, proyectoMeta?.fechaMax ?? null);
+                setFechaDesde(v);
+                if (fechaHasta && v > fechaHasta) setFechaHasta(v);
+              }}
+            />
+          </div>
+          <div className="form-field">
+            <label className="form-label" htmlFor="rb-hasta">
+              Hasta
+            </label>
+            <input
+              id="rb-hasta"
+              type="date"
+              className="form-input"
+              value={fechaHasta}
+              min={proyectoMeta?.fechaMin ?? undefined}
+              max={proyectoMeta?.fechaMax ?? undefined}
+              disabled={!projectId || loadingMeta}
+              onChange={(e) => {
+                const v = clampYmd(e.target.value, proyectoMeta?.fechaMin ?? null, proyectoMeta?.fechaMax ?? null);
+                setFechaHasta(v);
+                if (fechaDesde && v < fechaDesde) setFechaDesde(v);
+              }}
+            />
+          </div>
+        </div>
+
+        {loadingRango && projectId && <p className="shell-text-muted">Buscando registros en el rango…</p>}
+        {!loadingRango && rangoResumen && projectId && (
+          <p className="shell-text-muted" style={{ marginTop: 0 }}>
+            En el rango hay <strong>{rangoResumen.conInforme ?? 0}</strong> informe
+            {(rangoResumen.conInforme ?? 0) === 1 ? '' : 's'} diario
+            {(rangoResumen.conInforme ?? 0) === 1 ? '' : 's'} (una hoja por informe) y{' '}
+            <strong>{rangoResumen.conRegistro}</strong> registro{rangoResumen.conRegistro === 1 ? '' : 's'} de bitácora
+            por día.
+          </p>
+        )}
+        {!loadingRango && rangoResumen && projectId && (
+          <RegistroBitacoraRangoCalendario
+            fechaDesde={fechaDesde}
+            fechaHasta={fechaHasta}
+            selectedDate={fechaDia}
+            informes={rangoResumen.informes ?? []}
+            registros={rangoResumen.registros ?? []}
+            obraStart={proyectoMeta?.fechaMin ?? null}
+            obraEnd={proyectoMeta?.fechaMax ?? null}
+            onSelectDate={irADiaRegistro}
+          />
+        )}
+
+        <div className="form-field registro-bitacora-print-wrap">
+          <button
+            type="button"
+            className="registro-bitacora-print-btn"
+            onClick={handleImprimir}
+            disabled={
+              !projectId ||
+              !fechaDesde ||
+              !fechaHasta ||
+              loadingRango ||
+              (rangoResumen != null &&
+                (rangoResumen.conInforme ?? 0) === 0 &&
+                (rangoResumen.conRegistro ?? 0) === 0)
+            }
+          >
+            <span className="registro-bitacora-print-btn-title">Vista previa e imprimir PDF del rango</span>
+            <span className="registro-bitacora-print-btn-hint">
+              Una hoja por informe diario o por registro de bitácora con datos manuales del día.
+            </span>
+          </button>
+        </div>
       </form>
     </section>
   );
