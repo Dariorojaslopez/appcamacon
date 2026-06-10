@@ -192,7 +192,7 @@ async function uploadRegistroDocumento(file: File, projectId: string): Promise<R
     error?: string;
   };
   if (!res.ok) throw new Error(data.error ?? 'Error al subir documento');
-  const url = data.previewUrl || data.url;
+  const url = data.url || data.previewUrl;
   if (!url) throw new Error('Respuesta sin URL');
   return {
     url: String(url),
@@ -212,7 +212,7 @@ async function uploadEvidenciaFoto(file: File, projectId: string): Promise<strin
   });
   const data = (await res.json()) as { url?: string; previewUrl?: string; error?: string };
   if (!res.ok) throw new Error(data.error ?? 'Error al subir archivo');
-  const url = data.previewUrl || data.url;
+  const url = data.url || data.previewUrl;
   if (!url) throw new Error('Respuesta sin URL');
   return String(url);
 }

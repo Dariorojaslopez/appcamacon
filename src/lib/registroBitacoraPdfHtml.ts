@@ -589,7 +589,11 @@ function buildSeccionesHtml(secciones: RegistroBitacoraPdfSlot[]): string {
       }
       for (const doc of s.firmaDocs ?? []) {
         const abs = doc.url.startsWith('http') ? doc.url : doc.url;
-        if (isImageContentType(doc.contentType) || /\.(jpe?g|png|gif|webp)(\?|$)/i.test(doc.url)) {
+        if (
+          doc.url.startsWith('data:image/') ||
+          isImageContentType(doc.contentType) ||
+          /\.(jpe?g|png|gif|webp)(\?|$)/i.test(doc.url)
+        ) {
           firmaParts.push(
             `<div class="firma-doc-block"><div class="firma-doc-name">${esc(doc.name)}</div><img class="firma-img" src="${esc(abs)}" alt="" /></div>`,
           );

@@ -20,7 +20,7 @@ export function parseFirmaDocsJson(raw: unknown): RegistroBitacoraFirmaDoc[] {
     const o = item as Record<string, unknown>;
     const url = typeof o.url === 'string' ? o.url.trim() : '';
     const name = typeof o.name === 'string' ? o.name.trim() : '';
-    if (!url || !/^https?:\/\//i.test(url)) continue;
+    if (!url || (!/^https?:\/\//i.test(url) && !url.startsWith('/'))) continue;
     out.push({
       url,
       name: name || 'Documento',

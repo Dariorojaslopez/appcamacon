@@ -1,10 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import type { RegistroBitacoraObra, User } from '@prisma/client';
-import {
-  extractGoogleDriveFileIdFromStoredUrl,
-  storedMediaImgSrc,
-} from './evidenciasUrlPayload';
+import { storedMediaImgSrc } from './evidenciasUrlPayload';
 import { diffInclusiveCalendarDaysUtc } from './registroBitacoraFecha';
 import { isSharePointOrOneDriveShareUrl } from './obraCarpetaNube';
 import {
@@ -18,6 +15,7 @@ import { agruparPersonalPorCargo } from './registroBitacoraPersonalPdf';
 import type { RegistroBitacoraPdfDia, RegistroBitacoraPdfObra, RegistroBitacoraPdfSlot } from './registroBitacoraPdfHtml';
 import { REGISTRO_BITACORA_SLOT_LABELS } from '../shared/registroBitacoraPermissions';
 import { mergeLegacyFirmaUrl, parseFirmaDocsJson } from '../shared/registroBitacoraFirmaDocs';
+import { resolveMediaParaPdfEmbed } from './registroBitacoraPdfMedia';
 
 type ProjectPdf = {
   name: string;
@@ -58,16 +56,11 @@ export async function resolveObraLogoParaPdfHtml(
     }
   }
 
-  if (rel.startsWith('/api/')) {
-    return `${origin}${rel}`;
-  }
-
-  if (rel.startsWith('http')) {
+  if (rel.startsWith('/api/') || rel.startsWith('http')) {
+    const embedded = await resolveMediaParaPdfEmbed(origin, logoUrl);
+    if (embedded) return embedded;
+    if (rel.startsWith('/api/')) return `${origin}${rel}`;
     if (isSharePointOrOneDriveShareUrl(rel)) return '';
-    const driveId = extractGoogleDriveFileIdFromStoredUrl(rel);
-    if (driveId) {
-      return `${origin}/api/uploads/drive-image?fileId=${encodeURIComponent(driveId)}`;
-    }
     return '';
   }
 
@@ -118,17 +111,19 @@ function transcurridoDiasObra(project: ProjectPdf, fecha: Date): number | null {
   return diffInclusiveCalendarDaysUtc(project.startDate, fecha);
 }
 
-function mapFirmaDocsPdf(
+async function mapFirmaDocsPdf(
   origin: string,
   firmaUrl: string | null,
   rawDocs: unknown,
-): { firmaUrl: string; firmaDocs: RegistroBitacoraPdfSlot['firmaDocs'] } {
+): Promise<{ firmaUrl: string; firmaDocs: RegistroBitacoraPdfSlot['firmaDocs'] }> {
   const merged = mergeLegacyFirmaUrl(firmaUrl, parseFirmaDocsJson(rawDocs));
-  const drawn = absMediaPdf(origin, firmaUrl);
-  const docs = merged.map((d) => ({
-    ...d,
-    url: absMediaPdf(origin, d.url),
-  }));
+  const drawn = await resolveMediaParaPdfEmbed(origin, firmaUrl);
+  const docs = await Promise.all(
+    merged.map(async (d) => ({
+      ...d,
+      url: await resolveMediaParaPdfEmbed(origin, d.url),
+    })),
+  );
   return {
     firmaUrl: drawn && !docs.some((d) => d.url === drawn) ? drawn : '',
     firmaDocs: docs,
@@ -161,29 +156,34 @@ function seccionesVaciasBitacora(): RegistroBitacoraPdfSlot[] {
   ];
 }
 
-function seccionesDesdeRegistro(origin: string, reg: RegistroWithUser): RegistroBitacoraPdfSlot[] {
-  const c = mapFirmaDocsPdf(origin, reg.contratistaFirmaUrl, reg.contratistaFirmaDocs);
-  const i = mapFirmaDocsPdf(origin, reg.interventoriaFirmaUrl, reg.interventoriaFirmaDocs);
-  const d = mapFirmaDocsPdf(origin, reg.iduFirmaUrl, reg.iduFirmaDocs);
+async function seccionesDesdeRegistro(origin: string, reg: RegistroWithUser): Promise<RegistroBitacoraPdfSlot[]> {
+  const [c, i, d, fotoC, fotoI, fotoU] = await Promise.all([
+    mapFirmaDocsPdf(origin, reg.contratistaFirmaUrl, reg.contratistaFirmaDocs),
+    mapFirmaDocsPdf(origin, reg.interventoriaFirmaUrl, reg.interventoriaFirmaDocs),
+    mapFirmaDocsPdf(origin, reg.iduFirmaUrl, reg.iduFirmaDocs),
+    resolveMediaParaPdfEmbed(origin, reg.contratistaFotoUrl),
+    resolveMediaParaPdfEmbed(origin, reg.interventoriaFotoUrl),
+    resolveMediaParaPdfEmbed(origin, reg.iduFotoUrl),
+  ]);
   return [
     {
       titulo: REGISTRO_BITACORA_SLOT_LABELS.contratista,
       observaciones: reg.contratistaObservaciones,
-      fotoUrl: absMediaPdf(origin, reg.contratistaFotoUrl),
+      fotoUrl: fotoC,
       firmaUrl: c.firmaUrl,
       firmaDocs: c.firmaDocs,
     },
     {
       titulo: REGISTRO_BITACORA_SLOT_LABELS.interventor,
       observaciones: reg.interventoriaObservaciones,
-      fotoUrl: absMediaPdf(origin, reg.interventoriaFotoUrl),
+      fotoUrl: fotoI,
       firmaUrl: i.firmaUrl,
       firmaDocs: i.firmaDocs,
     },
     {
       titulo: REGISTRO_BITACORA_SLOT_LABELS.idu,
       observaciones: reg.iduObservaciones,
-      fotoUrl: absMediaPdf(origin, reg.iduFotoUrl),
+      fotoUrl: fotoU,
       firmaUrl: d.firmaUrl,
       firmaDocs: d.firmaDocs,
     },
@@ -195,13 +195,13 @@ type RegistroManualPdfSource = RegistroBitacoraObra & {
 };
 
 /** Hoja PDF cuando no hay informe diario pero sí registro con datos manuales del contratista. */
-export function buildRegistroSinInformePdfPage(
+export async function buildRegistroSinInformePdfPage(
   origin: string,
   project: ProjectPdf,
   fecha: Date,
   reg: RegistroManualPdfSource,
   catalog: Map<string, string>,
-): RegistroBitacoraPdfDia {
+): Promise<RegistroBitacoraPdfDia> {
   const climaFilas = buildClimaFilasFromInformes([], catalog, {
     franjaClimaMananaCodigo: reg.franjaClimaMananaCodigo,
     franjaClimaTardeCodigo: reg.franjaClimaTardeCodigo,
@@ -219,20 +219,20 @@ export function buildRegistroSinInformePdfPage(
     climaFilas,
     personalPorCargo: parsePersonalManualJson(reg.contratistaPersonalManual),
     equiposMateriales: parseEquiposManualJson(reg.contratistaEquiposManual),
-    secciones: seccionesDesdeRegistro(origin, reg),
+    secciones: await seccionesDesdeRegistro(origin, reg),
     registradoPor: reg.user.name ?? '—',
     actualizadoTexto: reg.updatedAt.toLocaleString('es-CO', { timeZone: 'America/Bogota' }),
   };
 }
 
 /** Una hoja del PDF = un informe diario (obra + fecha + jornada) + bitácora del mismo día si existe. */
-export function buildInformeDiarioPdfPage(
+export async function buildInformeDiarioPdfPage(
   origin: string,
   project: ProjectPdf,
   informe: InformeDiarioPdfRow,
   reg: RegistroWithUser | null,
   catalog: Map<string, string>,
-): RegistroBitacoraPdfDia {
+): Promise<RegistroBitacoraPdfDia> {
   const fecha = informe.date;
   const informeNo =
     informe.informeNo?.trim() ||
@@ -249,7 +249,7 @@ export function buildInformeDiarioPdfPage(
     climaFilas: buildClimaFilasDeUnInforme(informe, catalog),
     personalPorCargo: agruparPersonalPorCargo(informe.personal ?? []),
     equiposMateriales: mapEquiposMaterialesParaPdf(informe.equipos ?? []),
-    secciones: reg ? seccionesDesdeRegistro(origin, reg) : seccionesVaciasBitacora(),
+    secciones: reg ? await seccionesDesdeRegistro(origin, reg) : seccionesVaciasBitacora(),
     registradoPor: reg?.user.name ?? '—',
     actualizadoTexto: reg
       ? reg.updatedAt.toLocaleString('es-CO', { timeZone: 'America/Bogota' })

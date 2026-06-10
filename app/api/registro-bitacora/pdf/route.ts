@@ -106,7 +106,7 @@ export async function GET(req: NextRequest) {
       const registroConDatos = reg != null && registroBitacoraTieneDatosParaPdf(reg);
       if (!informeConDatos && !registroConDatos) continue;
 
-      const dia = buildInformeDiarioPdfPage(origin, project, informe, reg, catalog);
+      const dia = await buildInformeDiarioPdfPage(origin, project, informe, reg, catalog);
       if (!paginaRegistroBitacoraPdfTieneDatos(dia)) continue;
       paginas.push({ ymd, dia });
     }
@@ -116,7 +116,7 @@ export async function GET(req: NextRequest) {
       if (informeYmds.has(ymd)) continue;
       if (!registroBitacoraTieneDatosParaPdf(reg)) continue;
 
-      const dia = buildRegistroSinInformePdfPage(origin, project, reg.fecha, reg, catalog);
+      const dia = await buildRegistroSinInformePdfPage(origin, project, reg.fecha, reg, catalog);
       if (!paginaRegistroBitacoraPdfTieneDatos(dia)) continue;
       paginas.push({ ymd, dia });
     }
