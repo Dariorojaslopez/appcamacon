@@ -8,6 +8,16 @@ import { isAllowedInlineImageUrl, localUploadPathFromUrl } from './firmaImageSrc
 import { getGoogleDriveAccessToken } from './googleDriveUpload';
 import { isSharePointOrOneDriveShareUrl } from './obraCarpetaNube';
 
+function localRelFromStored(stored: string): string | null {
+  const direct = localUploadPathFromUrl(stored);
+  if (direct) return direct;
+  try {
+    return localUploadPathFromUrl(new URL(stored).pathname);
+  } catch {
+    return null;
+  }
+}
+
 function absMediaPdfFallback(origin: string, stored: string): string {
   const rel = storedMediaImgSrc(stored) ?? stored.trim();
   if (!rel) return '';
@@ -82,7 +92,7 @@ export async function resolveMediaParaPdfEmbed(
   if (stored == null || !String(stored).trim()) return '';
   const s = String(stored).trim();
 
-  const localRel = localUploadPathFromUrl(s);
+  const localRel = localRelFromStored(s);
   if (localRel) {
     try {
       const filePath = path.join(process.cwd(), 'public', localRel);

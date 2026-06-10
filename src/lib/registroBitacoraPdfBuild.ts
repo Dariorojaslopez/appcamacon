@@ -118,12 +118,14 @@ async function mapFirmaDocsPdf(
 ): Promise<{ firmaUrl: string; firmaDocs: RegistroBitacoraPdfSlot['firmaDocs'] }> {
   const merged = mergeLegacyFirmaUrl(firmaUrl, parseFirmaDocsJson(rawDocs));
   const drawn = await resolveMediaParaPdfEmbed(origin, firmaUrl);
-  const docs = await Promise.all(
-    merged.map(async (d) => ({
-      ...d,
-      url: await resolveMediaParaPdfEmbed(origin, d.url),
-    })),
-  );
+  const docs = (
+    await Promise.all(
+      merged.map(async (d) => ({
+        ...d,
+        url: await resolveMediaParaPdfEmbed(origin, d.url),
+      })),
+    )
+  ).filter((d) => d.url.trim().length > 0);
   return {
     firmaUrl: drawn && !docs.some((d) => d.url === drawn) ? drawn : '',
     firmaDocs: docs,

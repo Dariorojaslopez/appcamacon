@@ -7,6 +7,14 @@ export type RegistroBitacoraFirmaDoc = {
 
 export const MAX_REGISTRO_FIRMA_DOCS = 20;
 
+/** Nombres internos de la firma capturada (dibujada o cargada como imagen); no son títulos para el PDF. */
+export const FIRMA_IMAGEN_INTERNA_DOC_NAMES = ['Firma dibujada', 'Firma (imagen)'] as const;
+
+export function isFirmaImagenInternaDocName(name: string | null | undefined): boolean {
+  const n = (name ?? '').trim();
+  return (FIRMA_IMAGEN_INTERNA_DOC_NAMES as readonly string[]).includes(n);
+}
+
 export function isImageContentType(ct: string | undefined): boolean {
   if (!ct) return false;
   return ct.startsWith('image/');

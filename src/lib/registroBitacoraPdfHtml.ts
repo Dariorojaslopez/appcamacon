@@ -1,7 +1,7 @@
 /** HTML imprimible del registro de bitácora (vista previa / PDF). */
 
 import type { RegistroBitacoraFirmaDoc } from '../shared/registroBitacoraFirmaDocs';
-import { isImageContentType } from '../shared/registroBitacoraFirmaDocs';
+import { isFirmaImagenInternaDocName, isImageContentType } from '../shared/registroBitacoraFirmaDocs';
 
 export type RegistroBitacoraPdfSlot = {
   titulo: string;
@@ -576,6 +576,25 @@ function buildEquiposMaterialesHtml(dia: RegistroBitacoraPdfDia): string {
     </table>`;
 }
 
+function docEsImagenFirma(doc: RegistroBitacoraFirmaDoc): boolean {
+  const url = doc.url.trim();
+  if (!url) return false;
+  return (
+    url.startsWith('data:image/') ||
+    isImageContentType(doc.contentType) ||
+    /\.(jpe?g|png|gif|webp)(\?|$)/i.test(url) ||
+    url.includes('/api/uploads/drive-image')
+  );
+}
+
+function buildFirmaImagenHtml(src: string, mostrarNombre?: string): string {
+  const nombre =
+    mostrarNombre && !isFirmaImagenInternaDocName(mostrarNombre)
+      ? `<div class="firma-doc-name">${esc(mostrarNombre)}</div>`
+      : '';
+  return `<div class="firma-doc-block">${nombre}<img class="firma-img" src="${esc(src)}" alt="" /></div>`;
+}
+
 function buildSeccionesHtml(secciones: RegistroBitacoraPdfSlot[]): string {
   return secciones
     .map((s) => {
@@ -584,22 +603,17 @@ function buildSeccionesHtml(secciones: RegistroBitacoraPdfSlot[]): string {
         ? `<img class="evidencia-img" src="${esc(s.fotoUrl)}" alt="" />`
         : '<span class="muted">Sin foto</span>';
       const firmaParts: string[] = [];
-      if (s.firmaUrl) {
-        firmaParts.push(`<img class="firma-img" src="${esc(s.firmaUrl)}" alt="Firma dibujada" />`);
+      if (s.firmaUrl?.trim()) {
+        firmaParts.push(buildFirmaImagenHtml(s.firmaUrl.trim()));
       }
       for (const doc of s.firmaDocs ?? []) {
-        const abs = doc.url.startsWith('http') ? doc.url : doc.url;
-        if (
-          doc.url.startsWith('data:image/') ||
-          isImageContentType(doc.contentType) ||
-          /\.(jpe?g|png|gif|webp)(\?|$)/i.test(doc.url)
-        ) {
-          firmaParts.push(
-            `<div class="firma-doc-block"><div class="firma-doc-name">${esc(doc.name)}</div><img class="firma-img" src="${esc(abs)}" alt="" /></div>`,
-          );
+        const src = doc.url.trim();
+        if (!src) continue;
+        if (docEsImagenFirma(doc)) {
+          firmaParts.push(buildFirmaImagenHtml(src, doc.name));
         } else {
           firmaParts.push(
-            `<div class="firma-doc-block"><a class="firma-doc-link" href="${esc(abs)}" target="_blank" rel="noopener">${esc(doc.name)}</a></div>`,
+            `<div class="firma-doc-block"><a class="firma-doc-link" href="${esc(src)}" target="_blank" rel="noopener">${esc(doc.name)}</a></div>`,
           );
         }
       }
