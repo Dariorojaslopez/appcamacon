@@ -25,7 +25,8 @@ import {
   paginaRegistroBitacoraPdfTieneDatos,
   registroBitacoraTieneDatosParaPdf,
 } from '../../../../src/lib/registroBitacoraPdfDatos';
-import { fetchFolioPorFechaMap, syncRegistroBitacoraConsecutivos } from '../../../../src/lib/registroBitacoraFolio';
+import { fetchFolioPorFechaMap } from '../../../../src/lib/registroBitacoraFolio';
+import { clearRegistroBitacoraPdfMediaCache } from '../../../../src/lib/registroBitacoraPdfMedia';
 import { authFromRequest, isAuthPayload, requireAccessibleProject } from '../../../../src/lib/requireProjectAccess';
 import type { RegistroBitacoraPdfDia } from '../../../../src/lib/registroBitacoraPdfHtml';
 
@@ -97,33 +98,39 @@ export async function GET(req: NextRequest) {
     const catalog = new Map(tipos.map((t) => [t.codigo, t.nombre]));
 
     const obra = await buildObraPdfBase(origin, project);
-    const paginas: { ymd: string; dia: RegistroBitacoraPdfDia }[] = [];
+    clearRegistroBitacoraPdfMediaCache();
 
-    for (const informe of informes) {
-      const ymd = toYmdUtc(informe.date);
-      const reg = registrosByYmd.get(ymd) ?? null;
-      const informeConDatos = informeDiarioTieneDatosParaPdf(informe);
-      const registroConDatos = reg != null && registroBitacoraTieneDatosParaPdf(reg);
-      if (!informeConDatos && !registroConDatos) continue;
+    const informePages = await Promise.all(
+      informes.map(async (informe) => {
+        const ymd = toYmdUtc(informe.date);
+        const reg = registrosByYmd.get(ymd) ?? null;
+        const informeConDatos = informeDiarioTieneDatosParaPdf(informe);
+        const registroConDatos = reg != null && registroBitacoraTieneDatosParaPdf(reg);
+        if (!informeConDatos && !registroConDatos) return null;
 
-      const dia = await buildInformeDiarioPdfPage(origin, project, informe, reg, catalog);
-      if (!paginaRegistroBitacoraPdfTieneDatos(dia)) continue;
-      paginas.push({ ymd, dia });
-    }
+        const dia = await buildInformeDiarioPdfPage(origin, project, informe, reg, catalog);
+        if (!paginaRegistroBitacoraPdfTieneDatos(dia)) return null;
+        return { ymd, dia };
+      }),
+    );
 
-    for (const reg of registros) {
-      const ymd = toYmdUtc(reg.fecha);
-      if (informeYmds.has(ymd)) continue;
-      if (!registroBitacoraTieneDatosParaPdf(reg)) continue;
+    const registroPages = await Promise.all(
+      registros.map(async (reg) => {
+        const ymd = toYmdUtc(reg.fecha);
+        if (informeYmds.has(ymd)) return null;
+        if (!registroBitacoraTieneDatosParaPdf(reg)) return null;
 
-      const dia = await buildRegistroSinInformePdfPage(origin, project, reg.fecha, reg, catalog);
-      if (!paginaRegistroBitacoraPdfTieneDatos(dia)) continue;
-      paginas.push({ ymd, dia });
-    }
+        const dia = await buildRegistroSinInformePdfPage(origin, project, reg.fecha, reg, catalog);
+        if (!paginaRegistroBitacoraPdfTieneDatos(dia)) return null;
+        return { ymd, dia };
+      }),
+    );
 
+    const paginas = [...informePages, ...registroPages].filter(
+      (p): p is { ymd: string; dia: RegistroBitacoraPdfDia } => p != null,
+    );
     paginas.sort((a, b) => a.ymd.localeCompare(b.ymd));
 
-    await syncRegistroBitacoraConsecutivos(projectId);
     const folioPorFecha = await fetchFolioPorFechaMap(projectId);
     const dias = paginas.map((p) => {
       const folio = folioPorFecha.get(p.ymd);

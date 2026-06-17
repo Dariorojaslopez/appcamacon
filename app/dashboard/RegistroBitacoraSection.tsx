@@ -19,6 +19,10 @@ import {
 import { firmaImageDisplaySrc } from '../../src/lib/firmaImageSrc';
 import { formatRegistroBitacoraGuardado } from '../../src/lib/registroBitacoraSlotMeta';
 import {
+  fechaRegistroBitacoraEsHoy,
+  ymdEnZonaRegistroBitacora,
+} from '../../src/lib/registroBitacoraFecha';
+import {
   RegistroBitacoraDiaInformePanel,
   emptyRegistroBitacoraDiaInformeState,
   type RegistroBitacoraDiaInformeState,
@@ -104,10 +108,7 @@ function validateRegistroDoc(file: File): string | null {
 }
 
 function localYmd(d = new Date()): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  return ymdEnZonaRegistroBitacora(d);
 }
 
 function clampYmd(val: string, min: string | null, max: string | null): string {
@@ -233,6 +234,7 @@ type SlotProps = {
   onFirmaInkChange?: () => void;
   firmaGuardadaUrl: string | null;
   guardadoMeta: string | null;
+  bloqueado?: boolean;
 };
 
 function SlotBlock({
@@ -251,6 +253,7 @@ function SlotBlock({
   onFirmaInkChange,
   firmaGuardadaUrl,
   guardadoMeta,
+  bloqueado = false,
 }: SlotProps) {
   const firmaPreviewSrc = firmaGuardadaUrl ? firmaImageDisplaySrc(firmaGuardadaUrl) : null;
   const fotoInputRef = useRef<HTMLInputElement>(null);
@@ -301,12 +304,15 @@ function SlotBlock({
             value={observaciones}
             onChange={(e) => onObservaciones(e.target.value)}
             placeholder="Escriba las observaciones…"
+            readOnly={bloqueado}
+            disabled={bloqueado}
           />
           <button
             type="button"
             className="informe-icon-button"
             aria-label="Dictar observaciones"
             onClick={() => void onDictarObs()}
+            disabled={bloqueado}
           >
             <IconMic />
           </button>
@@ -319,6 +325,7 @@ function SlotBlock({
           type="file"
           accept="image/jpeg,image/jpg,image/png"
           className="sr-only"
+          disabled={bloqueado}
           onChange={(e) => {
             const f = e.target.files?.[0] ?? null;
             onPickFoto(f);
@@ -326,7 +333,7 @@ function SlotBlock({
           }}
         />
         <div className="registro-bitacora-foto-row">
-          <button type="button" className="btn-secondary" onClick={() => fotoInputRef.current?.click()}>
+          <button type="button" className="btn-secondary" onClick={() => fotoInputRef.current?.click()} disabled={bloqueado}>
             Elegir imagen
           </button>
           <span className="shell-text-muted" style={{ fontSize: '0.85rem' }}>
@@ -346,17 +353,18 @@ function SlotBlock({
           accept={REGISTRO_DOC_ACCEPT}
           multiple
           className="sr-only"
+          disabled={bloqueado}
           onChange={(e) => {
             onAddFirmaDocs(e.target.files);
             e.target.value = '';
           }}
         />
         <div className="registro-bitacora-foto-row">
-          <button type="button" className="btn-secondary" onClick={() => firmaDocsInputRef.current?.click()}>
+          <button type="button" className="btn-secondary" onClick={() => firmaDocsInputRef.current?.click()} disabled={bloqueado}>
             Agregar documentos
           </button>
           {firmaDocRows.length > 0 ? (
-            <button type="button" className="btn-secondary" onClick={onQuitarTodosDocumentos}>
+            <button type="button" className="btn-secondary" onClick={onQuitarTodosDocumentos} disabled={bloqueado}>
               Quitar todos los documentos
             </button>
           ) : null}
@@ -383,6 +391,7 @@ function SlotBlock({
                   type="button"
                   className="btn-secondary registro-bitacora-firma-doc-remove"
                   onClick={() => onRemoveFirmaDoc(row.id)}
+                  disabled={bloqueado}
                 >
                   Quitar
                 </button>
@@ -410,6 +419,7 @@ function SlotBlock({
           type="file"
           accept="image/jpeg,image/jpg,image/png"
           className="sr-only"
+          disabled={bloqueado}
           onChange={(e) => {
             const f = e.target.files?.[0] ?? null;
             void cargarFirmaDesdeImagen(f);
@@ -417,14 +427,14 @@ function SlotBlock({
           }}
         />
         <div className="registro-bitacora-foto-row" style={{ marginBottom: '0.5rem' }}>
-          <button type="button" className="btn-secondary" onClick={() => firmaImagenInputRef.current?.click()}>
+          <button type="button" className="btn-secondary" onClick={() => firmaImagenInputRef.current?.click()} disabled={bloqueado}>
             Subir imagen de firma
           </button>
           <span className="shell-text-muted" style={{ fontSize: '0.85rem' }}>
             JPG o PNG · máx. 10 MB
           </span>
         </div>
-        <div className="signature-pad-wrap">
+        <div className={`signature-pad-wrap${bloqueado ? ' signature-pad-wrap--disabled' : ''}`}>
           <SignaturePadField ref={sigRef} />
         </div>
         <div className="registro-bitacora-foto-row" style={{ marginTop: '0.5rem' }}>
@@ -435,6 +445,7 @@ function SlotBlock({
               onLimpiarFirmaDibujo();
               setFirmaLocalHint(null);
             }}
+            disabled={bloqueado}
           >
             Borrar firma
           </button>
@@ -884,6 +895,10 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
       setErr('Seleccione la fecha del registro.');
       return;
     }
+    if (!fechaRegistroBitacoraEsHoy(fechaDia)) {
+      setErr('Solo puede registrar o editar la bitácora del día actual.');
+      return;
+    }
     const allowed = REGISTRO_BITACORA_SLOT_KEYS.filter((s) => canSlot(s));
     if (allowed.length === 0) {
       setErr('Su rol no tiene permiso para guardar ninguna sección del registro de bitácora.');
@@ -1094,6 +1109,8 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
     setMsg(null);
   };
 
+  const puedeEditarDia = fechaRegistroBitacoraEsHoy(fechaDia);
+
   return (
     <section className="shell-card shell-card-wide registro-bitacora-shell">
       <h1 className="shell-title">Registro de bitácora</h1>
@@ -1167,6 +1184,12 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
           </p>
         )}
         {loadingRegistro && projectId && <p className="shell-text-muted">Cargando datos del día…</p>}
+        {projectId && !loadingRegistro && fechaDia && !puedeEditarDia && (
+          <p className="feedback feedback-error" role="status" style={{ marginTop: '0.5rem' }}>
+            Este día ya pasó: puede consultar los datos e imprimir el PDF, pero no editar observaciones, fotos ni
+            firmas. Solo se permite registrar o modificar la bitácora del día actual ({localYmd()}).
+          </p>
+        )}
 
         <div className="section-divider" />
         {loadingSlots ? (
@@ -1185,6 +1208,7 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
               onChange={setDiaInforme}
               tipoCondicionOptions={tipoCondicionOptions}
               loading={loadingRegistro}
+              bloqueado={!puedeEditarDia}
             />
             <div className="section-divider" />
             <SlotBlock
@@ -1216,6 +1240,7 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
               onQuitarTodosDocumentos={() => setFirmaRowsC([])}
               firmaGuardadaUrl={findFirmaVisualUrl(persisted.contratistaFirmaUrl, firmaRowsC)}
               guardadoMeta={metaC}
+              bloqueado={!puedeEditarDia}
             />
             <div className="section-divider" />
           </>
@@ -1252,6 +1277,7 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
               onQuitarTodosDocumentos={() => setFirmaRowsI([])}
               firmaGuardadaUrl={findFirmaVisualUrl(persisted.interventoriaFirmaUrl, firmaRowsI)}
               guardadoMeta={metaI}
+              bloqueado={!puedeEditarDia}
             />
             <div className="section-divider" />
           </>
@@ -1288,6 +1314,7 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
               onQuitarTodosDocumentos={() => setFirmaRowsD([])}
               firmaGuardadaUrl={findFirmaVisualUrl(persisted.iduFirmaUrl, firmaRowsD)}
               guardadoMeta={metaD}
+              bloqueado={!puedeEditarDia}
             />
             <div className="section-divider" />
           </>
@@ -1303,6 +1330,7 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
             loadingSlots ||
             obraOptions.length === 0 ||
             !projectId ||
+            !puedeEditarDia ||
             !REGISTRO_BITACORA_SLOT_KEYS.some((s) => canSlot(s))
           }
         >

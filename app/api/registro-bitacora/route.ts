@@ -6,7 +6,7 @@ import {
   jsonRegistroBitacoraSchemaPendiente,
   prismaIndicaTablaRegistroBitacoraDesactualizada,
 } from '../../../src/lib/prismaRegistroBitacoraSchema';
-import { fechaRegistroEnRangoObra, parseYmdUtc, toYmdUtc } from '../../../src/lib/registroBitacoraFecha';
+import { fechaRegistroEnRangoObra, fechaRegistroBitacoraEsHoy, parseYmdUtc, toYmdUtc } from '../../../src/lib/registroBitacoraFecha';
 import {
   fetchFolioPorFechaMap,
   syncRegistroBitacoraConsecutivos,
@@ -191,6 +191,13 @@ export async function POST(req: NextRequest) {
     const rango = fechaRegistroEnRangoObra(fecha, project.startDate, project.endDate);
     if (rango.ok === false) return NextResponse.json({ error: rango.error }, { status: 400 });
 
+    if (!fechaRegistroBitacoraEsHoy(fechaStr)) {
+      return NextResponse.json(
+        { error: 'Solo puede registrar o editar la bitácora del día actual.' },
+        { status: 403 },
+      );
+    }
+
     const allowedSlots = await dbRegistroBitacoraSlotsForRole(payload.role);
     if (allowedSlots.length === 0) {
       return NextResponse.json(
@@ -207,9 +214,10 @@ export async function POST(req: NextRequest) {
 
     const me = await prisma.user.findUnique({
       where: { id: userId },
-      select: { name: true },
+      select: { name: true, identification: true },
     });
-    const guardadoPorNombre = me?.name?.trim() || 'Usuario';
+    const guardadoPorNombre =
+      me?.identification?.trim() || me?.name?.trim() || 'Usuario';
     const guardadoEn = new Date();
 
     const { row, created } = await prisma.$transaction(async (tx) => {

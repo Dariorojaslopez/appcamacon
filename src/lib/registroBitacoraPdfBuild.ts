@@ -28,6 +28,36 @@ type ProjectPdf = {
 
 type RegistroWithUser = RegistroBitacoraObra & { user: Pick<User, 'name'> };
 
+function formatGuardadoEnPdf(iso: Date | string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = iso instanceof Date ? iso : new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString('es-CO', { timeZone: 'America/Bogota' });
+}
+
+/** Identificación de quien guardó cada sección (contratista, interventoría, IDU). */
+export function registradoPorDesdeRegistro(reg: RegistroBitacoraObra): string {
+  const partes: string[] = [];
+  const c = reg.contratistaGuardadoPor?.trim();
+  const i = reg.interventoriaGuardadoPor?.trim();
+  const d = reg.iduGuardadoPor?.trim();
+  if (c) partes.push(`${REGISTRO_BITACORA_SLOT_LABELS.contratista}: ${c}`);
+  if (i) partes.push(`${REGISTRO_BITACORA_SLOT_LABELS.interventor}: ${i}`);
+  if (d) partes.push(`${REGISTRO_BITACORA_SLOT_LABELS.idu}: ${d}`);
+  return partes.length > 0 ? partes.join(' · ') : '—';
+}
+
+function actualizadoTextoDesdeRegistro(reg: RegistroBitacoraObra): string {
+  const fechas = [
+    formatGuardadoEnPdf(reg.contratistaGuardadoEn),
+    formatGuardadoEnPdf(reg.interventoriaGuardadoEn),
+    formatGuardadoEnPdf(reg.iduGuardadoEn),
+    formatGuardadoEnPdf(reg.updatedAt),
+  ].filter((v): v is string => Boolean(v));
+  if (fechas.length === 0) return '—';
+  return fechas.sort().at(-1) ?? '—';
+}
+
 export function absMediaPdf(origin: string, stored: string | null | undefined): string {
   const rel = storedMediaImgSrc(stored) ?? (typeof stored === 'string' && stored.trim() ? stored.trim() : '');
   if (!rel) return '';
@@ -222,8 +252,8 @@ export async function buildRegistroSinInformePdfPage(
     personalPorCargo: parsePersonalManualJson(reg.contratistaPersonalManual),
     equiposMateriales: parseEquiposManualJson(reg.contratistaEquiposManual),
     secciones: await seccionesDesdeRegistro(origin, reg),
-    registradoPor: reg.user.name ?? '—',
-    actualizadoTexto: reg.updatedAt.toLocaleString('es-CO', { timeZone: 'America/Bogota' }),
+    registradoPor: registradoPorDesdeRegistro(reg),
+    actualizadoTexto: actualizadoTextoDesdeRegistro(reg),
   };
 }
 
@@ -252,9 +282,7 @@ export async function buildInformeDiarioPdfPage(
     personalPorCargo: agruparPersonalPorCargo(informe.personal ?? []),
     equiposMateriales: mapEquiposMaterialesParaPdf(informe.equipos ?? []),
     secciones: reg ? await seccionesDesdeRegistro(origin, reg) : seccionesVaciasBitacora(),
-    registradoPor: reg?.user.name ?? '—',
-    actualizadoTexto: reg
-      ? reg.updatedAt.toLocaleString('es-CO', { timeZone: 'America/Bogota' })
-      : '—',
+    registradoPor: reg ? registradoPorDesdeRegistro(reg) : '—',
+    actualizadoTexto: reg ? actualizadoTextoDesdeRegistro(reg) : '—',
   };
 }

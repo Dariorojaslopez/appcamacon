@@ -25,6 +25,7 @@ type Props = {
   onChange: (next: RegistroBitacoraDiaInformeState) => void;
   tipoCondicionOptions: InformeSearchableOption[];
   loading?: boolean;
+  bloqueado?: boolean;
 };
 
 function climaLabel(codigo: string, options: InformeSearchableOption[]): string {
@@ -38,9 +39,10 @@ export function RegistroBitacoraDiaInformePanel({
   onChange,
   tipoCondicionOptions,
   loading,
+  bloqueado = false,
 }: Props) {
-  const editable = !state.tieneInformeDiario;
-  const inputsDisabled = Boolean(loading);
+  const editable = !state.tieneInformeDiario && !bloqueado;
+  const inputsDisabled = Boolean(loading) || bloqueado;
 
   useEffect(() => {
     if (!editable || loading) return;

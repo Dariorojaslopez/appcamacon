@@ -106,6 +106,39 @@ export function clearOneDriveFolderCache() {
   folderCacheByShareUrl.clear();
 }
 
+/** Descarga el contenido de un archivo compartido en OneDrive/SharePoint (p. ej. webUrl tras subir). */
+export async function downloadOneDriveFileFromShareLink(
+  shareUrl: string,
+  tenantId: string,
+  clientId: string,
+  clientSecret: string,
+): Promise<{ buffer: Buffer; mime: string } | null> {
+  try {
+    const token = await getGraphAppOnlyToken(tenantId, clientId, clientSecret);
+    const shareId = encodeSharingUrlForGraph(shareUrl);
+    const res = await fetch(`${GRAPH}/shares/${encodeURIComponent(shareId)}/driveItem/content`, {
+      headers: { Authorization: `Bearer ${token}` },
+      redirect: 'follow',
+    });
+    if (!res.ok) return null;
+    const mime = res.headers.get('content-type') || 'application/octet-stream';
+    return { buffer: Buffer.from(await res.arrayBuffer()), mime };
+  } catch {
+    return null;
+  }
+}
+
+export function oneDriveGraphCredentials():
+  | { tenantId: string; clientId: string; clientSecret: string }
+  | null {
+  if (process.env.ONEDRIVE_ENABLED !== 'true') return null;
+  const tenantId = process.env.ONEDRIVE_TENANT_ID?.trim();
+  const clientId = process.env.ONEDRIVE_CLIENT_ID?.trim();
+  const clientSecret = process.env.ONEDRIVE_CLIENT_SECRET?.trim();
+  if (!tenantId || !clientId || !clientSecret) return null;
+  return { tenantId, clientId, clientSecret };
+}
+
 export async function uploadEvidenciaToOneDrive(
   shareUrl: string,
   tenantId: string,

@@ -10,12 +10,12 @@ export function formatRegistroBitacoraGuardado(meta: RegistroBitacoraSlotGuardad
   if (!usuario && !raw) return null;
 
   if (!raw) {
-    return usuario ? `Último guardado por: ${usuario}` : null;
+    return usuario ? `Último guardado (identificación): ${usuario}` : null;
   }
 
   const d = new Date(raw);
   if (Number.isNaN(d.getTime())) {
-    return usuario ? `Último guardado por: ${usuario}` : null;
+    return usuario ? `Último guardado (identificación): ${usuario}` : null;
   }
 
   const fecha = d.toLocaleDateString('es-CO', {
@@ -29,5 +29,5 @@ export function formatRegistroBitacoraGuardado(meta: RegistroBitacoraSlotGuardad
     hour12: false,
   });
 
-  return `Último guardado por: ${usuario || '—'} · ${fecha} ${hora}`;
+  return `Último guardado (identificación): ${usuario || '—'} · ${fecha} ${hora}`;
 }

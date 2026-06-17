@@ -1,3 +1,24 @@
+/** Zona horaria del registro de bitácora (día civil operativo en Colombia). */
+export const ZONA_REGISTRO_BITACORA = 'America/Bogota';
+
+/** YYYY-MM-DD del instante en la zona de la bitácora. */
+export function ymdEnZonaRegistroBitacora(
+  date = new Date(),
+  timeZone = ZONA_REGISTRO_BITACORA,
+): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+/** Solo se permite crear o editar el registro del día actual (zona Colombia). */
+export function fechaRegistroBitacoraEsHoy(fechaYmd: string): boolean {
+  return fechaYmd.trim() === ymdEnZonaRegistroBitacora();
+}
+
 /** Interpreta YYYY-MM-DD como día civil en UTC (coincide con @db.Date). */
 export function parseYmdUtc(ymd: string): Date | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;

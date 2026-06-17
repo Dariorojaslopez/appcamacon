@@ -579,9 +579,9 @@ function buildEquiposMaterialesHtml(dia: RegistroBitacoraPdfDia): string {
 function docEsImagenFirma(doc: RegistroBitacoraFirmaDoc): boolean {
   const url = doc.url.trim();
   if (!url) return false;
+  if (isImageContentType(doc.contentType)) return true;
   return (
     url.startsWith('data:image/') ||
-    isImageContentType(doc.contentType) ||
     /\.(jpe?g|png|gif|webp)(\?|$)/i.test(url) ||
     url.includes('/api/uploads/drive-image')
   );
@@ -657,7 +657,7 @@ function buildDaySheetHtml(obra: RegistroBitacoraPdfObra, dia: RegistroBitacoraP
     ${buildEquiposMaterialesHtml(dia)}
     ${buildSeccionesHtml(dia.secciones)}
     <p class="footer-note">
-      ${hojaPrefix}Registrado por: ${esc(dia.registradoPor)} · ${esc(dia.actualizadoTexto)}
+      ${hojaPrefix}Anotaciones por: ${esc(dia.registradoPor)} · ${esc(dia.actualizadoTexto)}
     </p>
   </section>`;
 }

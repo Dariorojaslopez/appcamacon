@@ -6,7 +6,17 @@ import {
 } from './evidenciasUrlPayload';
 import { isAllowedInlineImageUrl, localUploadPathFromUrl } from './firmaImageSrc';
 import { getGoogleDriveAccessToken } from './googleDriveUpload';
+import {
+  downloadOneDriveFileFromShareLink,
+  oneDriveGraphCredentials,
+} from './onedriveGraphUpload';
 import { isSharePointOrOneDriveShareUrl } from './obraCarpetaNube';
+
+const embedCache = new Map<string, string>();
+
+export function clearRegistroBitacoraPdfMediaCache(): void {
+  embedCache.clear();
+}
 
 function localRelFromStored(stored: string): string | null {
   const direct = localUploadPathFromUrl(stored);
@@ -81,18 +91,25 @@ async function fetchRemoteImageBuffer(url: string): Promise<{ buffer: Buffer; mi
   }
 }
 
-/**
- * Resuelve una URL guardada en BD a un src embebible en HTML/PDF (data URI o URL absoluta).
- * Evita depender de cookies del navegador para /api/uploads/drive-image al imprimir.
- */
-export async function resolveMediaParaPdfEmbed(
-  origin: string,
-  stored: string | null | undefined,
-): Promise<string> {
-  if (stored == null || !String(stored).trim()) return '';
-  const s = String(stored).trim();
+async function fetchOneDriveImageBuffer(url: string): Promise<{ buffer: Buffer; mime: string } | null> {
+  const creds = oneDriveGraphCredentials();
+  if (!creds) return null;
+  const fetched = await downloadOneDriveFileFromShareLink(
+    url,
+    creds.tenantId,
+    creds.clientId,
+    creds.clientSecret,
+  );
+  if (!fetched) return null;
+  if (!fetched.mime.startsWith('image/')) return null;
+  return fetched;
+}
 
-  const localRel = localRelFromStored(s);
+async function resolveMediaParaPdfEmbedInner(
+  origin: string,
+  stored: string,
+): Promise<string> {
+  const localRel = localRelFromStored(stored);
   if (localRel) {
     try {
       const filePath = path.join(process.cwd(), 'public', localRel);
@@ -103,21 +120,39 @@ export async function resolveMediaParaPdfEmbed(
     }
   }
 
-  const driveId = resolveDriveFileId(s);
+  const driveId = resolveDriveFileId(stored);
   if (driveId) {
     const fetched = await fetchGoogleDriveImageBuffer(driveId);
     if (fetched) return toDataUri(fetched.mime, fetched.buffer);
   }
 
-  if (/^https?:\/\//i.test(s) && isAllowedInlineImageUrl(s)) {
-    const fetched = await fetchRemoteImageBuffer(s);
+  if (/^https?:\/\//i.test(stored) && isSharePointOrOneDriveShareUrl(stored)) {
+    const fetched = await fetchOneDriveImageBuffer(stored);
     if (fetched) return toDataUri(fetched.mime, fetched.buffer);
   }
 
-  if (/^https?:\/\//i.test(s) && isSharePointOrOneDriveShareUrl(s)) {
-    const fetched = await fetchRemoteImageBuffer(s);
+  if (/^https?:\/\//i.test(stored) && isAllowedInlineImageUrl(stored)) {
+    const fetched = await fetchRemoteImageBuffer(stored);
     if (fetched) return toDataUri(fetched.mime, fetched.buffer);
   }
 
-  return absMediaPdfFallback(origin, s);
+  return absMediaPdfFallback(origin, stored);
+}
+
+/**
+ * Resuelve una URL guardada en BD a un src embebible en HTML/PDF (data URI o URL absoluta).
+ * Evita depender de cookies del navegador para /api/uploads/drive-image al imprimir.
+ */
+export async function resolveMediaParaPdfEmbed(
+  origin: string,
+  stored: string | null | undefined,
+): Promise<string> {
+  if (stored == null || !String(stored).trim()) return '';
+  const s = String(stored).trim();
+  const cacheKey = `${origin}\0${s}`;
+  const cached = embedCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+  const resolved = await resolveMediaParaPdfEmbedInner(origin, s);
+  embedCache.set(cacheKey, resolved);
+  return resolved;
 }

@@ -4113,6 +4113,12 @@ ul.informe-searchable-list {
   user-select: none;
 }
 
+.signature-pad-wrap--disabled {
+  opacity: 0.65;
+  pointer-events: none;
+  background: #f3f4f6;
+}
+
 .signature-pad-canvas {
   display: block;
   width: 100%;
