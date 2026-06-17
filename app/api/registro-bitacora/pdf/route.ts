@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAccessToken } from '../../../../src/infrastructure/auth/tokens';
 import prisma from '../../../../src/lib/prisma';
 import {
   jsonRegistroBitacoraSchemaPendiente,
@@ -28,6 +27,7 @@ import {
 import { fetchFolioPorFechaMap } from '../../../../src/lib/registroBitacoraFolio';
 import { clearRegistroBitacoraPdfMediaCache } from '../../../../src/lib/registroBitacoraPdfMedia';
 import { resolvePublicAppOrigin } from '../../../../src/lib/appOrigin';
+import { authFromRequest, isAuthPayload, requireAccessibleProject } from '../../../../src/lib/requireProjectAccess';
 import type { RegistroBitacoraPdfDia } from '../../../../src/lib/registroBitacoraPdfHtml';
 
 export async function GET(req: NextRequest) {
