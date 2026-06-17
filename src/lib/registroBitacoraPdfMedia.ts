@@ -28,11 +28,12 @@ function localRelFromStored(stored: string): string | null {
   }
 }
 
-function absMediaPdfFallback(origin: string, stored: string): string {
+function absMediaPdfFallback(_origin: string, stored: string): string {
   const rel = storedMediaImgSrc(stored) ?? stored.trim();
   if (!rel) return '';
   if (rel.startsWith('http')) return rel;
-  return `${origin}${rel.startsWith('/') ? '' : '/'}${rel}`;
+  if (rel.startsWith('/')) return rel;
+  return `${_origin}/${rel}`;
 }
 
 function mimeFromExt(ext: string): string {

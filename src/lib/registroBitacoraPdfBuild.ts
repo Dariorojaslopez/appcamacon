@@ -15,7 +15,8 @@ import { agruparPersonalPorCargo } from './registroBitacoraPersonalPdf';
 import type { RegistroBitacoraPdfDia, RegistroBitacoraPdfObra, RegistroBitacoraPdfSlot } from './registroBitacoraPdfHtml';
 import { REGISTRO_BITACORA_SLOT_LABELS } from '../shared/registroBitacoraPermissions';
 import { mergeLegacyFirmaUrl, parseFirmaDocsJson } from '../shared/registroBitacoraFirmaDocs';
-import { registroArchivoAppHref, registroDocEsImagen } from './registroArchivoUrl';
+import { registroArchivoPdfHref } from './appOrigin';
+import { registroDocEsImagen } from './registroArchivoUrl';
 import { resolveMediaParaPdfEmbed } from './registroBitacoraPdfMedia';
 
 type ProjectPdf = {
@@ -83,14 +84,14 @@ export async function resolveObraLogoParaPdfHtml(
         ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : ext === '.gif' ? 'image/gif' : 'image/jpeg';
       return `data:${mime};base64,${buf.toString('base64')}`;
     } catch {
-      return `${origin}${rel}`;
+      return rel;
     }
   }
 
   if (rel.startsWith('/api/') || rel.startsWith('http')) {
     const embedded = await resolveMediaParaPdfEmbed(origin, logoUrl);
     if (embedded) return embedded;
-    if (rel.startsWith('/api/')) return `${origin}${rel}`;
+    if (rel.startsWith('/api/')) return rel;
     if (isSharePointOrOneDriveShareUrl(rel)) return '';
     return '';
   }
@@ -155,7 +156,7 @@ async function mapFirmaDocsPdf(
         const isImg = registroDocEsImagen(d.url, d.contentType);
         const url = isImg
           ? await resolveMediaParaPdfEmbed(origin, d.url)
-          : registroArchivoAppHref(d.url, d.name, origin);
+          : registroArchivoPdfHref(d.url, d.name);
         return { ...d, url };
       }),
     )

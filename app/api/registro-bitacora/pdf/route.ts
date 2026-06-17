@@ -27,7 +27,7 @@ import {
 } from '../../../../src/lib/registroBitacoraPdfDatos';
 import { fetchFolioPorFechaMap } from '../../../../src/lib/registroBitacoraFolio';
 import { clearRegistroBitacoraPdfMediaCache } from '../../../../src/lib/registroBitacoraPdfMedia';
-import { authFromRequest, isAuthPayload, requireAccessibleProject } from '../../../../src/lib/requireProjectAccess';
+import { resolvePublicAppOrigin } from '../../../../src/lib/appOrigin';
 import type { RegistroBitacoraPdfDia } from '../../../../src/lib/registroBitacoraPdfHtml';
 
 export async function GET(req: NextRequest) {
@@ -35,7 +35,8 @@ export async function GET(req: NextRequest) {
     const auth = authFromRequest(req);
     if (!isAuthPayload(auth)) return auth;
 
-    const { searchParams, origin } = new URL(req.url);
+    const origin = resolvePublicAppOrigin(req);
+    const { searchParams } = new URL(req.url);
     const projectId = searchParams.get('projectId')?.trim() ?? '';
 
     const denied = await requireAccessibleProject(auth, projectId);
