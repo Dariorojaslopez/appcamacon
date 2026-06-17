@@ -114,8 +114,8 @@ export async function POST(req: NextRequest) {
       fileName,
       buffer,
       mime || 'application/octet-stream',
-      'evidencias',
-      { driveUrlMode: 'direct' },
+      'registro-docs',
+      { preferLocal: true },
     );
 
     return NextResponse.json({

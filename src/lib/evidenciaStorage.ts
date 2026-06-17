@@ -85,16 +85,28 @@ export async function uploadEvidenciaBuffer(
   fileName: string,
   buffer: Buffer,
   contentType: string,
-  localSubdir: 'evidencias' | 'obras-logos' = 'evidencias',
-  options?: { driveUrlMode?: 'direct' | 'proxy' },
+  localSubdir: 'evidencias' | 'obras-logos' | 'registro-docs' = 'evidencias',
+  options?: { driveUrlMode?: 'direct' | 'proxy'; preferLocal?: boolean },
 ): Promise<EvidenciaUploadResult> {
   const driveUrlMode = options?.driveUrlMode ?? 'direct';
+  const preferLocal = options?.preferLocal === true;
 
   const refs = projectId ? await loadProjectFolderRefs(projectId) : null;
   const obraShare = refs?.onedriveShareUrl ?? null;
 
   const obraQuiereSharePoint =
     Boolean(obraShare && isSharePointOrOneDriveShareUrl(obraShare));
+
+  if (preferLocal) {
+    const uploadsDir = path.join(process.cwd(), 'public', 'uploads', localSubdir);
+    await fs.mkdir(uploadsDir, { recursive: true });
+    const filePath = path.join(uploadsDir, fileName);
+    await fs.writeFile(filePath, buffer);
+    return {
+      url: `/uploads/${localSubdir}/${fileName}`,
+      storage: 'local',
+    };
+  }
 
   if (oneDriveConfigured()) {
     const shareUrl = resolveShareUrlForProject(obraShare);

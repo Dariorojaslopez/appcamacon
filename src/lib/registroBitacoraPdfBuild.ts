@@ -15,6 +15,7 @@ import { agruparPersonalPorCargo } from './registroBitacoraPersonalPdf';
 import type { RegistroBitacoraPdfDia, RegistroBitacoraPdfObra, RegistroBitacoraPdfSlot } from './registroBitacoraPdfHtml';
 import { REGISTRO_BITACORA_SLOT_LABELS } from '../shared/registroBitacoraPermissions';
 import { mergeLegacyFirmaUrl, parseFirmaDocsJson } from '../shared/registroBitacoraFirmaDocs';
+import { registroArchivoAppHref, registroDocEsImagen } from './registroArchivoUrl';
 import { resolveMediaParaPdfEmbed } from './registroBitacoraPdfMedia';
 
 type ProjectPdf = {
@@ -150,10 +151,13 @@ async function mapFirmaDocsPdf(
   const drawn = await resolveMediaParaPdfEmbed(origin, firmaUrl);
   const docs = (
     await Promise.all(
-      merged.map(async (d) => ({
-        ...d,
-        url: await resolveMediaParaPdfEmbed(origin, d.url),
-      })),
+      merged.map(async (d) => {
+        const isImg = registroDocEsImagen(d.url, d.contentType);
+        const url = isImg
+          ? await resolveMediaParaPdfEmbed(origin, d.url)
+          : registroArchivoAppHref(d.url, d.name, origin);
+        return { ...d, url };
+      }),
     )
   ).filter((d) => d.url.trim().length > 0);
   return {

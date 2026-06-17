@@ -18,6 +18,7 @@ import {
 } from '../../src/shared/registroBitacoraFirmaDocs';
 import { firmaImageDisplaySrc } from '../../src/lib/firmaImageSrc';
 import { formatRegistroBitacoraGuardado } from '../../src/lib/registroBitacoraSlotMeta';
+import { registroArchivoAppHref, registroDocEsImagen } from '../../src/lib/registroArchivoUrl';
 import {
   fechaRegistroBitacoraEsHoy,
   ymdEnZonaRegistroBitacora,
@@ -379,12 +380,12 @@ function SlotBlock({
                 </span>
                 {row.url ? (
                   <a
-                    href={row.url}
+                    href={registroArchivoAppHref(row.url, row.name)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="registro-bitacora-firma-doc-link"
                   >
-                    Ver
+                    {registroDocEsImagen(row.url) ? 'Ver' : 'Descargar'}
                   </a>
                 ) : null}
                 <button
