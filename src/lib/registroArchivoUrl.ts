@@ -22,8 +22,8 @@ export function isAllowedRegistroArchivoUrl(url: string): boolean {
 }
 
 /**
- * Enlace para ver o descargar el archivo desde la app (evita redirigir a OneDrive/Drive).
- * Los archivos en `/uploads/…` se sirven directamente.
+ * Enlace para ver o descargar el archivo desde la app (misma página / API).
+ * Siempre usa `/api/uploads/archivo` para que funcione en local, Docker y producción.
  */
 export function registroArchivoAppHref(
   storedUrl: string,
@@ -32,7 +32,6 @@ export function registroArchivoAppHref(
 ): string {
   const s = storedUrl.trim();
   if (!s) return '';
-  if (s.startsWith('/uploads/')) return origin ? `${origin}${s}` : s;
   if (s.startsWith('data:')) return s;
   const qs = new URLSearchParams({ url: s });
   if (fileName?.trim()) qs.set('name', fileName.trim());

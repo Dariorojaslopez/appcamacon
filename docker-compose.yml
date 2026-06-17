@@ -25,8 +25,11 @@ services:
       - .env
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql://admin:admin123@postgres:5432/appdb?schema=public}
+    volumes:
+      - uploads_data:/app/public/uploads
     depends_on:
       - postgres
 
 volumes:
   postgres_data:
+  uploads_data:
