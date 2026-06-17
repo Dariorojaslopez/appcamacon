@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
         (mime === 'application/pdf' || registroDocEsImagen(storedUrl, mime)));
     const disposition = `${inline ? 'inline' : 'attachment'}; filename="${downloadName}"`;
 
-    return new NextResponse(fetched.buffer, {
+    return new NextResponse(new Uint8Array(fetched.buffer), {
       status: 200,
       headers: {
         'Content-Type': mime,
