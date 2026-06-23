@@ -1,6 +1,6 @@
 import type { RegistroBitacoraSlotKey } from '../shared/registroBitacoraPermissions';
 
-export const BITACORA_NOTIFY_USERS_PER_ROLE_MAX = 5;
+export const BITACORA_NOTIFY_USERS_PER_ROLE_MAX = 20;
 
 export type BitacoraNotifyRole = 'contratista' | 'interventor' | 'idu';
 

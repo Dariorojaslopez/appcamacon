@@ -1387,6 +1387,7 @@ export default function DashboardPage() {
       bitacoraNotifyContratistaUserIds?: string[];
       bitacoraNotifyInterventorUserIds?: string[];
       bitacoraNotifyIduUserIds?: string[];
+      bitacoraPermitirEditarDiasAnteriores?: boolean;
     }[]
   >([]);
   const [obraNotifyUsersOptions, setObraNotifyUsersOptions] = useState<
@@ -1398,6 +1399,7 @@ export default function DashboardPage() {
     startDate: '',
     endDate: '',
     evidenciasCarpetaShareUrl: '',
+    bitacoraPermitirEditarDiasAnteriores: false,
     ...emptyObraBitacoraNotifyFormFields(),
   });
   const [creatingObra, setCreatingObra] = useState(false);
@@ -1416,6 +1418,7 @@ export default function DashboardPage() {
     bitacoraNotifyContratistaUserIds?: string[];
     bitacoraNotifyInterventorUserIds?: string[];
     bitacoraNotifyIduUserIds?: string[];
+    bitacoraPermitirEditarDiasAnteriores?: boolean;
   } | null>(null);
   const [editObraForm, setEditObraForm] = useState({
     name: '',
@@ -1423,6 +1426,7 @@ export default function DashboardPage() {
     endDate: '',
     evidenciasCarpetaShareUrl: '',
     logoUrl: null as string | null,
+    bitacoraPermitirEditarDiasAnteriores: false,
     ...emptyObraBitacoraNotifyFormFields(),
   });
   const [savingObra, setSavingObra] = useState(false);
@@ -3864,6 +3868,7 @@ export default function DashboardPage() {
           endDate: obraForm.endDate || undefined,
           ...carpeta,
           ...bitacoraNotifyPayloadFromForm(obraForm),
+          bitacoraPermitirEditarDiasAnteriores: obraForm.bitacoraPermitirEditarDiasAnteriores,
         }),
       });
       const data = await res.json();
@@ -3905,6 +3910,7 @@ export default function DashboardPage() {
         startDate: '',
         endDate: '',
         evidenciasCarpetaShareUrl: '',
+        bitacoraPermitirEditarDiasAnteriores: false,
         ...emptyObraBitacoraNotifyFormFields(),
       });
       setObraMessage('Obra creada. El consecutivo y código se asignaron automáticamente.');
@@ -3929,6 +3935,7 @@ export default function DashboardPage() {
     bitacoraNotifyContratistaUserIds?: string[];
     bitacoraNotifyInterventorUserIds?: string[];
     bitacoraNotifyIduUserIds?: string[];
+    bitacoraPermitirEditarDiasAnteriores?: boolean;
   }) => {
     setEditObra(o);
     setEditObraForm({
@@ -3940,6 +3947,7 @@ export default function DashboardPage() {
         o.evidenciasGoogleDriveFolderId,
       ),
       logoUrl: o.logoUrl ?? null,
+      bitacoraPermitirEditarDiasAnteriores: o.bitacoraPermitirEditarDiasAnteriores === true,
       ...obraBitacoraNotifyFormFromObra(o),
     });
     setObraEditLogoPickLabel(null);
@@ -3979,6 +3987,7 @@ export default function DashboardPage() {
           ...carpetaEdit,
           logoUrl: nextLogoUrl,
           ...bitacoraNotifyPayloadFromForm(editObraForm),
+          bitacoraPermitirEditarDiasAnteriores: editObraForm.bitacoraPermitirEditarDiasAnteriores,
         }),
       });
       const data = await res.json();
@@ -8435,6 +8444,26 @@ export default function DashboardPage() {
                     </p>
                   </div>
                   <h3 className="shell-title" style={{ fontSize: '1rem', marginTop: '0.75rem' }}>
+                    Registro de bitácora
+                  </h3>
+                  <div className="form-field">
+                    <label className="perms-check-label" style={{ justifyContent: 'flex-start', gap: '0.55rem' }}>
+                      <input
+                        type="checkbox"
+                        checked={obraForm.bitacoraPermitirEditarDiasAnteriores}
+                        onChange={(e) =>
+                          setObraForm({ ...obraForm, bitacoraPermitirEditarDiasAnteriores: e.target.checked })
+                        }
+                      />
+                      <span className="perms-check-box" />
+                      <span>Permitir editar días anteriores</span>
+                    </label>
+                    <p className="shell-text-muted" style={{ fontSize: '0.85rem', margin: '0.35rem 0 0' }}>
+                      Si está desmarcado, solo se puede modificar la bitácora del día actual. Si está marcado, también
+                      se pueden corregir registros de fechas pasadas (dentro del rango de la obra).
+                    </p>
+                  </div>
+                  <h3 className="shell-title" style={{ fontSize: '1rem', marginTop: '0.75rem' }}>
                     Notificaciones de bitácora
                   </h3>
                   <ObraBitacoraNotifyFields
@@ -8635,6 +8664,29 @@ export default function DashboardPage() {
                             Quitar logo (guardar para aplicar)
                           </button>
                         ) : null}
+                      </div>
+                      <h4 className="shell-title" style={{ fontSize: '0.95rem', marginTop: '0.5rem' }}>
+                        Registro de bitácora
+                      </h4>
+                      <div className="form-field">
+                        <label className="perms-check-label" style={{ justifyContent: 'flex-start', gap: '0.55rem' }}>
+                          <input
+                            type="checkbox"
+                            checked={editObraForm.bitacoraPermitirEditarDiasAnteriores}
+                            onChange={(e) =>
+                              setEditObraForm({
+                                ...editObraForm,
+                                bitacoraPermitirEditarDiasAnteriores: e.target.checked,
+                              })
+                            }
+                          />
+                          <span className="perms-check-box" />
+                          <span>Permitir editar días anteriores</span>
+                        </label>
+                        <p className="shell-text-muted" style={{ fontSize: '0.85rem', margin: '0.35rem 0 0' }}>
+                          Si está desmarcado, solo se puede modificar la bitácora del día actual. Si está marcado,
+                          también se pueden corregir registros de fechas pasadas (dentro del rango de la obra).
+                        </p>
                       </div>
                       <h4 className="shell-title" style={{ fontSize: '0.95rem', marginTop: '0.5rem' }}>
                         Notificaciones de bitácora

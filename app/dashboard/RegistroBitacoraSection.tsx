@@ -20,7 +20,7 @@ import { firmaImageDisplaySrc } from '../../src/lib/firmaImageSrc';
 import { formatRegistroBitacoraGuardado } from '../../src/lib/registroBitacoraSlotMeta';
 import { registroArchivoAppHref, registroDocEsImagen } from '../../src/lib/registroArchivoUrl';
 import {
-  fechaRegistroBitacoraEsHoy,
+  puedeEditarRegistroBitacoraEnFecha,
   ymdEnZonaRegistroBitacora,
 } from '../../src/lib/registroBitacoraFecha';
 import {
@@ -44,6 +44,34 @@ type FirmaDocRow = {
 
 function newFirmaDocRowId(): string {
   return `d-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function firmaDocRowDedupeKey(row: FirmaDocRow): string {
+  if (row.file) return `file:${row.file.name}|${row.file.size}|${row.file.lastModified}`;
+  if (row.url) return `url:${row.url}`;
+  return `id:${row.id}`;
+}
+
+function openRegistroFirmaDocPicker(onPick: (files: File[]) => void): void {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.multiple = true;
+  input.accept = REGISTRO_DOC_ACCEPT;
+  input.style.display = 'none';
+  const cleanup = () => {
+    input.remove();
+  };
+  input.addEventListener(
+    'change',
+    () => {
+      const picked = input.files ? Array.from(input.files) : [];
+      cleanup();
+      if (picked.length) onPick(picked);
+    },
+    { once: true },
+  );
+  document.body.appendChild(input);
+  input.click();
 }
 
 function firmaRowsFromDocs(firmaUrl: string | null, firmaDocs: RegistroBitacoraFirmaDoc[]): FirmaDocRow[] {
@@ -129,6 +157,7 @@ type ProyectoMeta = {
   fechaMax: string | null;
   name: string;
   code: string;
+  bitacoraPermitirEditarDiasAnteriores: boolean;
 };
 
 type ProyectoApiResponse = ProyectoMeta & {
@@ -228,7 +257,7 @@ type SlotProps = {
   onPickFoto: (file: File | null) => void;
   sigRef: RefObject<SignaturePadFieldHandle | null>;
   firmaDocRows: FirmaDocRow[];
-  onAddFirmaDocs: (files: FileList | null) => void;
+  onAddFirmaDocs: (files: File[]) => void;
   onRemoveFirmaDoc: (id: string) => void;
   onLimpiarFirmaDibujo: () => void;
   onQuitarTodosDocumentos: () => void;
@@ -258,7 +287,6 @@ function SlotBlock({
 }: SlotProps) {
   const firmaPreviewSrc = firmaGuardadaUrl ? firmaImageDisplaySrc(firmaGuardadaUrl) : null;
   const fotoInputRef = useRef<HTMLInputElement>(null);
-  const firmaDocsInputRef = useRef<HTMLInputElement>(null);
   const firmaImagenInputRef = useRef<HTMLInputElement>(null);
   const [firmaLocalHint, setFirmaLocalHint] = useState<string | null>(null);
 
@@ -348,20 +376,16 @@ function SlotBlock({
           Dibuje la firma en el recuadro, suba una imagen JPG/PNG de la firma, o adjunte documentos (PDF, Word,
           Excel; máx. 10 MB c/u, hasta {MAX_REGISTRO_FIRMA_DOCS} archivos).
         </p>
-        <input
-          ref={firmaDocsInputRef}
-          type="file"
-          accept={REGISTRO_DOC_ACCEPT}
-          multiple
-          className="sr-only"
-          disabled={bloqueado}
-          onChange={(e) => {
-            onAddFirmaDocs(e.target.files);
-            e.target.value = '';
-          }}
-        />
         <div className="registro-bitacora-foto-row">
-          <button type="button" className="btn-secondary" onClick={() => firmaDocsInputRef.current?.click()} disabled={bloqueado}>
+          <button
+            type="button"
+            className="btn-secondary"
+            disabled={bloqueado}
+            onClick={() => {
+              if (bloqueado) return;
+              openRegistroFirmaDocPicker(onAddFirmaDocs);
+            }}
+          >
             Agregar documentos
           </button>
           {firmaDocRows.length > 0 ? (
@@ -618,6 +642,7 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
           fechaMax: data.fechaMax ?? null,
           name: data.name,
           code: data.code,
+          bitacoraPermitirEditarDiasAnteriores: data.bitacoraPermitirEditarDiasAnteriores === true,
         });
         setBitacoraNotifyEmails(
           Array.isArray(data.bitacoraNotifyEmails) ? data.bitacoraNotifyEmails : [],
@@ -853,21 +878,37 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
   };
 
   const addFirmaDocs = useCallback(
-    (files: FileList | null, setRows: Dispatch<SetStateAction<FirmaDocRow[]>>) => {
-      if (!files?.length) return;
-      setErr(null);
-      const added: FirmaDocRow[] = [];
-      for (let i = 0; i < files.length; i += 1) {
-        const f = files[i];
+    (files: File[], setRows: Dispatch<SetStateAction<FirmaDocRow[]>>) => {
+      if (!files.length) return;
+      let validationErr: string | null = null;
+      const valid: File[] = [];
+      for (const f of files) {
         const vErr = validateRegistroDoc(f);
         if (vErr) {
-          setErr(vErr);
+          validationErr = vErr;
           continue;
         }
-        added.push({ id: newFirmaDocRowId(), name: f.name, url: null, file: f });
+        valid.push(f);
       }
-      if (added.length === 0) return;
-      setRows((prev) => [...prev, ...added].slice(0, MAX_REGISTRO_FIRMA_DOCS));
+      if (valid.length === 0) {
+        if (validationErr) setErr(validationErr);
+        return;
+      }
+      if (validationErr) setErr(validationErr);
+      else setErr(null);
+
+      setRows((prev) => {
+        const seen = new Set(prev.map(firmaDocRowDedupeKey));
+        const added: FirmaDocRow[] = [];
+        for (const f of valid) {
+          const key = `file:${f.name}|${f.size}|${f.lastModified}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          added.push({ id: newFirmaDocRowId(), name: f.name, url: null, file: f });
+        }
+        if (added.length === 0) return prev;
+        return [...prev, ...added].slice(0, MAX_REGISTRO_FIRMA_DOCS);
+      });
     },
     [],
   );
@@ -896,8 +937,17 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
       setErr('Seleccione la fecha del registro.');
       return;
     }
-    if (!fechaRegistroBitacoraEsHoy(fechaDia)) {
-      setErr('Solo puede registrar o editar la bitácora del día actual.');
+    if (
+      !puedeEditarRegistroBitacoraEnFecha(
+        fechaDia,
+        proyectoMeta?.bitacoraPermitirEditarDiasAnteriores ?? false,
+      )
+    ) {
+      setErr(
+        proyectoMeta?.bitacoraPermitirEditarDiasAnteriores
+          ? 'No puede registrar o editar la bitácora de fechas futuras.'
+          : 'Solo puede registrar o editar la bitácora del día actual.',
+      );
       return;
     }
     const allowed = REGISTRO_BITACORA_SLOT_KEYS.filter((s) => canSlot(s));
@@ -1110,7 +1160,11 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
     setMsg(null);
   };
 
-  const puedeEditarDia = fechaRegistroBitacoraEsHoy(fechaDia);
+  const puedeEditarDia = puedeEditarRegistroBitacoraEnFecha(
+    fechaDia,
+    proyectoMeta?.bitacoraPermitirEditarDiasAnteriores ?? false,
+  );
+  const diaEsPasado = fechaDia.trim() < localYmd();
 
   return (
     <section className="shell-card shell-card-wide registro-bitacora-shell">
@@ -1187,8 +1241,14 @@ export function RegistroBitacoraSection({ obraOptions, loadingObras }: Props) {
         {loadingRegistro && projectId && <p className="shell-text-muted">Cargando datos del día…</p>}
         {projectId && !loadingRegistro && fechaDia && !puedeEditarDia && (
           <p className="feedback feedback-error" role="status" style={{ marginTop: '0.5rem' }}>
-            Este día ya pasó: puede consultar los datos e imprimir el PDF, pero no editar observaciones, fotos ni
-            firmas. Solo se permite registrar o modificar la bitácora del día actual ({localYmd()}).
+            {diaEsPasado ? (
+              <>
+                Este día ya pasó: puede consultar los datos e imprimir el PDF, pero no editar observaciones, fotos ni
+                firmas. Active «Permitir editar días anteriores» en Configuración → Obras → Editar para esta obra.
+              </>
+            ) : (
+              <>No puede editar la bitácora de fechas futuras.</>
+            )}
           </p>
         )}
 

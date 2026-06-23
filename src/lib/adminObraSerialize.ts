@@ -49,6 +49,7 @@ export function serializeAdminObra(o: AdminObraRow) {
     evidenciasGoogleDriveFolderId: o.evidenciasGoogleDriveFolderId,
     logoUrl: o.logoUrl,
     isActive: o.isActive,
+    bitacoraPermitirEditarDiasAnteriores: o.bitacoraPermitirEditarDiasAnteriores,
     createdAt: o.createdAt,
     updatedAt: o.updatedAt,
     ...serializeNotifyUsers(o),

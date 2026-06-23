@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
         endDate: true,
         logoUrl: true,
         consecutivo: true,
+        bitacoraPermitirEditarDiasAnteriores: true,
       },
     });
     if (!p) return NextResponse.json({ error: 'Obra no encontrada o inactiva' }, { status: 404 });
@@ -63,6 +64,7 @@ export async function GET(req: NextRequest) {
       consecutivoObra: p.consecutivo,
       bitacoraNotifyConfigurado: notifyEmails.length > 0,
       bitacoraNotifyEmails: notifyEmails,
+      bitacoraPermitirEditarDiasAnteriores: p.bitacoraPermitirEditarDiasAnteriores,
     });
   } catch (error: unknown) {
     const err = error as { name?: string };

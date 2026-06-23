@@ -19,6 +19,18 @@ export function fechaRegistroBitacoraEsHoy(fechaYmd: string): boolean {
   return fechaYmd.trim() === ymdEnZonaRegistroBitacora();
 }
 
+/** Día editable: hoy siempre; pasado solo si la obra lo permite; futuro nunca. */
+export function puedeEditarRegistroBitacoraEnFecha(
+  fechaYmd: string,
+  permitirDiasAnteriores: boolean,
+): boolean {
+  const ymd = fechaYmd.trim();
+  const hoy = ymdEnZonaRegistroBitacora();
+  if (ymd > hoy) return false;
+  if (ymd === hoy) return true;
+  return permitirDiasAnteriores;
+}
+
 /** Interpreta YYYY-MM-DD como día civil en UTC (coincide con @db.Date). */
 export function parseYmdUtc(ymd: string): Date | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;

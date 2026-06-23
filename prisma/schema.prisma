@@ -53,6 +53,8 @@ model Project {
   evidenciasGoogleDriveFolderId String?
   logoUrl       String?
   isActive    Boolean         @default(true)
+  /// Si es true, el registro de bitácora puede editarse en fechas pasadas (no futuras).
+  bitacoraPermitirEditarDiasAnteriores Boolean @default(false)
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
@@ -71,7 +73,7 @@ model Project {
   bitacoraNotifyUsers ProjectBitacoraNotifyUser[]
 }
 
-/// Usuarios notificados por correo al guardar el registro de bitácora (hasta 5 por rol).
+/// Usuarios notificados por correo al guardar el registro de bitácora (hasta 20 por rol).
 model ProjectBitacoraNotifyUser {
   id        String   @id @default(cuid())
   projectId String

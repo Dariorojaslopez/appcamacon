@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
       bitacoraNotifyContratistaUserId?: unknown;
       bitacoraNotifyInterventorUserId?: unknown;
       bitacoraNotifyIduUserId?: unknown;
+      bitacoraPermitirEditarDiasAnteriores?: unknown;
     };
     const { name, description, startDate, endDate, evidenciasOnedriveShareUrl, evidenciasGoogleDriveFolderId } =
       body;
@@ -90,6 +91,7 @@ export async function POST(req: NextRequest) {
           evidenciasGoogleDriveFolderId != null && String(evidenciasGoogleDriveFolderId).trim()
             ? String(evidenciasGoogleDriveFolderId).trim()
             : null,
+        bitacoraPermitirEditarDiasAnteriores: body.bitacoraPermitirEditarDiasAnteriores === true,
       },
       include: adminObraInclude,
     });

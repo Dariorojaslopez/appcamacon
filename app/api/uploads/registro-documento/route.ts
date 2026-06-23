@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
       .replace(/[^a-zA-Z0-9._-]/g, '_')
       .slice(0, 120);
     const buffer = Buffer.from(await blob.arrayBuffer());
-    const fileName = `${Date.now()}_${safeName}`;
+    const fileName = `${Date.now()}_${Math.random().toString(36).slice(2, 9)}_${safeName}`;
     ctx.fileName = fileName;
 
     const uploaded = await uploadEvidenciaBuffer(

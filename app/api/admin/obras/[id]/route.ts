@@ -36,6 +36,7 @@ export async function PATCH(
       bitacoraNotifyContratistaUserId?: unknown;
       bitacoraNotifyInterventorUserId?: unknown;
       bitacoraNotifyIduUserId?: unknown;
+      bitacoraPermitirEditarDiasAnteriores?: unknown;
     };
     const notifyParsed = await buildObraNotifyDataFromBody(body);
     if ('error' in notifyParsed) {
@@ -60,6 +61,9 @@ export async function PATCH(
     if (body.logoUrl !== undefined) {
       const s = body.logoUrl;
       data.logoUrl = s != null && String(s).trim() ? String(s).trim() : null;
+    }
+    if (body.bitacoraPermitirEditarDiasAnteriores !== undefined) {
+      data.bitacoraPermitirEditarDiasAnteriores = body.bitacoraPermitirEditarDiasAnteriores === true;
     }
 
     const obra = await prisma.project.update({

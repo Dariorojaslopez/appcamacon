@@ -6,7 +6,7 @@ import {
   jsonRegistroBitacoraSchemaPendiente,
   prismaIndicaTablaRegistroBitacoraDesactualizada,
 } from '../../../src/lib/prismaRegistroBitacoraSchema';
-import { fechaRegistroEnRangoObra, fechaRegistroBitacoraEsHoy, parseYmdUtc, toYmdUtc } from '../../../src/lib/registroBitacoraFecha';
+import { fechaRegistroEnRangoObra, puedeEditarRegistroBitacoraEnFecha, parseYmdUtc, toYmdUtc } from '../../../src/lib/registroBitacoraFecha';
 import {
   fetchFolioPorFechaMap,
   syncRegistroBitacoraConsecutivos,
@@ -182,7 +182,7 @@ export async function POST(req: NextRequest) {
 
     const project = await prisma.project.findFirst({
       where: { id: projectId, isActive: true },
-      select: { id: true, startDate: true, endDate: true },
+      select: { id: true, startDate: true, endDate: true, bitacoraPermitirEditarDiasAnteriores: true },
     });
     if (!project) {
       return NextResponse.json({ error: 'Obra no encontrada o inactiva' }, { status: 404 });
@@ -191,9 +191,13 @@ export async function POST(req: NextRequest) {
     const rango = fechaRegistroEnRangoObra(fecha, project.startDate, project.endDate);
     if (rango.ok === false) return NextResponse.json({ error: rango.error }, { status: 400 });
 
-    if (!fechaRegistroBitacoraEsHoy(fechaStr)) {
+    if (!puedeEditarRegistroBitacoraEnFecha(fechaStr, project.bitacoraPermitirEditarDiasAnteriores)) {
       return NextResponse.json(
-        { error: 'Solo puede registrar o editar la bitácora del día actual.' },
+        {
+          error: project.bitacoraPermitirEditarDiasAnteriores
+            ? 'No puede registrar o editar la bitácora de fechas futuras.'
+            : 'Solo puede registrar o editar la bitácora del día actual.',
+        },
         { status: 403 },
       );
     }
